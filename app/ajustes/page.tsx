@@ -3,13 +3,12 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowDown, ArrowUp, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
-import { Boton, Campo, Tarjeta, cx, useAvisos, PUNTOS } from "@/components/ui";
+import { Boton, Campo, Tarjeta, useAvisos } from "@/components/ui";
 import { sb, subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
 import { borrarEjemplo, cargarEjemplo } from "@/lib/ejemplo";
-import type { Estado } from "@/lib/tipos";
 
 const esquema = z.object({
   nombre: z.string().trim().min(1, "Obligatorio"),
@@ -20,7 +19,7 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "1.0.0";
+const VERSION = "2.0.0";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();
@@ -78,8 +77,6 @@ export default function Ajustes() {
           </form>
         </Tarjeta>
 
-        <Estados />
-
         <Tarjeta titulo="Datos de ejemplo">
           <p className="mb-4 text-[13px] text-texto2">Clientes, prendas y pedidos de muestra para probar. Solo se borran los de ejemplo, nunca los tuyos.</p>
           <div className="flex flex-wrap gap-2">
@@ -109,49 +106,3 @@ export default function Ajustes() {
   );
 }
 
-function Estados() {
-  const { estados, recargar, empresa } = useSesion();
-  const { aviso, confirmar } = useAvisos();
-  const [lista, setLista] = useState<Estado[]>(estados);
-  useEffect(() => setLista(estados), [estados]);
-  const colores = Object.keys(PUNTOS);
-
-  async function guardar(e: Estado, c: Partial<Estado>) {
-    const { error } = await sb.from("estados").update(c).eq("id", e.id);
-    if (error) aviso(textoError(error), "error"); else recargar();
-  }
-  async function mover(i: number, d: -1 | 1) {
-    const a = lista[i], b = lista[i + d]; if (!a || !b) return;
-    await Promise.all([sb.from("estados").update({ orden: b.orden }).eq("id", a.id), sb.from("estados").update({ orden: a.orden }).eq("id", b.id)]);
-    recargar();
-  }
-  return (
-    <Tarjeta titulo="Estados de los pedidos">
-      <ul className="space-y-1.5">
-        {lista.map((e, i) => (
-          <li key={e.id} className="flex items-center gap-2">
-            <div className="relative">
-              <select aria-label="Color" className={cx("size-8 cursor-pointer appearance-none rounded-full border-4 border-superficie text-transparent", PUNTOS[e.color])} value={e.color} onChange={(ev) => guardar(e, { color: ev.target.value })}>
-                {colores.map((c) => <option key={c} value={c} className="text-black">{c}</option>)}
-              </select>
-            </div>
-            <input className="campo h-9" defaultValue={e.nombre} aria-label="Nombre del estado" onBlur={(ev) => ev.target.value.trim() && ev.target.value !== e.nombre && guardar(e, { nombre: ev.target.value.trim() })} />
-            <button aria-label="Subir" className="grid size-8 place-items-center rounded-lg text-texto2 hover:bg-suave disabled:opacity-30" disabled={i === 0} onClick={() => mover(i, -1)}><ArrowUp className="size-4" /></button>
-            <button aria-label="Bajar" className="grid size-8 place-items-center rounded-lg text-texto2 hover:bg-suave disabled:opacity-30" disabled={i === lista.length - 1} onClick={() => mover(i, 1)}><ArrowDown className="size-4" /></button>
-            <button aria-label="Eliminar estado" title={e.clave ? "Estado del sistema: se puede renombrar pero no borrar" : "Eliminar"} disabled={!!e.clave} className="grid size-8 place-items-center rounded-lg text-texto2 hover:bg-suave hover:text-red-600 disabled:opacity-20"
-              onClick={async () => {
-                if (!(await confirmar({ titulo: `¿Eliminar «${e.nombre}»?`, ok: "Eliminar", peligro: true }))) return;
-                const { error } = await sb.from("estados").delete().eq("id", e.id);
-                if (error) aviso("No se puede eliminar: hay pedidos en este estado.", "error"); else recargar();
-              }}><Trash2 className="size-4" /></button>
-          </li>
-        ))}
-      </ul>
-      <Boton tam="s" className="mt-3" onClick={async () => {
-        const orden = Math.max(0, ...lista.map((x) => x.orden)) + 1;
-        const { error } = await sb.from("estados").insert({ empresa_id: empresa!.id, nombre: "Nuevo estado", orden, color: "gris" });
-        if (error) aviso(textoError(error), "error"); else recargar();
-      }}><Plus className="size-3.5" />Añadir estado</Boton>
-    </Tarjeta>
-  );
-}

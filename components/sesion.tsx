@@ -2,13 +2,13 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { sb } from "@/lib/supabase";
-import type { Empresa, Estado, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
+import type { Empresa, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
+import { MODELOS_ROLY } from "@/lib/roly";
 
 type Datos = {
   sesion: Session | null;
   empresa: Empresa | null;
   rol: string;
-  estados: Estado[];
   tecnicas: Tecnica[];
   tarifas: TarifaFila[];
   proveedores: Proveedor[];
@@ -16,8 +16,6 @@ type Datos = {
   version: number;
   recargar: () => Promise<void>;
   tocar: () => void;
-  estadoPor: (id?: string | null) => Estado | undefined;
-  estadoClave: (clave: string) => Estado | undefined;
 };
 
 const Ctx = createContext<Datos | null>(null);
@@ -29,7 +27,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [recuperacion, setRecuperacion] = useState(false);
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
   const [rol, setRol] = useState("lector");
-  const [estados, setEstados] = useState<Estado[]>([]);
   const [tecnicas, setTecnicas] = useState<Tecnica[]>([]);
   const [tarifas, setTarifas] = useState<TarifaFila[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -51,16 +48,14 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     const { data: m } = await sb.from("miembros").select("empresa_id, rol").eq("user_id", uid).limit(1).maybeSingle();
     if (!m) { setEmpresa(null); setCargado(true); return; }
     const e = m.empresa_id;
-    const [emp, est, tec, tar, prov] = await Promise.all([
+    const [emp, tec, tar, prov] = await Promise.all([
       sb.from("empresas").select("*").eq("id", e).single(),
-      sb.from("estados").select("*").eq("empresa_id", e).order("orden"),
       sb.from("tecnicas").select("*").eq("empresa_id", e).order("orden"),
       sb.from("tarifas").select("*").eq("empresa_id", e).order("desde"),
       sb.from("proveedores").select("*").eq("empresa_id", e).order("nombre"),
     ]);
     setRol(m.rol);
     setEmpresa(emp.data as Empresa);
-    setEstados((est.data ?? []) as Estado[]);
     setTecnicas((tec.data ?? []) as Tecnica[]);
     setTarifas(((tar.data ?? []) as TarifaFila[]).map((t) => ({ ...t, coste: Number(t.coste), precio: Number(t.precio) })));
     setProveedores((prov.data ?? []) as Proveedor[]);
@@ -87,8 +82,6 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     return () => { sb.removeChannel(canal); document.removeEventListener("visibilitychange", vis); window.removeEventListener("online", tocar); };
   }, [empresa, tocar]);
 
-  const estadoPor = useCallback((id?: string | null) => estados.find((e) => e.id === id), [estados]);
-  const estadoClave = useCallback((c: string) => estados.find((e) => e.clave === c), [estados]);
 
   if (!listo) return <PantallaCarga />;
   if (recuperacion && sesion) return <NuevaContrasena hecho={() => setRecuperacion(false)} />;
@@ -97,7 +90,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   if (!empresa) return <AltaEmpresa hecho={recargar} />;
 
   return (
-    <Ctx.Provider value={{ sesion, empresa, rol, estados, tecnicas, tarifas, proveedores, version, recargar, tocar, estadoPor, estadoClave }}>
+    <Ctx.Provider value={{ sesion, empresa, rol, tecnicas, tarifas, proveedores, version, recargar, tocar }}>
       {children}
     </Ctx.Provider>
   );
@@ -209,6 +202,7 @@ function AltaEmpresa({ hecho }: { hecho: () => Promise<void> }) {
         try {
           const { data, error } = await sb.rpc("crear_empresa", { nombre });
           if (error) throw error;
+          await sb.from("catalogo").insert(MODELOS_ROLY.map((m) => ({ empresa_id: data, marca: "Roly", tipo: m.tipo, modelo: m.modelo, referencia: m.referencia, colores: m.colores, tallas: m.tallas, notas: m.notas ?? null, favorito: true, precio_compra: 0 })));
           if (ejemplo) await cargarEjemplo(data as string);
           await hecho();
         } catch (err) { setError(textoError(err)); setCargando(false); }

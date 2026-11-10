@@ -1,7 +1,7 @@
 import { sb } from "./supabase";
 import { guardarPedido, hoy, id, lineaVacia, type PedidoEd, type PersEd } from "./pedidos";
 import { tarifaPara } from "./calculo";
-import type { Estado, TarifaFila, Tecnica } from "./tipos";
+import type { TarifaFila, Tecnica } from "./tipos";
 
 export const MARCA_EJEMPLO = "[ejemplo]";
 
@@ -10,10 +10,9 @@ const dias = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); 
 /** Datos de ejemplo realistas. Se marcan con [ejemplo] en las notas para poder borrarlos. */
 export async function cargarEjemplo(empresaId: string) {
   const { data: emp } = await sb.from("empresas").select("id, margen").eq("id", empresaId).single();
-  const est = ((await sb.from("estados").select("*").eq("empresa_id", empresaId)).data ?? []) as Estado[];
   const tec = ((await sb.from("tecnicas").select("*").eq("empresa_id", empresaId)).data ?? []) as Tecnica[];
   const tar = ((await sb.from("tarifas").select("*").eq("empresa_id", empresaId)).data ?? []) as TarifaFila[];
-  const E = (c: string) => est.find((e) => e.clave === c)?.id ?? null;
+  const E = (c: string) => c === "entregado";
   const T = (n: string) => tec.find((t) => t.nombre === n);
 
   const prov = (await sb.from("proveedores").insert([
@@ -23,13 +22,8 @@ export async function cargarEjemplo(empresaId: string) {
   ]).select("id, nombre")).data ?? [];
   const P = (n: string) => prov.find((p) => p.nombre === n)?.id ?? null;
 
-  await sb.from("catalogo").insert([
-    { empresa_id: empresaId, tipo: "Camiseta", marca: "Roly", modelo: "Atomic 150", colores: ["Blanco", "Negro", "Azul royal", "Rojo"], proveedor_id: P("Roly"), precio_compra: 1.95, precio_venta: 4.5, notas: MARCA_EJEMPLO },
-    { empresa_id: empresaId, tipo: "Camiseta técnica", marca: "Roly", modelo: "Montecarlo", colores: ["Azul royal", "Negro", "Blanco"], proveedor_id: P("Roly"), precio_compra: 3.2, precio_venta: 6.5, notas: MARCA_EJEMPLO },
-    { empresa_id: empresaId, tipo: "Polo", marca: "Sol's", modelo: "Summer II", colores: ["Marino", "Blanco", "Gris"], proveedor_id: P("Sol's"), precio_compra: 5.4, precio_venta: 10.9, notas: MARCA_EJEMPLO },
-    { empresa_id: empresaId, tipo: "Sudadera", marca: "Sol's", modelo: "Snake capucha", colores: ["Negro", "Gris jaspeado", "Marino"], proveedor_id: P("Sol's"), precio_compra: 11.9, precio_venta: 19.5, notas: MARCA_EJEMPLO },
-    { empresa_id: empresaId, tipo: "Gorra", marca: "Beechfield", modelo: "B15 5 paneles", colores: ["Negro", "Marino", "Blanco"], proveedor_id: P("Beechfield"), precio_compra: 2.6, precio_venta: 5.5, notas: MARCA_EJEMPLO },
-  ]);
+  // El catálogo de ejemplo son los modelos de Roly (se cargan al crear la empresa)
+
 
   const cli = (await sb.from("clientes").insert([
     { empresa_id: empresaId, nombre: "Club Deportivo Arenal", contacto: "Marta Gil", telefono: "612 345 678", email: "secretaria@cdarenal.es", nif: "G12345678", direccion: "C/ del Puerto 12, 46011 Valencia", notas: MARCA_EJEMPLO },
@@ -47,7 +41,7 @@ export async function cargarEjemplo(empresaId: string) {
   };
   const margen = Number(emp?.margen ?? 40);
   const base = (cliente: string, estado: string, entrega: number, extra: Partial<PedidoEd> = {}): PedidoEd => ({
-    id: id(), nuevo: true, cliente_id: C(cliente), fecha: dias(-Math.abs(entrega) - 6), entrega: dias(entrega), estado_id: E(estado),
+    id: id(), nuevo: true, cliente_id: C(cliente), fecha: dias(-Math.abs(entrega) - 6), entrega: dias(entrega), entregado: E(estado),
     referencia: "", notas: MARCA_EJEMPLO, descuento_pct: 0, gastos_coste: 0, gastos_venta: 0, iva: 21, lineas: [], pers: [], ...extra,
   });
 

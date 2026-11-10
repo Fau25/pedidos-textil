@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Home, ShoppingBag, FileText, Users, Shirt, Settings, Plus, Search, Moon, Sun, LogOut, MoreHorizontal, X, Loader2 } from "lucide-react";
+import { Home, ShoppingBag, Users, Shirt, Settings, Plus, Search, Moon, Sun, LogOut, MoreHorizontal, X, Loader2 } from "lucide-react";
 import { Logo } from "./logo";
 import { cx, Pastilla } from "./ui";
 import { useSesion } from "./sesion";
@@ -11,7 +11,6 @@ import { sb } from "@/lib/supabase";
 const NAV = [
   { href: "/", t: "Inicio", i: Home },
   { href: "/pedidos/", t: "Pedidos", i: ShoppingBag },
-  { href: "/presupuestos/", t: "Presupuestos", i: FileText },
   { href: "/clientes/", t: "Clientes", i: Users },
   { href: "/catalogo/", t: "Catálogo", i: Shirt },
   { href: "/ajustes/", t: "Ajustes", i: Settings },
@@ -89,13 +88,13 @@ export function Marco({ children }: { children: ReactNode }) {
         ))}
         <Link href="/pedidos/nuevo/" aria-label="Nuevo pedido" className="flex items-center justify-center"><span className="grid size-12 place-items-center rounded-full bg-acento text-white shadow-lg"><Plus className="size-6" /></span></Link>
         <Link href="/clientes/" className={cx("flex flex-col items-center justify-center gap-0.5 text-[11px]", activo("/clientes/") ? "text-acento" : "text-texto2")}><Users className="size-[22px]" strokeWidth={1.8} />Clientes</Link>
-        <button onClick={() => setMas(true)} className={cx("flex flex-col items-center justify-center gap-0.5 text-[11px]", ["/presupuestos/", "/catalogo/", "/ajustes/"].some(activo) ? "text-acento" : "text-texto2")}><MoreHorizontal className="size-[22px]" />Más</button>
+        <button onClick={() => setMas(true)} className={cx("flex flex-col items-center justify-center gap-0.5 text-[11px]", ["/catalogo/", "/ajustes/"].some(activo) ? "text-acento" : "text-texto2")}><MoreHorizontal className="size-[22px]" />Más</button>
       </nav>
       {mas && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMas(false)}>
           <div className="absolute inset-0 bg-black/25" />
           <div className="animar absolute inset-x-3 bottom-20 rounded-2xl bg-superficie p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {NAV.slice(2).filter((n) => n.href !== "/clientes/").map(({ href, t, i: I }) => (
+            {NAV.slice(3).map(({ href, t, i: I }) => (
               <Link key={href} href={href} className="flex h-12 items-center gap-3 rounded-xl px-3 hover:bg-suave"><I className="size-5 text-texto2" />{t}</Link>
             ))}
             <button onClick={cambiar} className="flex h-12 w-full items-center gap-3 rounded-xl px-3 hover:bg-suave">{oscuro ? <Sun className="size-5 text-texto2" /> : <Moon className="size-5 text-texto2" />}Modo {oscuro ? "claro" : "oscuro"}</button>
@@ -108,10 +107,10 @@ export function Marco({ children }: { children: ReactNode }) {
   );
 }
 
-type Resultado = { tipo: "Pedido" | "Cliente" | "Prenda"; t: string; s: string; href: string; estado?: string | null };
+type Resultado = { tipo: "Pedido" | "Cliente" | "Prenda"; t: string; s: string; href: string; entregado?: boolean };
 
 function Buscador({ cerrar }: { cerrar: () => void }) {
-  const { empresa, estadoPor } = useSesion();
+  const { empresa } = useSesion();
   const [q, setQ] = useState("");
   const [res, setRes] = useState<Resultado[]>([]);
   const [sel, setSel] = useState(0);
@@ -127,19 +126,19 @@ function Buscador({ cerrar }: { cerrar: () => void }) {
     const t = setTimeout(async () => {
       const like = `%${term}%`;
       const [p, c, l] = await Promise.all([
-        sb.from("pedidos").select("id, numero, referencia, estado_id, clientes(nombre)").eq("empresa_id", empresa!.id).or(`numero.ilike.${like},referencia.ilike.${like}`).limit(6),
+        sb.from("pedidos").select("id, numero, referencia, entregado, clientes(nombre)").eq("empresa_id", empresa!.id).or(`numero.ilike.${like},referencia.ilike.${like}`).limit(6),
         sb.from("clientes").select("id, nombre, contacto, telefono").eq("empresa_id", empresa!.id).or(`nombre.ilike.${like},contacto.ilike.${like},email.ilike.${like},telefono.ilike.${like}`).limit(6),
         sb.from("pedido_lineas").select("pedido_id, tipo, marca, modelo, color, pedidos(numero)").eq("empresa_id", empresa!.id).or(`tipo.ilike.${like},marca.ilike.${like},modelo.ilike.${like},color.ilike.${like}`).limit(6),
       ]);
       // También pedidos por nombre de cliente
       const ids = (c.data ?? []).map((x) => x.id);
-      const pc = ids.length ? (await sb.from("pedidos").select("id, numero, referencia, estado_id, clientes(nombre)").in("cliente_id", ids).order("fecha", { ascending: false }).limit(4)).data ?? [] : [];
-      type PR = { id: string; numero: string; referencia: string | null; estado_id: string | null; clientes: { nombre: string } | { nombre: string }[] | null };
+      const pc = ids.length ? (await sb.from("pedidos").select("id, numero, referencia, entregado, clientes(nombre)").in("cliente_id", ids).order("fecha", { ascending: false }).limit(4)).data ?? [] : [];
+      type PR = { id: string; numero: string; referencia: string | null; entregado: boolean; clientes: { nombre: string } | { nombre: string }[] | null };
       const nom = (x: PR) => (Array.isArray(x.clientes) ? x.clientes[0]?.nombre : x.clientes?.nombre) ?? "";
       const vistos = new Set<string>();
       const ped = [...((p.data ?? []) as PR[]), ...(pc as PR[])].filter((x) => !vistos.has(x.id) && vistos.add(x.id));
       setRes([
-        ...ped.map((x) => ({ tipo: "Pedido" as const, t: x.numero, s: [nom(x), x.referencia].filter(Boolean).join(" · "), href: `/pedidos/ver/?id=${x.id}`, estado: x.estado_id })),
+        ...ped.map((x) => ({ tipo: "Pedido" as const, t: x.numero, s: [nom(x), x.referencia].filter(Boolean).join(" · "), href: `/pedidos/ver/?id=${x.id}`, entregado: x.entregado })),
         ...(c.data ?? []).map((x) => ({ tipo: "Cliente" as const, t: x.nombre, s: [x.contacto, x.telefono].filter(Boolean).join(" · "), href: `/clientes/ver/?id=${x.id}` })),
         ...((l.data ?? []) as unknown as { pedido_id: string; tipo: string; marca: string | null; modelo: string | null; color: string | null; pedidos: { numero: string } | null }[])
           .map((x) => ({ tipo: "Prenda" as const, t: [x.tipo, x.marca, x.modelo].filter(Boolean).join(" "), s: [x.color, x.pedidos?.numero].filter(Boolean).join(" · "), href: `/pedidos/ver/?id=${x.pedido_id}` })),
@@ -169,12 +168,11 @@ function Buscador({ cerrar }: { cerrar: () => void }) {
           {q.trim().length < 2 ? <p className="px-3 py-6 text-center text-[13px] text-texto2">Escribe al menos 2 letras: número de pedido, cliente, teléfono, prenda o color.</p>
             : !cargando && !res.length ? <p className="px-3 py-6 text-center text-[13px] text-texto2">Sin resultados para «{q}».</p>
             : res.map((r, i) => {
-              const e = estadoPor(r.estado);
               return (
                 <button key={r.tipo + r.href + i} onMouseEnter={() => setSel(i)} onClick={() => ir(r)} className={cx("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left", i === sel && "bg-suave")}>
                   <span className="w-14 shrink-0 text-[11px] font-medium uppercase tracking-wide text-texto2">{r.tipo}</span>
                   <span className="min-w-0 flex-1"><span className="block truncate font-medium">{r.t}</span>{r.s && <span className="block truncate text-[12px] text-texto2">{r.s}</span>}</span>
-                  {e && <Pastilla color={e.color}>{e.nombre}</Pastilla>}
+                  {r.entregado !== undefined && <Pastilla color={r.entregado ? "verde" : "ambar"}>{r.entregado ? "Entregado" : "Pendiente"}</Pastilla>}
                 </button>
               );
             })}

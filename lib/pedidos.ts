@@ -9,6 +9,7 @@ export type LineaEd = {
   precio_compra: number; precio_venta: number | null;
   notas: string; imagen_path: string | null; estado: EstadoLinea;
   tallas: Record<string, number>;
+  tallasModelo?: string[]; // tallas del modelo del catálogo (solo para mostrar)
   tallasExtra: string[]; // tallas fuera de la lista estándar
 };
 export type PersEd = {
@@ -18,7 +19,7 @@ export type PersEd = {
 };
 export type PedidoEd = {
   id: string; numero?: string; nuevo: boolean;
-  cliente_id: string | null; fecha: string; entrega: string | null; estado_id: string | null;
+  cliente_id: string | null; fecha: string; entrega: string | null; entregado: boolean;
   referencia: string; notas: string; descuento_pct: number; gastos_coste: number; gastos_venta: number; iva: number;
   lineas: LineaEd[]; pers: PersEd[];
 };
@@ -57,7 +58,7 @@ export async function cargarPedido(pid: string): Promise<{ ed: PedidoEd; pedido:
   const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   const ed: PedidoEd = {
     id: ped.id, numero: ped.numero, nuevo: false, cliente_id: ped.cliente_id, fecha: ped.fecha, entrega: ped.entrega,
-    estado_id: ped.estado_id, referencia: ped.referencia ?? "", notas: ped.notas ?? "",
+    entregado: ped.entregado, referencia: ped.referencia ?? "", notas: ped.notas ?? "",
     descuento_pct: Number(ped.descuento_pct), gastos_coste: Number(ped.gastos_coste), gastos_venta: Number(ped.gastos_venta), iva: Number(ped.iva),
     lineas: ((l.data ?? []) as Linea[]).map((r) => {
       const tallas: Record<string, number> = {};
@@ -85,7 +86,7 @@ export async function guardarPedido(p: PedidoEd, empresa: Pick<Empresa, "id" | "
   const t = calcular(aCalc(p, Number(empresa.margen)));
   const cab = {
     id: p.id, empresa_id: empresa.id, cliente_id: p.cliente_id, fecha: p.fecha, entrega: p.entrega || null,
-    estado_id: p.estado_id, referencia: p.referencia || null, notas: p.notas || null,
+    entregado: p.entregado, referencia: p.referencia || null, notas: p.notas || null,
     descuento_pct: p.descuento_pct || 0, gastos_coste: p.gastos_coste || 0, gastos_venta: p.gastos_venta || 0, iva: p.iva,
     coste: aEuros(t.coste), base: aEuros(t.base), total: aEuros(t.total), unidades: t.unidades,
   };
@@ -134,10 +135,10 @@ export function ordenTalla(t: string, i = 0) {
 }
 
 /** Copia del pedido como borrador nuevo */
-export function duplicar(ed: PedidoEd, estadoBorrador: string | null): PedidoEd {
+export function duplicar(ed: PedidoEd): PedidoEd {
   const mapa = new Map(ed.lineas.map((l) => [l.clave, id()]));
   return {
-    ...ed, id: id(), numero: undefined, nuevo: true, fecha: hoy(), entrega: null, estado_id: estadoBorrador,
+    ...ed, id: id(), numero: undefined, nuevo: true, fecha: hoy(), entrega: null, entregado: false,
     lineas: ed.lineas.map((l) => ({ ...l, clave: mapa.get(l.clave)!, estado: "pendiente", tallas: { ...l.tallas } })),
     pers: ed.pers.map((x) => ({ ...x, clave: id(), estado: "pendiente", lineas: x.lineas.map((k) => mapa.get(k)!).filter(Boolean) })),
   };
@@ -168,4 +169,10 @@ export function datosPresupuesto(ed: PedidoEd, t: Totales, empresa: Empresa, cli
     gastos: ed.gastos_venta || 0, bruto: aEuros(t.bruto), descuento_pct: ed.descuento_pct || 0, descuento: aEuros(t.descuento),
     base: aEuros(t.base), iva_pct: ed.iva, iva: aEuros(t.iva), total: aEuros(t.total), condiciones: empresa.condiciones,
   };
+}
+
+/** Marca uno o varios pedidos como entregados (o los devuelve a pendientes) */
+export async function marcarEntregado(ids: string[], entregado: boolean) {
+  const { error } = await sb.from("pedidos").update({ entregado, entregado_en: entregado ? hoy() : null }).in("id", ids);
+  if (error) throw error;
 }

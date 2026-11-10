@@ -7,13 +7,12 @@ import { Boton, Campo, CampoImporte, Hoja, Tarjeta, cx, useAvisos } from "./ui";
 import { sb, subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
 import { calcular, euros, tarifaPara, precioVentaUd, sumaUnidades } from "@/lib/calculo";
 import { aCalc, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, ordenTalla, cargarPedido, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
-import { crearPresupuesto } from "@/lib/presupuestos";
 import { TALLAS, TALLAS_NINO, TIPOS_PRENDA, UBICACIONES, type Cliente, type Prenda } from "@/lib/tipos";
 
 const BORRADOR = "pedido-borrador";
 
 export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null; duplicarDe: string | null }) {
-  const { empresa, estadoClave, tecnicas, tarifas, proveedores } = useSesion();
+  const { empresa, tecnicas, tarifas, proveedores } = useSesion();
   const { aviso, confirmar } = useAvisos();
   const router = useRouter();
   const margen = Number(empresa!.margen);
@@ -35,17 +34,16 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
         if (!r) { aviso("No se encuentra el pedido", "error"); return router.replace("/pedidos/"); }
         return setP(r.ed);
       }
-      const borrador = estadoClave("borrador")?.id ?? null;
       if (duplicarDe) {
         const r = await cargarPedido(duplicarDe);
-        if (r) { setP(duplicar(r.ed, borrador)); cambiado.current = true; return; }
+        if (r) { setP(duplicar(r.ed)); cambiado.current = true; return; }
       }
       try {
         const g = JSON.parse(localStorage.getItem(BORRADOR) || "null") as PedidoEd | null;
         if (g && g.nuevo && (g.lineas.length || g.cliente_id)) { setP(g); aviso("Hemos recuperado el pedido que estabas creando"); return; }
       } catch {}
       setP({
-        id: id(), nuevo: true, cliente_id: new URLSearchParams(location.search).get("cliente"), fecha: hoy(), entrega: null, estado_id: borrador,
+        id: id(), nuevo: true, cliente_id: new URLSearchParams(location.search).get("cliente"), fecha: hoy(), entrega: null, entregado: false,
         referencia: "", notas: "", descuento_pct: 0, gastos_coste: 0, gastos_venta: 0, iva: Number(empresa!.iva),
         lineas: [lineaVacia(margen)], pers: [],
       });
@@ -84,21 +82,15 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     if (cambia) setP((x) => (x ? { ...x, pers } : x));
   }, [p, t, tarifas]);
 
-  async function guardar(presupuesto = false) {
+  async function guardar() {
     if (!p) return;
     if (!p.cliente_id) { setErrorCliente(true); document.getElementById("bloque-cliente")?.scrollIntoView({ behavior: "smooth", block: "center" }); return aviso("Elige un cliente para guardar el pedido", "error"); }
     setEnviando(true);
     try {
       await guardarPedido(p, empresa!);
       if (p.nuevo) try { localStorage.removeItem(BORRADOR); } catch {}
-      if (presupuesto) {
-        await crearPresupuesto(p.id, empresa!);
-        aviso("Pedido guardado y presupuesto generado");
-        router.push(`/pedidos/ver/?id=${p.id}&tab=presupuesto`);
-      } else {
-        aviso(p.nuevo ? "Pedido creado" : "Cambios guardados");
-        router.push(`/pedidos/ver/?id=${p.id}`);
-      }
+      aviso(p.nuevo ? "Pedido creado" : "Cambios guardados");
+      router.push(`/pedidos/ver/?id=${p.id}`);
     } catch (e) { aviso(textoError(e), "error"); setEnviando(false); }
   }
 
@@ -227,8 +219,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
               </details>
             </div>
             <div className="mt-4 hidden flex-col gap-2 lg:flex">
-              <Boton variante="primario" cargando={enviando} onClick={() => guardar(true)}>Guardar y generar presupuesto</Boton>
-              <Boton onClick={() => guardar(false)} disabled={enviando}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
+              <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
               {p.nuevo && <Boton variante="fantasma" onClick={descartar}>Descartar</Boton>}
             </div>
           </Tarjeta>
@@ -238,13 +229,12 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
       {/* Barra de acciones (móvil) */}
       <div className="no-imprimir fixed inset-x-0 bottom-16 z-20 flex items-center gap-3 border-t border-borde bg-superficie/95 px-4 py-3 backdrop-blur lg:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>
-        <Boton onClick={() => guardar(false)} disabled={enviando}>Guardar</Boton>
-        <Boton variante="primario" cargando={enviando} onClick={() => guardar(true)}>Presupuesto</Boton>
+        <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>Guardar</Boton>
       </div>
 
       <Catalogo abierto={catalogo} cerrar={() => setCatalogo(false)} margen={margen}
         elegir={(pr, color) => { set((x) => ({ ...x, lineas: [...x.lineas.filter((l) => !(sumaUnidades(Object.entries(l.tallas).map(([a, b]) => ({ talla: a, cantidad: b }))) === 0 && !l.marca && !l.modelo && !l.precio_compra)), lineaVacia(margen, {
-          tipo: pr.tipo, marca: pr.marca ?? "", modelo: pr.modelo ?? "", color, proveedor_id: pr.proveedor_id, precio_compra: Number(pr.precio_compra), precio_venta: pr.precio_venta === null ? null : Number(pr.precio_venta), imagen_path: pr.imagen_path,
+          tipo: pr.tipo, marca: pr.marca ?? "", modelo: pr.modelo ?? "", color, proveedor_id: pr.proveedor_id, precio_compra: Number(pr.precio_compra), precio_venta: pr.precio_venta === null ? null : Number(pr.precio_venta), imagen_path: pr.imagen_path, tallasModelo: pr.tallas,
         })] })); setCatalogo(false); }} />
     </>
   );
@@ -253,7 +243,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 const Fila = ({ t, v }: { t: string; v: string }) => <div className="flex justify-between gap-3"><dt className="text-texto2">{t}</dt><dd className="num">{v}</dd></div>;
 
 /* ───────── Cliente ───────── */
-function SelectorCliente({ clientes, valor, cambiar, creado, error }: { clientes: Cliente[]; valor: string | null; cambiar: (id: string) => void; creado: (c: Cliente) => void; error?: boolean }) {
+export function SelectorCliente({ clientes, valor, cambiar, creado, error }: { clientes: Cliente[]; valor: string | null; cambiar: (id: string) => void; creado: (c: Cliente) => void; error?: boolean }) {
   const { empresa } = useSesion();
   const { aviso } = useAvisos();
   const [abierto, setAbierto] = useState(false);
@@ -338,12 +328,16 @@ function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar 
 }) {
   const { empresa } = useSesion();
   const { aviso } = useAvisos();
-  const [nino, setNino] = useState(() => Object.keys(l.tallas).some((k) => TALLAS_NINO.includes(k)));
+  const [nino, setNino] = useState(() => Object.keys(l.tallas).some((k) => TALLAS_NINO.includes(k) || k.includes("/")));
+  const [mas, setMas] = useState(false);
+  const delModelo = l.tallasModelo?.length ? l.tallasModelo : null;
+  const ninoModelo = delModelo?.filter((k) => /^\d/.test(k)) ?? [];
+  const adultoModelo = delModelo?.filter((k) => !/^\d/.test(k)) ?? [];
   const [img, setImg] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [nuevaTalla, setNuevaTalla] = useState("");
   useEffect(() => { urlArchivo(l.imagen_path).then(setImg); }, [l.imagen_path]);
-  const base = nino ? TALLAS_NINO : TALLAS;
+  const base = delModelo ? (nino && ninoModelo.length ? ninoModelo : adultoModelo.length ? adultoModelo : delModelo) : nino ? TALLAS_NINO : TALLAS;
   const tallas = [...base, ...Object.keys(l.tallas).filter((k) => !base.includes(k))].sort((a, b) => ordenTalla(a) - ordenTalla(b));
   const pvSugerido = precioVentaUd({ precio_compra: l.precio_compra, precio_venta: null }, margen) / 100;
 
@@ -370,10 +364,10 @@ function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar 
       <div className="px-4 py-4 sm:px-5">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] font-medium text-texto2">Cantidades por talla</span>
-          <div className="flex rounded-lg bg-suave p-0.5 text-[12px]">
+          {(!delModelo || (ninoModelo.length > 0 && adultoModelo.length > 0)) && <div className="flex rounded-lg bg-suave p-0.5 text-[12px]">
             <button className={cx("rounded-md px-2 py-0.5", !nino && "bg-superficie shadow-sm")} onClick={() => setNino(false)}>Adulto</button>
             <button className={cx("rounded-md px-2 py-0.5", nino && "bg-superficie shadow-sm")} onClick={() => setNino(true)}>Niño</button>
-          </div>
+          </div>}
         </div>
         <div className="flex flex-wrap items-end gap-2">
           {tallas.map((k) => (
@@ -392,19 +386,24 @@ function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar 
           <div className="ml-auto flex h-10 items-center rounded-xl bg-suave px-3 text-[13px]"><span className="text-texto2">Total</span><b className="num ml-2 text-[16px]">{t?.unidades ?? 0}</b><span className="ml-1 text-texto2">uds</span></div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-4">
-          <Campo etiqueta="Proveedor">
-            <select className="campo" value={l.proveedor_id ?? ""} onChange={(e) => cambiar({ proveedor_id: e.target.value || null })}>
-              <option value="">—</option>{proveedores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-            </select>
-          </Campo>
-          <Campo etiqueta="Precio compra / ud"><CampoImporte valor={l.precio_compra || null} cambiar={(v) => cambiar({ precio_compra: v ?? 0 })} /></Campo>
-          <Campo etiqueta="Precio venta / ud" ayuda={l.precio_venta === null ? `Con tu margen (${margen} %)` : undefined}>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+          <Campo etiqueta="Precio / ud" ayuda={l.precio_venta === null && l.precio_compra ? `Compra + ${margen} %` : undefined}>
             <CampoImporte valor={l.precio_venta} placeholder={pvSugerido.toFixed(2).replace(".", ",")} cambiar={(v) => cambiar({ precio_venta: v })} />
           </Campo>
-          <div className="flex flex-col justify-end"><span className="mb-1.5 text-[12px] font-medium text-texto2">Importe</span><span className="num flex h-10 items-center justify-end text-[15px] font-semibold">{euros(t?.venta ?? 0)}</span></div>
+          <div className="flex flex-col justify-end"><span className="mb-1.5 text-[12px] font-medium text-texto2">Importe</span><span className="num flex h-10 items-center text-[15px] font-semibold">{euros(t?.venta ?? 0)}</span></div>
+          <div className="col-span-2 flex items-end sm:col-span-1"><button className="h-10 text-[13px] text-acento" onClick={() => setMas((v) => !v)}>{mas ? "Menos" : "Más detalles"}</button></div>
         </div>
-        <input className="campo mt-3" placeholder="Observaciones de esta prenda" value={l.notas} onChange={(e) => cambiar({ notas: e.target.value })} aria-label="Observaciones de la prenda" />
+        {mas && (
+          <div className="animar mt-3 grid gap-3 sm:grid-cols-3">
+            <Campo etiqueta="Precio de compra / ud"><CampoImporte valor={l.precio_compra || null} cambiar={(v) => cambiar({ precio_compra: v ?? 0 })} /></Campo>
+            <Campo etiqueta="Proveedor">
+              <select className="campo" value={l.proveedor_id ?? ""} onChange={(e) => cambiar({ proveedor_id: e.target.value || null })}>
+                <option value="">—</option>{proveedores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+              </select>
+            </Campo>
+            <Campo etiqueta="Observaciones"><input className="campo" value={l.notas} onChange={(e) => cambiar({ notas: e.target.value })} /></Campo>
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap gap-1 border-t border-borde px-3 py-2">
         <Boton tam="s" variante="fantasma" onClick={duplicar}><Copy className="size-3.5" />Duplicar con otro color</Boton>
@@ -480,21 +479,23 @@ function TarjetaPers({ z, lineas, calc, tecnicas, cambiar, quitar, usarTarifa }:
 }
 
 /* ───────── Catálogo ───────── */
-function Catalogo({ abierto, cerrar, elegir, margen }: { abierto: boolean; cerrar: () => void; elegir: (p: Prenda, color: string) => void; margen: number }) {
+export function Catalogo({ abierto, cerrar, elegir, margen }: { abierto: boolean; cerrar: () => void; elegir: (p: Prenda, color: string) => void; margen: number }) {
   const { empresa } = useSesion();
   const [lista, setLista] = useState<Prenda[] | null>(null);
   const [q, setQ] = useState("");
   useEffect(() => { if (abierto) sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("tipo").then(({ data }) => setLista((data ?? []) as Prenda[])); }, [abierto, empresa]);
-  const f = (lista ?? []).filter((p) => !q || [p.tipo, p.marca, p.modelo].join(" ").toLowerCase().includes(q.toLowerCase()));
+  const f = (lista ?? []).filter((p) => (q ? [p.tipo, p.marca, p.modelo, p.referencia].join(" ").toLowerCase().includes(q.toLowerCase()) : p.favorito))
+    .sort((a, b) => Number(b.favorito) - Number(a.favorito));
   return (
     <Hoja abierta={abierto} cerrar={cerrar} titulo="Prendas del catálogo">
-      <input className="campo mb-4" placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="campo mb-4" placeholder="Buscar modelo o referencia (también en toda la tarifa)…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {!q && <p className="-mt-2 mb-3 text-[12px] text-texto2">Tus prendas habituales. Escribe para buscar en todo el catálogo.</p>}
       {!lista ? <Loader2 className="mx-auto size-5 animate-spin text-texto2" /> : !f.length ? <p className="py-8 text-center text-[13px] text-texto2">No hay prendas en el catálogo. Añádelas en Catálogo para tenerlas a un clic.</p> : (
         <ul className="space-y-2">
           {f.map((p) => (
             <li key={p.id} className="rounded-xl border border-borde p-3">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="font-medium">{[p.tipo, p.marca, p.modelo].filter(Boolean).join(" · ")}</span>
+                <span className="font-medium">{[p.marca, p.modelo].filter(Boolean).join(" ")}<span className="font-normal text-texto2"> · {p.tipo}{p.referencia ? " · " + p.referencia : ""}</span></span>
                 <span className="num text-[12px] text-texto2">{euros(Math.round(Number(p.precio_compra) * 100))} → {euros(precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }, margen))}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">

@@ -35,7 +35,7 @@ function Doc({ p, logo }: { p: Presupuesto; logo: string | null }) {
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={s.titulo}>Presupuesto</Text>
-            <Text style={[s.gris, { marginTop: 2 }]}>{p.numero}{p.version > 1 ? ` · v${p.version}` : ""}</Text>
+            <Text style={[s.gris, { marginTop: 2 }]}>{p.numero}</Text>
           </View>
         </View>
 

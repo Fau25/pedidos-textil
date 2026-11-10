@@ -14,11 +14,13 @@ export type Proveedor = { id: string; nombre: string; contacto: string | null; t
 export type Prenda = {
   id: string; tipo: string; marca: string | null; modelo: string | null; colores: string[]; proveedor_id: string | null;
   precio_compra: number; precio_venta: number | null; imagen_path: string | null; notas: string | null;
+  referencia: string | null; tallas: string[]; favorito: boolean;
 };
 export type Pedido = {
   id: string; empresa_id: string; numero: string; cliente_id: string | null; fecha: string; entrega: string | null;
   estado_id: string | null; referencia: string | null; notas: string | null; descuento_pct: number; gastos_coste: number;
   gastos_venta: number; iva: number; coste: number; base: number; total: number; unidades: number; creado: string; actualizado: string;
+  entregado: boolean; entregado_en: string | null;
   clientes?: { nombre: string } | null;
 };
 export type Linea = {

@@ -1,115 +1,176 @@
 "use client";
 import Link from "next/link";
-import { Plus, ArrowRight, Inbox } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSesion } from "@/components/sesion";
-import { Cabecera } from "@/components/marco";
-import { Boton, Cargando, Pastilla, SelloFecha, Tarjeta, Vacio, cx, diasHasta, fecha } from "@/components/ui";
-import { sb } from "@/lib/supabase";
+import { Cargando, Tarjeta, cx, diasHasta, useAvisos } from "@/components/ui";
+import { TrabajoRapido } from "@/components/trabajo-rapido";
+import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
+import { hoy, marcarEntregado } from "@/lib/pedidos";
 import type { Pedido } from "@/lib/tipos";
 
 export default function Inicio() {
-  const { empresa, estados, estadoPor, sesion } = useSesion();
-  const { datos } = useCarga(async () => {
-    const { data, error } = await sb.from("pedidos").select("id, numero, fecha, entrega, total, estado_id, unidades, actualizado, clientes(nombre)")
-      .eq("empresa_id", empresa!.id).order("fecha", { ascending: false }).limit(1000);
+  const { empresa } = useSesion();
+  const { aviso } = useAvisos();
+  const { datos, setDatos } = useCarga(async () => {
+    const { data, error } = await sb.from("pedidos").select("id, numero, fecha, entrega, total, unidades, referencia, entregado, entregado_en, clientes(nombre)")
+      .eq("empresa_id", empresa!.id).eq("entregado", false).order("entrega", { ascending: true, nullsFirst: false }).limit(500);
     if (error) throw error;
     return data as unknown as Pedido[];
   });
 
-  const finales = new Set(estados.filter((e) => e.final).map((e) => e.id));
-  const clave = (p: Pedido) => estadoPor(p.estado_id)?.clave;
-  const activos = (datos ?? []).filter((p) => !finales.has(p.estado_id ?? ""));
-  const mes = new Date().toISOString().slice(0, 7);
-  const cuenta = (c: string) => activos.filter((p) => clave(p) === c);
-  const enviados = cuenta("presupuesto_enviado");
-  const tarjetas = [
-    { t: "Pedidos activos", v: activos.length, f: "activos" },
-    { t: "Pendientes de presupuesto", v: cuenta("pte_presupuesto").length + cuenta("borrador").length, f: "pte_presupuesto,borrador" },
-    { t: "Pendientes de compra", v: cuenta("pte_compra").length + cuenta("presupuesto_aceptado").length, f: "pte_compra,presupuesto_aceptado" },
-    { t: "En personalización", v: cuenta("en_personalizacion").length + cuenta("material_recibido").length, f: "en_personalizacion,material_recibido" },
-    { t: "Listos para entregar", v: cuenta("listo").length, f: "listo", alerta: cuenta("listo").length > 0 },
-    { t: "Entregados este mes", v: (datos ?? []).filter((p) => clave(p) === "entregado" && (p.actualizado ?? "").startsWith(mes)).length, f: "entregado" },
-    { t: "Presupuestos enviados", v: euros(enviados.reduce((a, p) => a + aCent(p.total), 0)), sub: `${enviados.length} sin respuesta`, f: "presupuesto_enviado" },
-    { t: "Importe pedidos activos", v: euros(activos.reduce((a, p) => a + aCent(p.total), 0)), sub: "IVA incluido", f: "activos", grande: true },
-  ];
-  const proximas = activos.filter((p) => p.entrega && clave(p) !== "borrador").sort((a, b) => (a.entrega! < b.entrega! ? -1 : 1)).slice(0, 5);
-  const recientes = [...(datos ?? [])].sort((a, b) => (a.actualizado < b.actualizado ? 1 : -1)).slice(0, 8);
+  async function entregar(p: Pedido) {
+    setDatos((d) => d?.filter((x) => x.id !== p.id) ?? null);
+    try { await marcarEntregado([p.id], true); aviso(`${p.clientes?.nombre ?? p.numero}: entregado`); }
+    catch (e) { aviso(textoError(e), "error"); }
+  }
+
+  const grupos = useMemo(() => {
+    const g: { t: string; tono?: string; l: Pedido[] }[] = [
+      { t: "Atrasados", tono: "text-red-600", l: [] }, { t: "Hoy", tono: "text-amber-700 dark:text-amber-400", l: [] }, { t: "Mañana", tono: "text-amber-700 dark:text-amber-400", l: [] },
+      { t: "Esta semana", l: [] }, { t: "Más adelante", l: [] }, { t: "Sin fecha", l: [] },
+    ];
+    for (const p of datos ?? []) {
+      const d = diasHasta(p.entrega);
+      g[d === null ? 5 : d < 0 ? 0 : d === 0 ? 1 : d === 1 ? 2 : d <= 7 ? 3 : 4].l.push(p);
+    }
+    return g.filter((x) => x.l.length);
+  }, [datos]);
+
   const h = new Date().getHours();
   const saludo = h < 6 ? "Buenas noches" : h < 14 ? "Buenos días" : h < 21 ? "Buenas tardes" : "Buenas noches";
-  const nombre = (sesion?.user.email ?? "").split("@")[0].split(/[._]/)[0];
 
   return (
     <>
-      <Cabecera
-        titulo={`${saludo}${nombre ? ", " + nombre.charAt(0).toUpperCase() + nombre.slice(1) : ""}`}
-        sub={new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
-        acciones={<Link href="/pedidos/nuevo/"><Boton variante="primario"><Plus className="size-4" />Nuevo pedido</Boton></Link>}
-      />
-      {!datos ? <Cargando /> : (
-        <>
-          <div className="-mx-4 mb-6 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 lg:grid-cols-4">
-            {tarjetas.map((t) => (
-              <Link key={t.t} href={`/pedidos/?estado=${t.f}`} className="tarjeta group min-w-[150px] snap-start p-4 transition-shadow hover:shadow-md">
-                <p className="text-[12px] font-medium text-texto2">{t.t}</p>
-                <p className={cx("num mt-1.5 font-semibold tracking-[-0.02em]", typeof t.v === "number" ? "text-[28px]" : "text-[20px] leading-[42px]", t.alerta && "text-emerald-600 dark:text-emerald-400")}>{t.v}</p>
-                {t.sub && <p className="text-[12px] text-texto2">{t.sub}</p>}
-              </Link>
-            ))}
-          </div>
+      <div className="mb-5">
+        <h1 className="text-[24px] font-semibold tracking-[-0.02em] sm:text-[28px]">{saludo}</h1>
+        <p className="text-texto2">{new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} · {datos ? (datos.length ? `${datos.length} pedido${datos.length > 1 ? "s" : ""} pendiente${datos.length > 1 ? "s" : ""}` : "nada pendiente") : ""}</p>
+      </div>
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-            <Tarjeta titulo="Pedidos recientes" accion={<Link href="/pedidos/" className="flex items-center gap-1 text-[13px] text-acento">Ver todos <ArrowRight className="size-3.5" /></Link>} sinPadding>
-              {!recientes.length ? (
-                <Vacio icono={<Inbox className="size-5" />} titulo="Aún no hay pedidos" texto="Crea el primero: cliente, prendas con sus tallas y la personalización. El presupuesto se calcula solo."
-                  accion={<Link href="/pedidos/nuevo/"><Boton variante="primario"><Plus className="size-4" />Nuevo pedido</Boton></Link>} />
-              ) : (
-                <ul className="divide-y divide-borde">
-                  {recientes.map((p) => {
-                    const e = estadoPor(p.estado_id);
-                    return (
-                      <li key={p.id}>
-                        <Link href={`/pedidos/ver/?id=${p.id}`} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-3 hover:bg-suave/60 sm:grid-cols-[110px_1fr_90px_100px_auto]">
-                          <span className="num text-[13px] font-semibold">{p.numero}</span>
-                          <span className="order-first col-span-2 truncate font-medium sm:order-none sm:col-span-1">{p.clientes?.nombre ?? "Sin cliente"}</span>
-                          <span className="hidden text-[13px] text-texto2 sm:block">{p.entrega ? "Entrega " + fecha(p.entrega) : fecha(p.fecha)}</span>
-                          <span className="num text-right text-[13px] font-medium">{euros(aCent(p.total))}</span>
-                          {e && <Pastilla color={e.color} className="justify-self-end">{e.nombre}</Pastilla>}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Tarjeta>
-
-            <Tarjeta titulo="Próximas entregas">
-              {!proximas.length ? <p className="py-6 text-center text-[13px] text-texto2">No hay entregas programadas.</p> : (
-                <ul className="space-y-1">
-                  {proximas.map((p) => {
-                    const d = diasHasta(p.entrega);
-                    const e = estadoPor(p.estado_id);
-                    return (
-                      <li key={p.id}>
-                        <Link href={`/pedidos/ver/?id=${p.id}`} className="-mx-2 flex items-center gap-3 rounded-xl p-2 hover:bg-suave/60">
-                          <SelloFecha d={p.entrega} alerta={d !== null && d <= 2} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate font-medium">{p.clientes?.nombre ?? p.numero}</span>
-                            <span className={cx("block text-[12px]", d !== null && d < 0 ? "text-red-600" : d !== null && d <= 2 ? "text-amber-700 dark:text-amber-400" : "text-texto2")}>
-                              {d === null ? "" : d < 0 ? `Retrasado ${-d} día${d === -1 ? "" : "s"}` : d === 0 ? "Hoy" : d === 1 ? "Mañana" : `En ${d} días`} · {p.unidades} uds · {e?.nombre}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="space-y-6">
+          <TrabajoRapido />
+          <Tarjeta titulo="Pendientes" accion={<Link href="/pedidos/?ver=entregados" className="text-[13px] text-acento">Entregados</Link>} sinPadding>
+            {!datos ? <Cargando /> : !datos.length ? <p className="px-5 pb-8 pt-4 text-center text-texto2">No hay nada pendiente. 🎉</p> : (
+              <div className="pb-2">
+                {grupos.map((g) => (
+                  <div key={g.t}>
+                    <p className={cx("px-5 pb-1 pt-3 text-[12px] font-semibold uppercase tracking-wide", g.tono ?? "text-texto2")}>{g.t} · {g.l.length}</p>
+                    <ul>
+                      {g.l.map((p) => (
+                        <li key={p.id} className="flex items-center gap-3 px-5 py-2.5 hover:bg-suave/60">
+                          <button onClick={() => entregar(p)} aria-label={`Marcar ${p.numero} como entregado`} title="Marcar entregado"
+                            className="grid size-7 shrink-0 place-items-center rounded-full border-2 border-borde text-transparent transition-colors hover:border-emerald-500 hover:text-emerald-600">
+                            <Check className="size-3.5" strokeWidth={3} />
+                          </button>
+                          <Link href={`/pedidos/ver/?id=${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium">{p.clientes?.nombre ?? "Sin cliente"}</span>
+                              <span className="block truncate text-[12px] text-texto2">{p.unidades} uds{p.referencia ? " · " + p.referencia : ""} · <span className="num">{p.numero}</span></span>
                             </span>
-                          </span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Tarjeta>
+                            <span className="shrink-0 text-right">
+                              <span className="block text-[12px] font-medium">{p.entrega ? new Date(p.entrega + "T12:00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }) : "—"}</span>
+                              <span className="num block text-[12px] text-texto2">{euros(aCent(p.total))}</span>
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Tarjeta>
+        </div>
+        <Calendario pedidos={datos ?? []} />
+      </div>
+    </>
+  );
+}
+
+const DIAS = ["L", "M", "X", "J", "V", "S", "D"];
+const iso = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+
+function Calendario({ pedidos }: { pedidos: Pedido[] }) {
+  const [vista, setVista] = useState<"semana" | "mes">("semana");
+  const [ref, setRef] = useState(() => new Date());
+  const porDia = useMemo(() => {
+    const m = new Map<string, Pedido[]>();
+    for (const p of pedidos) if (p.entrega) m.set(p.entrega, [...(m.get(p.entrega) ?? []), p]);
+    return m;
+  }, [pedidos]);
+  const hoyS = hoy();
+
+  const lunes = (d: Date) => { const x = new Date(d); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+  let dias: Date[] = [];
+  let titulo = "";
+  if (vista === "semana") {
+    const l = lunes(ref);
+    dias = Array.from({ length: 7 }, (_, i) => { const x = new Date(l); x.setDate(l.getDate() + i); return x; });
+    titulo = `${dias[0].toLocaleDateString("es-ES", { day: "numeric", month: "short" })} – ${dias[6].toLocaleDateString("es-ES", { day: "numeric", month: "short" })}`;
+  } else {
+    const ini = lunes(new Date(ref.getFullYear(), ref.getMonth(), 1, 12));
+    dias = Array.from({ length: 42 }, (_, i) => { const x = new Date(ini); x.setDate(ini.getDate() + i); return x; });
+    if (dias[35].getMonth() !== ref.getMonth()) dias = dias.slice(0, 35);
+    titulo = ref.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  }
+  const mover = (n: number) => setRef((r) => { const x = new Date(r); if (vista === "semana") x.setDate(x.getDate() + 7 * n); else x.setMonth(x.getMonth() + n, 1); return x; });
+
+  return (
+    <section className="tarjeta p-4 xl:sticky xl:top-8">
+      <div className="mb-3 flex items-center gap-2">
+        <h2 className="flex-1 text-[15px] font-semibold first-letter:uppercase">{titulo}</h2>
+        <button aria-label="Anterior" className="grid size-8 place-items-center rounded-lg text-texto2 hover:bg-suave" onClick={() => mover(-1)}><ChevronLeft className="size-4" /></button>
+        <button className="h-8 rounded-lg px-2 text-[12px] text-texto2 hover:bg-suave" onClick={() => setRef(new Date())}>Hoy</button>
+        <button aria-label="Siguiente" className="grid size-8 place-items-center rounded-lg text-texto2 hover:bg-suave" onClick={() => mover(1)}><ChevronRight className="size-4" /></button>
+        <div className="ml-1 flex rounded-lg bg-suave p-0.5 text-[12px]">
+          {(["semana", "mes"] as const).map((v) => <button key={v} onClick={() => setVista(v)} className={cx("rounded-md px-2 py-1 capitalize", vista === v && "bg-superficie font-medium shadow-sm")}>{v}</button>)}
+        </div>
+      </div>
+
+      {vista === "semana" ? (
+        <ul className="space-y-1">
+          {dias.map((d) => {
+            const s = iso(d); const l = porDia.get(s) ?? [];
+            return (
+              <li key={s} className={cx("flex gap-3 rounded-xl p-2", s === hoyS && "bg-acento-suave")}>
+                <div className="w-10 shrink-0 text-center leading-tight">
+                  <p className="text-[11px] uppercase text-texto2">{d.toLocaleDateString("es-ES", { weekday: "short" }).replace(".", "")}</p>
+                  <p className={cx("num text-[18px] font-semibold", s === hoyS && "text-acento")}>{d.getDate()}</p>
+                </div>
+                <div className="min-w-0 flex-1 space-y-1 pt-0.5">
+                  {!l.length ? <p className="pt-2 text-[12px] text-texto2/60">—</p> : l.map((p) => (
+                    <Link key={p.id} href={`/pedidos/ver/?id=${p.id}`} className={cx("block truncate rounded-lg border px-2.5 py-1.5 text-[13px] hover:shadow-sm", s < hoyS ? "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300" : "border-borde bg-superficie")}>
+                      <b className="font-medium">{p.clientes?.nombre ?? p.numero}</b> <span className="text-texto2">· {p.unidades} uds</span>
+                    </Link>
+                  ))}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <>
+          <div className="grid grid-cols-7 text-center text-[11px] font-medium text-texto2">{DIAS.map((d) => <span key={d} className="pb-1">{d}</span>)}</div>
+          <div className="grid grid-cols-7 gap-1">
+            {dias.map((d) => {
+              const s = iso(d); const l = porDia.get(s) ?? []; const fuera = d.getMonth() !== ref.getMonth();
+              return (
+                <div key={s} className={cx("min-h-[64px] rounded-lg p-1", s === hoyS ? "bg-acento-suave" : "bg-suave/50", fuera && "opacity-40")}>
+                  <p className={cx("num text-right text-[11px]", s === hoyS ? "font-bold text-acento" : "text-texto2")}>{d.getDate()}</p>
+                  {l.slice(0, 2).map((p) => (
+                    <Link key={p.id} href={`/pedidos/ver/?id=${p.id}`} title={p.clientes?.nombre ?? p.numero}
+                      className={cx("mt-0.5 block truncate rounded px-1 text-[10px] leading-4", s < hoyS ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300" : "bg-acento text-white")}>{p.clientes?.nombre ?? p.numero}</Link>
+                  ))}
+                  {l.length > 2 && <p className="mt-0.5 text-[10px] text-texto2">+{l.length - 2}</p>}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
-    </>
+    </section>
   );
 }
