@@ -1,15 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Camera, ExternalLink, Loader2, Plus, Shirt, Trash2, Truck } from "lucide-react";
+import { Camera, Loader2, Plus, Shirt, Trash2, Truck } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Campo, CampoImporte, Cargando, Hoja, Pestanas, Tarjeta, Vacio, cx, useAvisos } from "@/components/ui";
 import { ImportarTarifa } from "@/components/importar-tarifa";
 import { Muestra } from "@/components/muestra";
-import { enlaceRoly, sb, subirArchivo, textoError } from "@/lib/supabase";
+import { sb, subirArchivo, textoError } from "@/lib/supabase";
 import { FotoPrenda } from "@/components/bloques-pedido";
 import { useCarga } from "@/lib/usar";
-import { euros, precioVentaUd } from "@/lib/calculo";
 import { TIPOS_PRENDA, type Prenda, type Proveedor, type TarifaFila } from "@/lib/tipos";
 
 export default function Catalogo() {
@@ -33,7 +32,6 @@ function Prendas() {
   const [q, setQ] = useState("");
   const [todas, setTodas] = useState(true);
   const { datos, recargar, setDatos, error } = useCarga(async () => ((await sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000)).data ?? []) as Prenda[]);
-  const margen = Number(empresa!.margen);
   const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const lista = (datos ?? []).filter((p) => (q ? n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(n(q)) : todas || p.favorito))
     .sort((a, b) => Number(b.favorito) - Number(a.favorito)); // habituales primero
@@ -81,9 +79,6 @@ function Prendas() {
                   {p.notas && <span className="ml-1 text-amber-700 dark:text-amber-400">· {p.notas}</span>}
                 </p>
               </button>
-              {enlaceRoly(p) && <a href={enlaceRoly(p)!} target="_blank" rel="noopener noreferrer" aria-label={`Ver ${p.modelo} en Roly`} title="Ver en Roly"
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-azul-suave text-azul hover:opacity-80"><ExternalLink className="size-4" /></a>}
-              <span className="num shrink-0 text-right text-[13px] font-medium">{precioDe(p, margen) !== null ? euros(Math.round(precioDe(p, margen)! * 100)) : <span className="text-[12px] font-normal text-texto2">Sin precio</span>}</span>
             </div>
           ))}
           {lista.length > 300 && <p className="px-4 py-3 text-center text-[12px] text-texto2">Mostrando 300 de {lista.length}. Afina la búsqueda.</p>}
@@ -105,8 +100,6 @@ function Prendas() {
               }} />
             </label>
             <p className="-mt-2 text-center text-[12px] text-texto2">Foto del producto: sale al elegir esta prenda en un pedido.</p>
-            {enlaceRoly(ed) && <a href={enlaceRoly(ed)!} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-full bg-azul-suave px-4 py-2.5 text-[14px] font-medium text-azul hover:opacity-80">
-              <ExternalLink className="size-4" /> Ver {ed.modelo || "modelo"} en Roly</a>}
             <div className="grid gap-4 sm:grid-cols-2">
               <Campo etiqueta="Marca"><input className="campo" value={ed.marca ?? ""} onChange={(e) => setEd({ ...ed, marca: e.target.value })} /></Campo>
               <Campo etiqueta="Modelo"><input className="campo" value={ed.modelo ?? ""} onChange={(e) => setEd({ ...ed, modelo: e.target.value })} /></Campo>
@@ -116,9 +109,6 @@ function Prendas() {
             <datalist id="tipos-cat">{TIPOS_PRENDA.map((x) => <option key={x} value={x} />)}</datalist>
             <Campo etiqueta="Colores" ayuda="Separados por comas."><textarea className="campo" rows={2} value={(ed.colores ?? []).join(", ")} onChange={(e) => setEd({ ...ed, colores: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} /></Campo>
             <Campo etiqueta="Tallas" ayuda="Separadas por comas, en orden. Vacío = tallas estándar."><input className="campo" value={(ed.tallas ?? []).join(", ")} onChange={(e) => setEd({ ...ed, tallas: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} /></Campo>
-            <Campo etiqueta="Precio de venta por unidad (sin IVA)" ayuda={ed.precio_venta === null && Number(ed.precio_compra) ? `Vacío = precio de tarifa + ${margen} %` : undefined}>
-              <CampoImporte valor={ed.precio_venta ?? null} placeholder={precioDe(ed as Prenda, margen)?.toFixed(2).replace(".", ",") ?? "0,00"} cambiar={(v) => setEd({ ...ed, precio_venta: v })} />
-            </Campo>
             <Campo etiqueta="Proveedor">
               <select className="campo" value={ed.proveedor_id ?? ""} onChange={(e) => setEd({ ...ed, proveedor_id: e.target.value || null })}>
                 <option value="">—</option>{proveedores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
@@ -246,9 +236,3 @@ function rango(t: string[]) {
   return [a.length ? `${a[0]}–${a[a.length - 1]}` : "", n.length ? "niño" : ""].filter(Boolean).join(" + ");
 }
 
-/** Precio de venta por unidad: el indicado o el de tarifa + margen (null si no hay ninguno) */
-function precioDe(p: Pick<Prenda, "precio_compra" | "precio_venta">, margen: number): number | null {
-  if (p.precio_venta !== null && p.precio_venta !== undefined && Number(p.precio_venta)) return Number(p.precio_venta);
-  if (Number(p.precio_compra)) return precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: null }, margen) / 100;
-  return null;
-}

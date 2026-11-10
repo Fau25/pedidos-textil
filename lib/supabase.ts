@@ -48,12 +48,6 @@ export async function subirArchivo(empresaId: string, carpeta: string, f: File):
   return path;
 }
 
-/** Búsqueda del modelo en la web de Roly (abre en el navegador) */
-export function enlaceRoly(p: { marca?: string | null; modelo?: string | null; referencia?: string | null }): string | null {
-  if (!/roly/i.test(p.marca ?? "")) return null;
-  const q = ["site:roly.es", p.modelo, (p.referencia ?? "").replace(/^[A-Z]+/i, "")].filter(Boolean).join(" ");
-  return "https://www.google.com/search?q=" + encodeURIComponent(q);
-}
 
 /** Sube fotos de Roly a la carpeta privada compartida. El nombre debe llevar la referencia (p. ej. «Camiseta CA6554.jpg») */
 export async function subirFotosRoly(files: File[], avance: (hechas: number) => void): Promise<{ ok: number; sinRef: string[] }> {

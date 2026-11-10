@@ -149,13 +149,6 @@ await prueba("la copia de seguridad se descarga en Excel", async () => {
   assert.match(d.suggestedFilename(), /^Copia .*\.xlsx$/); assert.ok(fs.statSync(await d.path()).size > 3000); await ctx.close();
 });
 
-await prueba("el catálogo enlaza cada modelo con Roly", async () => {
-  const { ctx, p } = await abrir();
-  await ir(p, "catalogo/");
-  const href = await p.getByRole("link", { name: "Ver Beagle en Roly" }).getAttribute("href");
-  assert.match(href, /roly\.es/); await ctx.close();
-});
-
 await prueba("el catálogo de Roly se completa con colores y fotos, y las fotos se suben en bloque", async () => {
   const { ctx, p, errores, escrituras } = await abrir();
   await ir(p, "");
