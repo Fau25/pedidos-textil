@@ -4,7 +4,7 @@ import { Camera, Check, ChevronDown, Copy, Loader2, Minus, Paperclip, Pencil, Pl
 import { useSesion } from "./sesion";
 import { Boton, Campo, CampoImporte, cx, useAvisos } from "./ui";
 import { Muestra, Prenda as Dibujo, colorTela } from "./muestra";
-import { subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
+import { subirArchivo, textoError, urlArchivo, urlCacheada } from "@/lib/supabase";
 import { euros, precioVentaUd } from "@/lib/calculo";
 import { ordenTalla, type LineaEd, type PersEd } from "@/lib/pedidos";
 import { TALLAS, TALLAS_NINO, TIPOS_PRENDA, UBICACIONES, type Prenda } from "@/lib/tipos";
@@ -19,12 +19,24 @@ export function prendaDe(l: Pick<LineaEd, "marca" | "modelo">, catalogo: Prenda[
 
 /** Foto de la prenda (si la hay) o su dibujo teñido con el color elegido */
 export function FotoPrenda({ path, tipo, color, className, cubrir }: { path: string | null; tipo: string; color: string; className?: string; cubrir?: boolean }) {
-  const [u, setU] = useState<string | null>(null);
-  useEffect(() => { let vivo = true; setU(null); urlArchivo(path).then((x) => vivo && setU(x)); return () => { vivo = false; }; }, [path]);
+  // Si la foto ya estaba firmada se pinta al momento; si no, se pide (por lotes) sin enseñar antes el dibujo
+  const [u, setU] = useState<string | null>(() => urlCacheada(path));
+  const [falla, setFalla] = useState(false);
+  const [lista, setLista] = useState(false);
+  useEffect(() => {
+    let vivo = true; setFalla(false); setLista(false);
+    const ya = urlCacheada(path); setU(ya);
+    if (!ya && path) urlArchivo(path).then((x) => { if (!vivo) return; setU(x); if (!x) setFalla(true); });
+    return () => { vivo = false; };
+  }, [path]);
+  const dibujo = !path || falla;
   return (
     <div className={cx("relative grid place-items-center overflow-hidden rounded-[18px] bg-suave", className)}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {u ? <img src={u} alt={tipo} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setU(null)} className={cx("size-full", cubrir ? "object-cover object-top" : "object-contain")} /> : <Dibujo tipo={tipo} color={color} className="size-[78%]" />}
+      {dibujo ? <Dibujo tipo={tipo} color={color} className="size-[78%]" /> : u ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={u} alt={tipo} loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setLista(true)} onError={() => setFalla(true)}
+          className={cx("size-full transition-opacity duration-200", lista ? "opacity-100" : "opacity-0", cubrir ? "object-cover object-top" : "object-contain")} />
+      ) : null}
     </div>
   );
 }

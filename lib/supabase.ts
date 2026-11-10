@@ -61,6 +61,14 @@ function pedirFirma(bucket: string, ruta: string): Promise<string | null> {
   });
 }
 
+/** URL ya firmada y vigente (sin esperar): para pintar la foto en el primer momento */
+export function urlCacheada(path?: string | null): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const hit = cacheUrl.get(path);
+  return hit && hit.hasta > Date.now() ? hit.url : null;
+}
+
 /** URL firmada de un archivo privado. «roly:REF» = foto compartida de Roly */
 export async function urlArchivo(path?: string | null): Promise<string | null> {
   if (!path) return null;
@@ -91,6 +99,7 @@ export async function subirFotosRoly(files: File[], avance: (hechas: number) => 
     const { error } = await sb.storage.from("roly").upload(ref + ".jpg", f, { upsert: true, contentType: f.type });
     if (error) throw error;
     cacheUrl.delete("roly:" + ref); persistir(); ok++; avance(ok);
+    try { const c = await caches.open("pedidos-textil-fotos-1"); for (const k of await c.keys()) if (k.url.endsWith("/roly/" + ref + ".jpg")) await c.delete(k); } catch { /* sin caché */ }
   }
   return { ok, sinRef };
 }
@@ -99,5 +108,6 @@ export async function subirFotosRoly(files: File[], avance: (hechas: number) => 
 export async function salir() {
   try { for (const k of Object.keys(localStorage)) if (k.startsWith("sesion-cache:") || k === CLAVE_CACHE) localStorage.removeItem(k); } catch { /* nada */ }
   cacheUrl.clear();
+  try { await caches.delete("pedidos-textil-fotos-1"); } catch { /* sin caché */ }
   await sb.auth.signOut();
 }

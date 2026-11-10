@@ -77,7 +77,7 @@ export function Marco({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Cabecera (móvil) */}
-      <header className={cx("no-imprimir sticky top-0 z-20 flex h-14 items-center gap-3 bg-fondo/85 px-4 backdrop-blur lg:hidden", ruta === "/" && "hidden")}>
+      <header className={cx("no-imprimir sticky top-0 z-20 flex h-14 items-center gap-3 bg-fondo/95 px-4 lg:hidden", ruta === "/" && "hidden")}>
         <Link href="/" className="flex items-center gap-2"><Logo /><span className="font-semibold">Mis pedidos</span></Link>
         <button onClick={() => setBuscar(true)} aria-label="Buscar" className="ml-auto grid size-10 place-items-center rounded-full bg-superficie shadow-sm"><Search className="size-[18px]" /></button>
       </header>

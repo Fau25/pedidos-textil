@@ -208,6 +208,22 @@ await prueba("en pantallas táctiles los campos tienen 16px (sin zoom al escribi
   assert.ok(tam.length && tam.every((x) => x >= 16), JSON.stringify(tam)); await ctx.close();
 });
 
+await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
+  const { ctx, p, errores } = await abrir();
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  let firmas = 0;
+  await ctx.route("**/storage/v1/object/sign/roly", async (r) => { firmas++; const { paths } = r.request().postDataJSON();
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paths.map((x) => ({ path: x, signedURL: "/object/sign/roly/" + x + "?token=t", error: null }))) }); });
+  await ctx.route("**/storage/v1/object/sign/roly/*.jpg*", (r) => r.fulfill({ status: 200, contentType: "image/png", body: png }));
+  T.catalogo.push({ ...T.catalogo[0], id: "c2", modelo: "Samoyedo", referencia: "CA6503", imagen_path: "roly:CA6503" });
+  T.catalogo[0] = { ...T.catalogo[0], imagen_path: "roly:CA6554" };
+  await ir(p, "catalogo/"); await p.waitForTimeout(800);
+  assert.equal(firmas, 1, "un solo lote de firmas");
+  assert.equal(await p.locator('main img[src*="roly/CA6554"]').count(), 1);
+  T.catalogo = T.catalogo.slice(0, 1); T.catalogo[0] = { ...T.catalogo[0], imagen_path: null };
+  assert.deepEqual(errores, []); await ctx.close();
+});
+
 await navegador.close(); servidor.close();
 if (fallos) { console.log(`\n${fallos} prueba(s) fallida(s)`); process.exit(1); }
 console.log("\nTodas las pruebas de pantalla pasan");
