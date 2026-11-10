@@ -24,7 +24,7 @@ export function FotoPrenda({ path, tipo, color, className }: { path: string | nu
   return (
     <div className={cx("relative grid place-items-center overflow-hidden rounded-[18px] bg-suave", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {u ? <img src={u} alt={tipo} className="size-full object-cover" /> : <Dibujo tipo={tipo} color={color} className="size-[78%]" />}
+      {u ? <img src={u} alt={tipo} referrerPolicy="no-referrer" onError={() => setU(null)} className="size-full object-contain" /> : <Dibujo tipo={tipo} color={color} className="size-[78%]" />}
     </div>
   );
 }

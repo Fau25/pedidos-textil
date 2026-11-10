@@ -149,6 +149,21 @@ await prueba("la copia de seguridad se descarga en Excel", async () => {
   assert.match(d.suggestedFilename(), /^Copia .*\.xlsx$/); assert.ok(fs.statSync(await d.path()).size > 3000); await ctx.close();
 });
 
+await prueba("el catálogo acepta la foto por enlace y enlaza con Roly", async () => {
+  const { ctx, p } = await abrir();
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  await ctx.route("https://fotos.ejemplo.test/**", (r) => r.fulfill({ status: 200, contentType: "image/png", body: png }));
+  await ir(p, "catalogo/");
+  assert.ok(await p.getByRole("link", { name: "Ver Beagle en Roly" }).count());
+  await p.getByText("Beagle").first().click();
+  await p.getByLabel("Enlace de la foto").fill("https://fotos.ejemplo.test/beagle.png");
+  await p.waitForSelector('img[src="https://fotos.ejemplo.test/beagle.png"]');
+  const href = await p.getByRole("link", { name: /Ver Beagle en Roly/ }).last().getAttribute("href");
+  assert.match(href, /roly\.es/);
+  if (process.env.CAPTURA) await p.screenshot({ path: process.env.CAPTURA });
+  await ctx.close();
+});
+
 await navegador.close(); servidor.close();
 if (fallos) { console.log(`\n${fallos} prueba(s) fallida(s)`); process.exit(1); }
 console.log("\nTodas las pruebas de pantalla pasan");

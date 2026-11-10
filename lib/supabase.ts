@@ -29,6 +29,7 @@ export function textoError(e: unknown): string {
 /** URL firmada (1 h) de un archivo privado */
 export async function urlArchivo(path?: string | null): Promise<string | null> {
   if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path; // foto enlazada desde otra web (p. ej. Roly)
   const { data } = await sb.storage.from("archivos").createSignedUrl(path, 3600);
   return data?.signedUrl ?? null;
 }
@@ -39,4 +40,11 @@ export async function subirArchivo(empresaId: string, carpeta: string, f: File):
   const { error } = await sb.storage.from("archivos").upload(path, f, { upsert: false, contentType: f.type || undefined });
   if (error) throw error;
   return path;
+}
+
+/** Búsqueda del modelo en la web de Roly (abre en el navegador) */
+export function enlaceRoly(p: { marca?: string | null; modelo?: string | null; referencia?: string | null }): string | null {
+  if (!/roly/i.test(p.marca ?? "")) return null;
+  const q = ["site:roly.es", p.modelo, (p.referencia ?? "").replace(/^[A-Z]+/i, "")].filter(Boolean).join(" ");
+  return "https://www.google.com/search?q=" + encodeURIComponent(q);
 }
