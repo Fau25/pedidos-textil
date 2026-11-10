@@ -4,3 +4,8 @@ out
 *.log
 .env*
 *.tsbuildinfo
+
+# Fotos de Roly: privadas, no se suben a GitHub
+fotos-roly/
+*.jpg
+*.jpeg
