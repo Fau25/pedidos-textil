@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Camera, ExternalLink, Link2, Loader2, Plus, Shirt, Trash2, Truck } from "lucide-react";
+import { Camera, ExternalLink, Loader2, Plus, Shirt, Trash2, Truck } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Campo, CampoImporte, Cargando, Hoja, Pestanas, Tarjeta, Vacio, cx, useAvisos } from "@/components/ui";
@@ -103,14 +103,7 @@ function Prendas() {
                 try { const path = await subirArchivo(empresa!.id, "catalogo", f); setEd((x) => (x ? { ...x, imagen_path: path } : x)); } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendoFoto(false); }
               }} />
             </label>
-            <p className="-mt-2 text-center text-[12px] text-texto2">Sube una foto o pega abajo su enlace. Sale al elegir la prenda en un pedido.</p>
-            <div className="flex items-end gap-2">
-              <Campo className="flex-1" etiqueta="Enlace de la foto" ayuda="En la web de Roly: clic derecho en la foto → «Copiar dirección de imagen».">
-                <div className="relative"><Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-texto2" />
-                  <input className="campo pl-9" type="url" inputMode="url" placeholder="https://…" value={/^https?:/i.test(ed.imagen_path ?? "") ? ed.imagen_path! : ""}
-                    onChange={(e) => setEd({ ...ed, imagen_path: e.target.value.trim() || null })} /></div>
-              </Campo>
-            </div>
+            <p className="-mt-2 text-center text-[12px] text-texto2">Foto del producto: sale al elegir esta prenda en un pedido.</p>
             {enlaceRoly(ed) && <a href={enlaceRoly(ed)!} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-full bg-azul-suave px-4 py-2.5 text-[14px] font-medium text-azul hover:opacity-80">
               <ExternalLink className="size-4" /> Ver {ed.modelo || "modelo"} en Roly</a>}
             <div className="grid gap-4 sm:grid-cols-2">
