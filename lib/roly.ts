@@ -10,7 +10,7 @@ export const MODELOS_ROLY: ModeloRoly[] = [
   { tipo: "Camiseta", modelo: "Beagle", referencia: "CA6554", tallas: [...ADULTO, "4XL", "1/2", "3/4", "5/6", "7/8", "9/10", "11/12"],
     colores: [...BASICOS, "Verde botella", "Verde kelly", "Naranja", "Amarillo", "Granate", "Celeste", "Turquesa", "Chocolate", "Rosa claro", "Fucsia", "Morado", "Gris plomo"] },
   { tipo: "Camiseta cuello pico", modelo: "Samoyedo", referencia: "CA6503", tallas: ADULTO, colores: [...BASICOS, "Verde botella", "Granate"], notas: "Revisa los colores" },
-  { tipo: "Camiseta técnica", modelo: "Mónaco", referencia: null, tallas: ADULTO, colores: [...BASICOS, "Verde fluor", "Amarillo fluor", "Naranja fluor"], notas: "Revisa referencia y colores" },
+  { tipo: "Camiseta técnica", modelo: "Mónaco", referencia: "CA6401", tallas: ADULTO, colores: [...BASICOS, "Verde fluor", "Amarillo fluor", "Naranja fluor"] },
   { tipo: "Sudadera con capucha", modelo: "Urban", referencia: "SU1067", tallas: ADULTO, colores: ["Blanco", "Negro", "Marino", "Azul royal", "Rojo", "Gris jaspeado", "Celeste", "Rosa claro", "Verde kelly", "Granate", "Verde botella"] },
   { tipo: "Sudadera", modelo: "Clásica", referencia: "SU1070", tallas: [...ADULTO, "3/4", "5/6", "7/8", "9/10", "11/12"], colores: [...BASICOS, "Verde botella", "Granate", "Celeste"], notas: "Revisa los colores" },
   { tipo: "Sudadera media cremallera", modelo: "Aneto", referencia: "SU1109", tallas: ADULTO, colores: ["Blanco", "Negro", "Marino", "Azul royal", "Rojo", "Granate", "Gris jaspeado", "Verde botella"] },

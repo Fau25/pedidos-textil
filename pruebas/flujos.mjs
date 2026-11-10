@@ -162,7 +162,7 @@ await prueba("el catálogo de Roly se completa con colores y fotos, y las fotos 
   await p.waitForTimeout(1500);
   const ins = escrituras.filter((x) => x.tabla === "catalogo" && x.metodo === "POST").flatMap((x) => x.cuerpo);
   const beagle = escrituras.find((x) => x.tabla === "catalogo" && x.metodo === "PATCH");
-  assert.equal(ins.length, 94, "añade los modelos que faltan");
+  assert.equal(ins.length, 96, "añade los modelos que faltan");
   assert.ok(ins.every((n) => n.imagen_path === "roly:" + n.referencia && n.favorito === false));
   assert.equal(beagle.cuerpo.colores.length, 36); assert.equal(beagle.cuerpo.imagen_path, "roly:CA6554");
   await ir(p, "ajustes/");

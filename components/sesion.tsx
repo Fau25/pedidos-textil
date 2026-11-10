@@ -89,7 +89,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   // Una vez por empresa: referencias, colores y fotos de Roly (catálogo 2026) y alta de los modelos que falten
   useEffect(() => {
     if (!empresa || (rol !== "propietario" && rol !== "editor")) return;
-    const clave = "roly-2026:" + empresa.id;
+    const clave = "roly-2026b:" + empresa.id; // b: + Mónaco y Montecarlo
     try { if (localStorage.getItem(clave)) return; } catch { return; }
     (async () => {
       const norm = (x?: string | null) => (x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
