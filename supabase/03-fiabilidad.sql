@@ -1,14 +1,8 @@
 -- Mis pedidos textiles · v2.1: guardado en una sola transacción y limpieza de lo que ya no se usa
 
--- 1) Quitar estados, historial y presupuestos con seguimiento
+-- 1) Dejar de escribir historial (las tablas estados, presupuestos y pedido_historial se conservan
+--    sin usar; borrarlas es opcional: ver 04-limpieza-opcional.sql)
 drop trigger if exists t_historial on pedidos;
-drop function if exists cambiar_estado(uuid, uuid, text);
-drop function if exists registrar_estado();
-drop table if exists pedido_historial;
-drop table if exists presupuestos;
-drop function if exists numerar_presupuesto();
-alter table pedidos drop column if exists estado_id;
-drop table if exists estados;
 
 -- 2) Alta de empresa sin estados
 create or replace function crear_empresa(nombre text) returns uuid
