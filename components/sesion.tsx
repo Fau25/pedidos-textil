@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session } from "@supabase/supabase-js";
 import { sb } from "@/lib/supabase";
 import type { Empresa, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
-import { MODELOS_ROLY } from "@/lib/roly";
+import { MODELOS_ROLY, REFERENCIAS_ROLY } from "@/lib/roly";
 
 type Datos = {
   sesion: Session | null;
@@ -86,6 +86,23 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     if (temporizador.current) clearTimeout(temporizador.current);
     temporizador.current = setTimeout(() => setVersion((v) => v + 1), 250);
   }, []);
+  // Una vez por empresa: completa las referencias de Roly que faltaban en catálogos antiguos
+  useEffect(() => {
+    if (!empresa) return;
+    const clave = "refs-roly-1:" + empresa.id;
+    try { if (localStorage.getItem(clave)) return; } catch { return; }
+    (async () => {
+      const { data } = await sb.from("catalogo").select("id, modelo, referencia, notas").eq("empresa_id", empresa.id).ilike("marca", "roly");
+      for (const p of data ?? []) {
+        const ref = REFERENCIAS_ROLY[p.modelo ?? ""];
+        if (!ref || p.referencia === ref) continue;
+        const notas = p.notas === "Revisa referencia y colores" ? "Revisa los colores" : p.notas;
+        await sb.from("catalogo").update({ referencia: ref, notas }).eq("id", p.id);
+      }
+      try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento */ }
+    })().catch(() => {});
+  }, [empresa]);
+
   useEffect(() => {
     if (!empresa) return;
     const canal = sb.channel("cambios-" + empresa.id);

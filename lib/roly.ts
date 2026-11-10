@@ -11,13 +11,17 @@ export const MODELOS_ROLY: ModeloRoly[] = [
     colores: [...BASICOS, "Verde botella", "Verde kelly", "Naranja", "Amarillo", "Granate", "Celeste", "Turquesa", "Chocolate", "Rosa claro", "Fucsia", "Morado", "Gris plomo"] },
   { tipo: "Camiseta cuello pico", modelo: "Samoyedo", referencia: "CA6503", tallas: ADULTO, colores: [...BASICOS, "Verde botella", "Granate"], notas: "Revisa los colores" },
   { tipo: "Camiseta técnica", modelo: "Mónaco", referencia: null, tallas: ADULTO, colores: [...BASICOS, "Verde fluor", "Amarillo fluor", "Naranja fluor"], notas: "Revisa referencia y colores" },
-  { tipo: "Sudadera con capucha", modelo: "Urban", referencia: null, tallas: ADULTO, colores: ["Blanco", "Negro", "Marino", "Azul royal", "Rojo", "Gris jaspeado", "Celeste", "Rosa claro", "Verde kelly", "Granate", "Verde botella"] },
-  { tipo: "Sudadera", modelo: "Clásica", referencia: null, tallas: [...ADULTO, "3/4", "5/6", "7/8", "9/10", "11/12"], colores: [...BASICOS, "Verde botella", "Granate", "Celeste"], notas: "Revisa referencia y colores" },
+  { tipo: "Sudadera con capucha", modelo: "Urban", referencia: "SU1067", tallas: ADULTO, colores: ["Blanco", "Negro", "Marino", "Azul royal", "Rojo", "Gris jaspeado", "Celeste", "Rosa claro", "Verde kelly", "Granate", "Verde botella"] },
+  { tipo: "Sudadera", modelo: "Clásica", referencia: "SU1070", tallas: [...ADULTO, "3/4", "5/6", "7/8", "9/10", "11/12"], colores: [...BASICOS, "Verde botella", "Granate", "Celeste"], notas: "Revisa los colores" },
   { tipo: "Sudadera media cremallera", modelo: "Aneto", referencia: "SU1109", tallas: ADULTO, colores: ["Blanco", "Negro", "Marino", "Azul royal", "Rojo", "Granate", "Gris jaspeado", "Verde botella"] },
-  { tipo: "Sudadera oversize", modelo: "Otto", referencia: null, tallas: ADULTO, colores: ["Blanco", "Negro", "Marino", "Gris jaspeado"], notas: "Revisa referencia y colores" },
-  { tipo: "Chaqueta softshell", modelo: "Antártida", referencia: null, tallas: ADULTO, colores: ["Negro", "Marino", "Rojo", "Verde botella", "Blanco perla", "Gris plomo"] },
+  { tipo: "Sudadera oversize", modelo: "Otto", referencia: "SU6702", tallas: ADULTO, colores: ["Blanco", "Negro", "Marino", "Gris jaspeado"], notas: "Revisa los colores" },
+  { tipo: "Chaqueta softshell", modelo: "Antártida", referencia: "SS6432", tallas: ADULTO, colores: ["Negro", "Marino", "Rojo", "Verde botella", "Blanco perla", "Gris plomo"] },
   { tipo: "Chaqueta acolchada", modelo: "Finland", referencia: null, tallas: ADULTO, colores: ["Negro", "Marino", "Rojo", "Granate", "Azul eléctrico", "Ébano", "Verde militar"] },
   { tipo: "Chaqueta acolchada", modelo: "Norway", referencia: null, tallas: ADULTO, colores: ["Negro", "Marino"] },
-  { tipo: "Chaqueta softshell", modelo: "Nebraska", referencia: null, tallas: ADULTO, colores: ["Negro", "Marino", "Azul royal", "Rojo", "Verde botella", "Aguamarina", "Lima"] },
-  { tipo: "Chaqueta sudadera", modelo: "Ulan", referencia: "6439", tallas: ["XS", ...ADULTO], colores: ["Blanco", "Negro", "Marino", "Azul royal", "Rojo", "Gris jaspeado"] },
+  { tipo: "Chaqueta softshell", modelo: "Nebraska", referencia: "SS6436", tallas: ADULTO, colores: ["Negro", "Marino", "Azul royal", "Rojo", "Verde botella", "Aguamarina", "Lima"] },
+  { tipo: "Chaqueta sudadera", modelo: "Ulan", referencia: "CQ6439", tallas: ["XS", ...ADULTO], colores: ["Blanco", "Negro", "Marino", "Azul royal", "Rojo", "Gris jaspeado"] },
 ];
+
+/** Referencias comprobadas en roly.eu (nov 2026): corrigen catálogos creados antes sin ellas */
+export const REFERENCIAS_ROLY: Record<string, string> = Object.fromEntries(
+  MODELOS_ROLY.filter((m) => m.referencia).map((m) => [m.modelo, m.referencia!]));
