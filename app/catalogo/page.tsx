@@ -30,11 +30,14 @@ function Prendas() {
   const [guardando, setGuardando] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [q, setQ] = useState("");
-  const [todas, setTodas] = useState(true);
+  const [cat, setCat] = useState<string | null>(null);
   const { datos, recargar, setDatos, error } = useCarga(async () => ((await sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000)).data ?? []) as Prenda[]);
   const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const lista = (datos ?? []).filter((p) => (q ? n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(n(q)) : todas || p.favorito))
-    .sort((a, b) => Number(b.favorito) - Number(a.favorito)); // habituales primero
+  const cats = categorias(datos ?? []);
+  const actual = cat && cats.some((c) => c.nombre === cat) ? cat : cats[0]?.nombre ?? null;
+  const lista = (datos ?? []).filter((p) => (q ? n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(n(q))
+    : actual === HABITUALES ? p.favorito : categoria(p.tipo) === actual))
+    .sort((a, b) => Number(b.favorito) - Number(a.favorito) || (a.modelo ?? "").localeCompare(b.modelo ?? "", "es")); // habituales primero
   const total = datos?.length ?? 0;
 
   async function estrella(p: Prenda) {
@@ -54,35 +57,51 @@ function Prendas() {
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <input className="campo flex-1 sm:max-w-sm" placeholder={`Buscar en ${total} modelos…`} value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="flex rounded-full border border-borde bg-superficie p-0.5 text-[13px]">
-          <button onClick={() => setTodas(false)} className={cx("h-8 rounded-lg px-3", !todas && "bg-acento-suave font-medium text-texto")}>Habituales</button>
-          <button onClick={() => setTodas(true)} className={cx("h-8 rounded-lg px-3", todas && "bg-acento-suave font-medium text-texto")}>Todas</button>
-        </div>
+        <input className="campo w-full sm:w-auto sm:flex-1 sm:max-w-sm" placeholder={`Buscar en ${total} modelos…`} value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="flex gap-2 sm:ml-auto">
           <ImportarTarifa hecho={recargar} />
           <Boton variante="primario" onClick={() => setEd({ tipo: "Camiseta", marca: "Roly", colores: [], tallas: [], precio_compra: 0, precio_venta: null })}><Plus className="size-4" />Añadir</Boton>
         </div>
       </div>
-      {!datos ? <Cargando error={error} reintentar={recargar} /> : !lista.length ? <div className="tarjeta"><Vacio icono={<Shirt className="size-5" />} titulo={q ? "Sin resultados" : "Sin prendas habituales"} texto={q ? undefined : "Marca con la estrella las prendas que más usas, o importa la tarifa de tu proveedor."} /></div> : (
-        <div className="tarjeta divide-y divide-borde">
-          {lista.slice(0, 300).map((p) => (
-            <div key={p.id} className="flex items-center gap-3 px-4 py-3">
-              <button aria-label={p.favorito ? "Quitar de habituales" : "Añadir a habituales"} title={p.favorito ? "Habitual" : "Marcar como habitual"} onClick={() => estrella(p)}
-                className={cx("grid size-8 shrink-0 place-items-center rounded-lg text-[18px] hover:bg-suave", p.favorito ? "text-amber-500" : "text-texto2/40")}>{p.favorito ? "★" : "☆"}</button>
-              <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} className="size-12 shrink-0 rounded-xl" />
-              <button className="min-w-0 flex-1 text-left" onClick={() => setEd({ ...p, precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) })}>
-                <p className="truncate font-medium">{[p.marca, p.modelo].filter(Boolean).join(" ")} <span className="font-normal text-texto2">· {p.tipo}{p.referencia ? " · " + p.referencia : ""}</span></p>
-                <p className="flex items-center gap-1 truncate text-[12px] text-texto2">
-                  {p.colores.slice(0, 10).map((c) => <Muestra key={c} color={c} />)}
-                  <span className="ml-1">{p.colores.length} colores · {rango(p.tallas)}</span>
-                  {p.notas && <span className="ml-1 text-amber-700 dark:text-amber-400">· {p.notas}</span>}
-                </p>
-              </button>
-            </div>
+      {!q && cats.length > 0 && (
+        <nav aria-label="Categorías" className="-mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-1">
+          {cats.map((c) => (
+            <button key={c.nombre} onClick={() => setCat(c.nombre)} aria-pressed={c.nombre === actual}
+              className={cx("flex h-11 shrink-0 items-center gap-2 rounded-full px-[18px] text-[14px] font-semibold transition-colors",
+                c.nombre === actual ? "bg-acento text-sobre-acento" : "bg-superficie text-texto hover:bg-acento-suave")}>
+              {c.nombre === HABITUALES && <span aria-hidden="true" className={c.nombre === actual ? "" : "text-azul"}>★</span>}
+              {c.nombre}<span className={cx("text-[12px] font-medium", c.nombre === actual ? "opacity-70" : "text-texto2")}>{c.n}</span>
+            </button>
           ))}
+        </nav>
+      )}
+      {!datos ? <Cargando error={error} reintentar={recargar} /> : !lista.length ? <div className="tarjeta"><Vacio icono={<Shirt className="size-5" />} titulo={q ? "Sin resultados" : "Aún no hay prendas"} texto={q ? undefined : "Añade una prenda o importa la tarifa de tu proveedor."} /></div> : (
+        <>
+          {q && <p className="mb-3 text-[13px] text-texto2">{lista.length} resultado{lista.length === 1 ? "" : "s"}</p>}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 xl:gap-4">
+            {lista.slice(0, 300).map((p) => (
+              <article key={p.id} className="tarjeta relative flex flex-col gap-2.5 p-2.5">
+                <button className="flex flex-col gap-2.5 text-left" onClick={() => setEd({ ...p, precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) })}>
+                  <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} cubrir className="aspect-square w-full rounded-2xl" />
+                  <span className="flex flex-col gap-1.5 px-1 pb-1">
+                    <span className="min-w-0">
+                      <span className="block truncate text-[14px] font-bold">{p.modelo || p.tipo}</span>
+                      <span className="block truncate text-[12px] text-texto2">{[p.referencia, p.marca !== "Roly" ? p.marca : null].filter(Boolean).join(" · ") || p.tipo}</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      {p.colores.slice(0, 5).map((c) => <Muestra key={c} color={c} />)}
+                      {p.colores.length > 5 && <span className="ml-0.5 text-[11px] text-texto2">+{p.colores.length - 5}</span>}
+                      {!p.colores.length && <span className="text-[11px] text-texto2">Sin colores</span>}
+                    </span>
+                  </span>
+                </button>
+                <button aria-label={p.favorito ? "Quitar de habituales" : "Marcar como habitual"} title={p.favorito ? "Habitual" : "Marcar como habitual"} onClick={() => estrella(p)}
+                  className={cx("absolute right-4 top-4 grid size-8 place-items-center rounded-full bg-superficie text-[16px] shadow-sm", p.favorito ? "text-azul" : "text-texto2/50 hover:text-azul")}>{p.favorito ? "★" : "☆"}</button>
+              </article>
+            ))}
+          </div>
           {lista.length > 300 && <p className="px-4 py-3 text-center text-[12px] text-texto2">Mostrando 300 de {lista.length}. Afina la búsqueda.</p>}
-        </div>
+        </>
       )}
       <Hoja abierta={!!ed} cerrar={() => setEd(null)} titulo={ed?.id ? "Editar prenda" : "Nueva prenda"}
         pie={<>
@@ -230,9 +249,27 @@ function Proveedores() {
   );
 }
 
-function rango(t: string[]) {
-  const a = t.filter((x) => !/^\d/.test(x)), n = t.filter((x) => /^\d/.test(x));
-  if (!t.length) return "tallas libres";
-  return [a.length ? `${a[0]}–${a[a.length - 1]}` : "", n.length ? "niño" : ""].filter(Boolean).join(" + ");
-}
 
+
+const HABITUALES = "Habituales";
+/** Categoría del menú según el tipo de prenda */
+function categoria(tipo?: string | null): string {
+  const t = (tipo ?? "").toLowerCase();
+  if (/body|beb/.test(t)) return "Bebé";
+  if (/polo/.test(t)) return "Polos";
+  if (/chaleco/.test(t)) return "Chalecos";
+  if (/softshell/.test(t)) return "Softshell";
+  if (/polar/.test(t)) return "Polares";
+  if (/sudadera/.test(t)) return "Sudaderas";
+  if (/chaqueta|cazadora|abrigo|parka/.test(t)) return "Chaquetas";
+  if (/camiseta|tirantes/.test(t)) return "Camisetas";
+  return "Otras";
+}
+const ORDEN_CATS = ["Camisetas", "Polos", "Sudaderas", "Chaquetas", "Polares", "Softshell", "Chalecos", "Bebé", "Otras"];
+/** Chips del menú: Habituales (si hay) y las categorías con prendas, con su número */
+function categorias(ps: Prenda[]): { nombre: string; n: number }[] {
+  const cuenta = new Map<string, number>();
+  for (const p of ps) cuenta.set(categoria(p.tipo), (cuenta.get(categoria(p.tipo)) ?? 0) + 1);
+  const fav = ps.filter((p) => p.favorito).length;
+  return [...(fav ? [{ nombre: HABITUALES, n: fav }] : []), ...ORDEN_CATS.filter((c) => cuenta.has(c)).map((c) => ({ nombre: c, n: cuenta.get(c)! }))];
+}

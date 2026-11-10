@@ -18,13 +18,13 @@ export function prendaDe(l: Pick<LineaEd, "marca" | "modelo">, catalogo: Prenda[
 }
 
 /** Foto de la prenda (si la hay) o su dibujo teñido con el color elegido */
-export function FotoPrenda({ path, tipo, color, className }: { path: string | null; tipo: string; color: string; className?: string }) {
+export function FotoPrenda({ path, tipo, color, className, cubrir }: { path: string | null; tipo: string; color: string; className?: string; cubrir?: boolean }) {
   const [u, setU] = useState<string | null>(null);
   useEffect(() => { let vivo = true; setU(null); urlArchivo(path).then((x) => vivo && setU(x)); return () => { vivo = false; }; }, [path]);
   return (
     <div className={cx("relative grid place-items-center overflow-hidden rounded-[18px] bg-suave", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {u ? <img src={u} alt={tipo} referrerPolicy="no-referrer" onError={() => setU(null)} className="size-full object-contain" /> : <Dibujo tipo={tipo} color={color} className="size-[78%]" />}
+      {u ? <img src={u} alt={tipo} referrerPolicy="no-referrer" onError={() => setU(null)} className={cx("size-full", cubrir ? "object-cover object-top" : "object-contain")} /> : <Dibujo tipo={tipo} color={color} className="size-[78%]" />}
     </div>
   );
 }
