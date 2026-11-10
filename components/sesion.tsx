@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { sb } from "@/lib/supabase";
+import { salir } from "@/lib/supabase";
 import type { Empresa, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
 import { CATALOGO_ROLY, MODELOS_ROLY, REFERENCIAS_ROLY, TALLAS_ADULTO, TALLAS_NINO } from "@/lib/roly";
 
@@ -65,13 +66,24 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     if (emp.error) throw emp.error;
     setProveedores((prov.data ?? []) as Proveedor[]);
     setCargado(true);
+    try { localStorage.setItem("sesion-cache:" + uid, JSON.stringify({ rol: m.rol, empresa: emp.data, tecnicas: tec.data, tarifas: tar.data, proveedores: prov.data })); } catch { /* sin almacenamiento */ }
     } catch (e) {
       // Un error de conexión NO es «no tienes empresa»: se avisa y se reintenta
       setFallo(textoError(e)); setCargado(true);
     }
   }, [uid]);
 
-  useEffect(() => { if (uid) { setCargado(false); recargar(); } else { setEmpresa(null); setCargado(true); } }, [uid, recargar]);
+  // Al abrir: se enseña al momento lo guardado en el dispositivo y se actualiza por detrás
+  useEffect(() => {
+    if (!uid) { setEmpresa(null); setCargado(true); return; }
+    let copia: { rol: string; empresa: Empresa; tecnicas: Tecnica[]; tarifas: TarifaFila[]; proveedores: Proveedor[] } | null = null;
+    try { copia = JSON.parse(localStorage.getItem("sesion-cache:" + uid) || "null"); } catch { /* nada */ }
+    if (copia?.empresa) {
+      setRol(copia.rol); setEmpresa(copia.empresa); setTecnicas(copia.tecnicas ?? []); setProveedores(copia.proveedores ?? []);
+      setTarifas((copia.tarifas ?? []).map((t) => ({ ...t, coste: Number(t.coste), precio: Number(t.precio) }))); setCargado(true);
+    } else setCargado(false);
+    recargar();
+  }, [uid, recargar]);
   useEffect(() => {
     if (!fallo) return;
     const r = () => recargar();
@@ -93,23 +105,27 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     try { if (localStorage.getItem(clave)) return; } catch { return; }
     (async () => {
       const norm = (x?: string | null) => (x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      const { data, error } = await sb.from("catalogo").select("id, modelo, referencia, notas, imagen_path").eq("empresa_id", empresa.id).ilike("marca", "roly");
+      const { data, error } = await sb.from("catalogo").select("id, modelo, referencia, notas, imagen_path, colores").eq("empresa_id", empresa.id).ilike("marca", "roly");
       if (error) return;
       const filas = data ?? [];
       // primero, referencias de los modelos antiguos que no la tenían
       for (const p of filas) { const r = REFERENCIAS_ROLY[p.modelo ?? ""]; if (r && !p.referencia) p.referencia = r; }
-      const nuevos = [];
+      const nuevos = []; const cambios: { id: string; c: Record<string, unknown> }[] = [];
       for (const m of CATALOGO_ROLY) {
         const p = filas.find((f) => f.referencia === m.ref) ?? filas.find((f) => !f.referencia && norm(f.modelo) === norm(m.modelo));
-        const cambios: Record<string, unknown> = { referencia: m.ref };
-        if (m.colores.length) cambios.colores = m.colores;
         if (p) {
-          if (!p.imagen_path) cambios.imagen_path = "roly:" + m.ref;
-          if (p.notas === "Revisa referencia y colores" || p.notas === "Revisa los colores") cambios.notas = null;
-          const { error: e } = await sb.from("catalogo").update(cambios).eq("id", p.id);
-          if (e) return;
+          const c: Record<string, unknown> = {};
+          if (p.referencia !== m.ref) c.referencia = m.ref;
+          if (m.colores.length && JSON.stringify(p.colores ?? []) !== JSON.stringify(m.colores)) c.colores = m.colores;
+          if (!p.imagen_path) c.imagen_path = "roly:" + m.ref;
+          if (p.notas === "Revisa referencia y colores" || (p.notas === "Revisa los colores" && m.colores.length)) c.notas = null;
+          if (Object.keys(c).length) cambios.push({ id: p.id, c }); // solo lo que de verdad cambia
         } else nuevos.push({ empresa_id: empresa.id, marca: "Roly", tipo: m.tipo, modelo: m.modelo, referencia: m.ref, colores: m.colores,
           tallas: m.ninos ? TALLAS_NINO : TALLAS_ADULTO, favorito: false, precio_compra: 0, imagen_path: "roly:" + m.ref, notas: m.colores.length ? null : "Revisa los colores" });
+      }
+      for (let i = 0; i < cambios.length; i += 8) {
+        const r = await Promise.all(cambios.slice(i, i + 8).map((x) => sb.from("catalogo").update(x.c).eq("id", x.id)));
+        if (r.some((x) => x.error)) return;
       }
       if (nuevos.length) { const { error: e } = await sb.from("catalogo").insert(nuevos); if (e) return; }
       try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento */ }
@@ -164,7 +180,7 @@ function SinConexion({ texto, reintentar }: { texto: string; reintentar: () => v
     <Marco titulo="Sin conexión" sub="Tus datos están a salvo. No se ha podido contactar con el servidor.">
       <p className="mb-4 text-[13px] text-texto2">{texto} Si hace más de una semana que nadie abre la app, el servidor puede tardar un minuto en despertar.</p>
       <Boton variante="primario" className="w-full" onClick={reintentar}>Reintentar</Boton>
-      <button className="mt-4 w-full text-center text-[13px] text-texto2 hover:underline" onClick={() => sb.auth.signOut()}>Salir</button>
+      <button className="mt-4 w-full text-center text-[13px] text-texto2 hover:underline" onClick={() => salir()}>Salir</button>
     </Marco>
   );
 }
@@ -278,7 +294,7 @@ function AltaEmpresa({ hecho }: { hecho: () => Promise<void> }) {
         </label>
         <Boton variante="primario" className="w-full" cargando={cargando} type="submit">Empezar</Boton>
       </form>
-      <button className="mt-4 w-full text-center text-[13px] text-texto2 hover:underline" onClick={() => sb.auth.signOut()}>Salir</button>
+      <button className="mt-4 w-full text-center text-[13px] text-texto2 hover:underline" onClick={() => salir()}>Salir</button>
     </Marco>
   );
 }

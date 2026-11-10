@@ -26,18 +26,51 @@ export function textoError(e: unknown): string {
   return m;
 }
 
-const cacheUrl = new Map<string, { url: string; hasta: number }>();
+// URLs firmadas: se piden por lotes (una petición para todas las fotos de una pantalla), valen 12 h
+// y se guardan en el dispositivo, así el navegador reutiliza las fotos ya descargadas.
+const DURA = 12 * 3600, CLAVE_CACHE = "urls-firmadas-1";
+const cacheUrl: Map<string, { url: string; hasta: number }> = (() => {
+  try { return new Map(Object.entries(JSON.parse(localStorage.getItem(CLAVE_CACHE) || "{}"))); } catch { return new Map(); }
+})();
+let guardarCache: ReturnType<typeof setTimeout> | null = null;
+function persistir() {
+  if (guardarCache) return;
+  guardarCache = setTimeout(() => {
+    guardarCache = null; const ahora = Date.now();
+    try { localStorage.setItem(CLAVE_CACHE, JSON.stringify(Object.fromEntries([...cacheUrl].filter(([, v]) => v.hasta > ahora)))); } catch { /* sin almacenamiento */ }
+  }, 500);
+}
+const colas = new Map<string, Map<string, ((u: string | null) => void)[]>>();
+function pedirFirma(bucket: string, ruta: string): Promise<string | null> {
+  return new Promise((res) => {
+    let cola = colas.get(bucket);
+    if (!cola) {
+      cola = new Map(); colas.set(bucket, cola);
+      setTimeout(async () => {
+        const lote = colas.get(bucket)!; colas.delete(bucket);
+        const rutas = [...lote.keys()];
+        for (let i = 0; i < rutas.length; i += 100) {
+          const parte = rutas.slice(i, i + 100);
+          const { data } = await sb.storage.from(bucket).createSignedUrls(parte, DURA).catch(() => ({ data: null }));
+          const porRuta = new Map((data ?? []).map((d) => [d.path, d.signedUrl]));
+          for (const r of parte) { const u = porRuta.get(r) || null; for (const f of lote.get(r)!) f(u); }
+        }
+      }, 15);
+    }
+    const esperan = cola.get(ruta) ?? []; esperan.push(res); cola.set(ruta, esperan);
+  });
+}
 
-/** URL firmada (1 h) de un archivo privado. «roly:REF» = foto compartida de Roly */
+/** URL firmada de un archivo privado. «roly:REF» = foto compartida de Roly */
 export async function urlArchivo(path?: string | null): Promise<string | null> {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
   const hit = cacheUrl.get(path);
   if (hit && hit.hasta > Date.now()) return hit.url;
   const [bucket, ruta] = path.startsWith("roly:") ? ["roly", path.slice(5) + ".jpg"] : ["archivos", path];
-  const { data } = await sb.storage.from(bucket).createSignedUrl(ruta, 3600);
-  if (data?.signedUrl) cacheUrl.set(path, { url: data.signedUrl, hasta: Date.now() + 50 * 60_000 });
-  return data?.signedUrl ?? null;
+  const url = await pedirFirma(bucket, ruta);
+  if (url) { cacheUrl.set(path, { url, hasta: Date.now() + (DURA - 600) * 1000 }); persistir(); }
+  return url;
 }
 
 export async function subirArchivo(empresaId: string, carpeta: string, f: File): Promise<string> {
@@ -57,7 +90,14 @@ export async function subirFotosRoly(files: File[], avance: (hechas: number) => 
     if (!ref || !/^image\//.test(f.type)) { sinRef.push(f.name); continue; }
     const { error } = await sb.storage.from("roly").upload(ref + ".jpg", f, { upsert: true, contentType: f.type });
     if (error) throw error;
-    cacheUrl.delete("roly:" + ref); ok++; avance(ok);
+    cacheUrl.delete("roly:" + ref); persistir(); ok++; avance(ok);
   }
   return { ok, sinRef };
+}
+
+/** Cerrar sesión borrando lo guardado en el dispositivo (datos del taller y enlaces de fotos) */
+export async function salir() {
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith("sesion-cache:") || k === CLAVE_CACHE) localStorage.removeItem(k); } catch { /* nada */ }
+  cacheUrl.clear();
+  await sb.auth.signOut();
 }

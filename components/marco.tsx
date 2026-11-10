@@ -9,6 +9,7 @@ import { Logo } from "./logo";
 import { cx } from "./ui";
 import { useSesion } from "./sesion";
 import { sb } from "@/lib/supabase";
+import { salir } from "@/lib/supabase";
 
 const NAV = [
   { href: "/", t: "Inicio", i: Home },
@@ -69,7 +70,7 @@ export function Marco({ children }: { children: ReactNode }) {
           <button onClick={cambiar} className="flex h-9 w-full items-center gap-3 rounded-full px-3 text-[13px] text-texto2 hover:bg-suave">
             {oscuro ? <Sun className="size-4" /> : <Moon className="size-4" />} Modo {oscuro ? "claro" : "oscuro"}
           </button>
-          <button onClick={() => sb.auth.signOut()} className="flex h-9 w-full items-center gap-3 rounded-full px-3 text-[13px] text-texto2 hover:bg-suave">
+          <button onClick={() => salir()} className="flex h-9 w-full items-center gap-3 rounded-full px-3 text-[13px] text-texto2 hover:bg-suave">
             <LogOut className="size-4" /> Salir
           </button>
         </div>
@@ -100,7 +101,7 @@ export function Marco({ children }: { children: ReactNode }) {
               <Link key={href} href={href} className="flex h-12 items-center gap-3 rounded-xl px-3 hover:bg-suave"><I className="size-5 text-texto2" />{t}</Link>
             ))}
             <button onClick={cambiar} className="flex h-12 w-full items-center gap-3 rounded-xl px-3 hover:bg-suave">{oscuro ? <Sun className="size-5 text-texto2" /> : <Moon className="size-5 text-texto2" />}Modo {oscuro ? "claro" : "oscuro"}</button>
-            <button onClick={() => sb.auth.signOut()} className="flex h-12 w-full items-center gap-3 rounded-xl px-3 hover:bg-suave"><LogOut className="size-5 text-texto2" />Salir</button>
+            <button onClick={() => salir()} className="flex h-12 w-full items-center gap-3 rounded-xl px-3 hover:bg-suave"><LogOut className="size-5 text-texto2" />Salir</button>
           </div>
         </div>
       )}
