@@ -1,16 +1,17 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Trash2, ImagePlus, Paperclip, Shirt, Check, Loader2, Sparkles, X } from "lucide-react";
+import { Plus, Loader2, BookOpen } from "lucide-react";
 import { useSesion } from "./sesion";
-import { Boton, Campo, CampoImporte, Tarjeta, cx, useAvisos } from "./ui";
-import { sb, subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
-import { calcular, euros, tarifaPara, precioVentaUd, sumaUnidades } from "@/lib/calculo";
-import { aCalc, claveBorrador, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, ordenTalla, cargarPedido, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
+import { Boton, Campo, CampoImporte, Tarjeta, useAvisos } from "./ui";
+import { sb, textoError } from "@/lib/supabase";
+import { calcular, euros, tarifaPara, sumaUnidades } from "@/lib/calculo";
+import { aCalc, claveBorrador, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, cargarPedido, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
 import { SelectorCliente } from "./selector-cliente";
+import { SelectorTecnica, TarjetaLinea, TarjetaPers } from "./bloques-pedido";
 import { Catalogo } from "./catalogo-picker";
 export { SelectorCliente };
-import { TALLAS, TALLAS_NINO, TIPOS_PRENDA, UBICACIONES, type Cliente } from "@/lib/tipos";
+import type { Cliente, Prenda } from "@/lib/tipos";
 
 
 export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null; duplicarDe: string | null }) {
@@ -25,14 +26,19 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   const [guardando, setGuardando] = useState<"" | "guardando" | "guardado" | "error">("");
   const [enviando, setEnviando] = useState(false);
   const [catalogo, setCatalogo] = useState(false);
+  const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [errorCliente, setErrorCliente] = useState(false);
   const cambiado = useRef(false);
 
   // Carga inicial
   useEffect(() => {
     (async () => {
-      const c = await sb.from("clientes").select("*").eq("empresa_id", empresa!.id).order("nombre");
+      const [c, cat] = await Promise.all([
+        sb.from("clientes").select("*").eq("empresa_id", empresa!.id).order("nombre"),
+        sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000),
+      ]);
       setClientes((c.data ?? []) as Cliente[]);
+      setPrendas((cat.data ?? []) as Prenda[]);
       if (pedidoId) {
         const r = await cargarPedido(pedidoId);
         if (!r) { aviso("No se encuentra el pedido", "error"); return router.replace("/pedidos/"); }
@@ -140,11 +146,14 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
           {/* 2 · Prendas */}
           <section>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[17px] font-semibold">Prendas <span className="ml-1 text-[13px] font-normal text-texto2">{t.unidades} uds</span></h2>
+              <h2 className="text-[19px] font-semibold tracking-[-0.01em]">Prendas <span className="ml-1 text-[13px] font-normal text-texto2">{t.unidades} uds</span></h2>
+              <button onClick={() => setCatalogo(true)} className="inline-flex h-10 items-center gap-2 rounded-full bg-azul-suave pl-1 pr-4 text-[13px] font-medium text-azul hover:brightness-95" aria-label="Desde el catálogo">
+                <span className="grid size-8 place-items-center rounded-full bg-azul text-white"><BookOpen className="size-4" /></span><span className="hidden sm:inline">Catálogo</span>
+              </button>
             </div>
             <div className="space-y-4">
               {p.lineas.map((l, i) => (
-                <TarjetaLinea key={l.clave} l={l} n={i + 1} margen={margen} t={t.lineas[l.clave]} proveedores={proveedores}
+                <TarjetaLinea key={l.clave} l={l} n={i + 1} margen={margen} t={t.lineas[l.clave]} catalogo={prendas} proveedores={proveedores}
                   cambiar={(c) => setLinea(l.clave, c)}
                   duplicar={() => set((x) => { const k = x.lineas.findIndex((z) => z.clave === l.clave); const nueva = { ...l, clave: id(), color: "", tallas: {}, estado: "pendiente" as const }; const ls = [...x.lineas]; ls.splice(k + 1, 0, nueva);
                     return { ...x, lineas: ls, pers: x.pers.map((z) => (z.lineas.includes(l.clave) ? { ...z, lineas: [...z.lineas, nueva.clave] } : z)) }; })}
@@ -153,28 +162,30 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
                     set((x) => ({ ...x, lineas: x.lineas.filter((z) => z.clave !== l.clave), pers: x.pers.map((z) => ({ ...z, lineas: z.lineas.filter((k) => k !== l.clave) })) }));
                   }} />
               ))}
-              <div className="flex flex-wrap gap-2">
-                <Boton onClick={() => set((x) => ({ ...x, lineas: [...x.lineas, lineaVacia(margen)] }))}><Plus className="size-4" />Añadir prenda</Boton>
-                <Boton variante="fantasma" onClick={() => setCatalogo(true)}><Shirt className="size-4" />Desde el catálogo</Boton>
-              </div>
+              <button onClick={() => set((x) => ({ ...x, lineas: [...x.lineas, lineaVacia(margen)] }))}
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-borde text-[14px] font-medium text-texto2 hover:border-acento hover:text-texto">
+                <Plus className="size-4" />Añadir otra prenda
+              </button>
             </div>
           </section>
 
           {/* 3 · Personalización */}
           <section>
-            <h2 className="mb-3 text-[17px] font-semibold">Personalización</h2>
+            <h2 className="mb-3 text-[19px] font-semibold tracking-[-0.01em]">Personalización</h2>
             <div className="space-y-4">
-              {!p.pers.length && <p className="tarjeta p-5 text-[13px] text-texto2">Sin personalización. Añade bordado, serigrafía, vinilo o DTF y elige a qué prendas se aplica.</p>}
               {p.pers.map((z, i) => (
                 <TarjetaPers key={z.clave} z={z} lineas={p.lineas} calc={t.pers[i]} tecnicas={tecnicas}
                   cambiar={(c) => setPers(z.clave, c)}
                   quitar={() => set((x) => ({ ...x, pers: x.pers.filter((q) => q.clave !== z.clave) }))}
                   usarTarifa={() => { const tf = tarifaPara(tarifas, z.tecnica_id, t.pers[i]?.unidades ?? 0); setPers(z.clave, { precio_manual: false, coste_ud: tf?.coste ?? 0, precio_ud: tf?.precio ?? 0 }); }} />
               ))}
-              <Boton onClick={() => {
-                const tec = tecnicas[0];
-                set((x) => ({ ...x, pers: [...x.pers, { clave: id(), tecnica_id: tec?.id ?? null, tecnica: tec?.nombre ?? "Bordado", ubicacion: "Pecho izquierdo", aplicaciones: 1, coste_ud: 0, precio_ud: 0, precio_manual: false, diseno_path: null, notas: "", estado: "pendiente", lineas: x.lineas.map((l) => l.clave) }] }));
-              }}><Sparkles className="size-4" />Añadir personalización</Boton>
+              <div className="tarjeta p-5">
+                <p className="mb-4 text-[13px] text-texto2">{p.pers.length ? "Añadir otra personalización:" : "Elige la técnica y después indica dónde va y a qué prendas se aplica."}</p>
+                <SelectorTecnica grande tecnicas={tecnicas} elegir={(tec) => set((x) => ({ ...x, pers: [...x.pers, {
+                  clave: id(), tecnica_id: tec.id, tecnica: tec.nombre, ubicacion: "Pecho izquierdo", aplicaciones: 1, coste_ud: 0, precio_ud: 0,
+                  precio_manual: false, diseno_path: null, notas: "", estado: "pendiente", lineas: x.lineas.map((l) => l.clave),
+                }] }))} />
+              </div>
             </div>
           </section>
 
@@ -235,159 +246,4 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 }
 
 const Fila = ({ t, v }: { t: string; v: string }) => <div className="flex justify-between gap-3"><dt className="text-texto2">{t}</dt><dd className="num">{v}</dd></div>;
-
-/* ───────── Prenda con matriz de tallas ───────── */
-function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar }: {
-  l: LineaEd; n: number; margen: number; t?: { unidades: number; ventaUd: number; venta: number }; proveedores: { id: string; nombre: string }[];
-  cambiar: (c: Partial<LineaEd>) => void; duplicar: () => void; quitar: () => void;
-}) {
-  const { empresa } = useSesion();
-  const { aviso } = useAvisos();
-  const [nino, setNino] = useState(() => Object.keys(l.tallas).some((k) => TALLAS_NINO.includes(k) || k.includes("/")));
-  const [mas, setMas] = useState(false);
-  const delModelo = l.tallasModelo?.length ? l.tallasModelo : null;
-  const ninoModelo = delModelo?.filter((k) => /^\d/.test(k)) ?? [];
-  const adultoModelo = delModelo?.filter((k) => !/^\d/.test(k)) ?? [];
-  const [img, setImg] = useState<string | null>(null);
-  const [subiendo, setSubiendo] = useState(false);
-  const [nuevaTalla, setNuevaTalla] = useState("");
-  useEffect(() => { urlArchivo(l.imagen_path).then(setImg); }, [l.imagen_path]);
-  const base = delModelo ? (nino && ninoModelo.length ? ninoModelo : adultoModelo.length ? adultoModelo : delModelo) : nino ? TALLAS_NINO : TALLAS;
-  const tallas = [...base, ...Object.keys(l.tallas).filter((k) => !base.includes(k))].sort((a, b) => ordenTalla(a) - ordenTalla(b));
-  const pvSugerido = precioVentaUd({ precio_compra: l.precio_compra, precio_venta: null }, margen) / 100;
-
-  return (
-    <div className="tarjeta animar">
-      <div className="flex items-start gap-3 border-b border-borde px-4 py-3 sm:px-5">
-        <label className="relative grid size-14 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-xl bg-suave text-texto2 hover:ring-2 hover:ring-azul/40" title="Imagen de la prenda">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {img ? <img src={img} alt="" className="size-full object-cover" /> : subiendo ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
-          <input type="file" accept="image/*" className="sr-only" aria-label="Subir imagen de la prenda" onChange={async (e) => {
-            const f = e.target.files?.[0]; if (!f) return; setSubiendo(true);
-            try { cambiar({ imagen_path: await subirArchivo(empresa!.id, "prendas", f) }); } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendo(false); }
-          }} />
-        </label>
-        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-4">
-          <input className="campo font-medium" list="tipos-prenda" aria-label={`Tipo de prenda ${n}`} placeholder="Tipo de prenda" value={l.tipo} onChange={(e) => cambiar({ tipo: e.target.value })} />
-          <input className="campo" aria-label="Marca" placeholder="Marca" value={l.marca} onChange={(e) => cambiar({ marca: e.target.value })} />
-          <input className="campo" aria-label="Modelo o referencia" placeholder="Modelo / ref." value={l.modelo} onChange={(e) => cambiar({ modelo: e.target.value })} />
-          <input className="campo" aria-label="Color" placeholder="Color" value={l.color} onChange={(e) => cambiar({ color: e.target.value })} />
-        </div>
-        <datalist id="tipos-prenda">{TIPOS_PRENDA.map((x) => <option key={x} value={x} />)}</datalist>
-      </div>
-
-      <div className="px-4 py-4 sm:px-5">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-[12px] font-medium text-texto2">Cantidades por talla</span>
-          {(!delModelo || (ninoModelo.length > 0 && adultoModelo.length > 0)) && <div className="flex rounded-lg bg-suave p-0.5 text-[12px]">
-            <button className={cx("rounded-md px-2 py-0.5", !nino && "bg-superficie shadow-sm")} onClick={() => setNino(false)}>Adulto</button>
-            <button className={cx("rounded-md px-2 py-0.5", nino && "bg-superficie shadow-sm")} onClick={() => setNino(true)}>Niño</button>
-          </div>}
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
-          {tallas.map((k) => (
-            <label key={k} className="flex w-[58px] flex-col items-center gap-1">
-              <span className="text-[11px] font-semibold text-texto2">{k}</span>
-              <input type="number" inputMode="numeric" min={0} className={cx("campo sin-flechas num h-10 px-1 text-center", (l.tallas[k] ?? 0) > 0 && "border-azul/50 bg-azul-suave font-semibold")}
-                value={l.tallas[k] || ""} placeholder="0" aria-label={`Cantidad talla ${k}`}
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => { const v = Math.max(0, Math.floor(Number(e.target.value) || 0)); const nt = { ...l.tallas }; if (v) nt[k] = v; else delete nt[k]; cambiar({ tallas: nt }); }} />
-            </label>
-          ))}
-          <form className="flex w-[70px] flex-col items-center gap-1" onSubmit={(e) => { e.preventDefault(); const k = nuevaTalla.trim(); if (k && !(k in l.tallas)) { cambiar({ tallas: { ...l.tallas, [k]: 0 } }); } setNuevaTalla(""); }}>
-            <span className="text-[11px] text-texto2">Otra</span>
-            <input className="campo h-10 px-1 text-center text-[12px]" placeholder="Única" value={nuevaTalla} onChange={(e) => setNuevaTalla(e.target.value)} aria-label="Añadir otra talla" onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
-          </form>
-          <div className="ml-auto flex h-10 items-center rounded-xl bg-suave px-3 text-[13px]"><span className="text-texto2">Total</span><b className="num ml-2 text-[16px]">{t?.unidades ?? 0}</b><span className="ml-1 text-texto2">uds</span></div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <Campo etiqueta="Precio / ud" ayuda={l.precio_venta === null && l.precio_compra ? "Precio de tarifa" : undefined}>
-            <CampoImporte valor={l.precio_venta} placeholder={pvSugerido.toFixed(2).replace(".", ",")} cambiar={(v) => cambiar({ precio_venta: v })} />
-          </Campo>
-          <div className="flex flex-col justify-end"><span className="mb-1.5 text-[12px] font-medium text-texto2">Importe</span><span className="num flex h-10 items-center text-[15px] font-semibold">{euros(t?.venta ?? 0)}</span></div>
-          <div className="col-span-2 flex items-end sm:col-span-1"><button className="h-10 text-[13px] text-azul" onClick={() => setMas((v) => !v)}>{mas ? "Menos" : "Más detalles"}</button></div>
-        </div>
-        {mas && (
-          <div className="animar mt-3 grid gap-3 sm:grid-cols-2">
-            <Campo etiqueta="Proveedor">
-              <select className="campo" value={l.proveedor_id ?? ""} onChange={(e) => cambiar({ proveedor_id: e.target.value || null })}>
-                <option value="">—</option>{proveedores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-              </select>
-            </Campo>
-            <Campo etiqueta="Observaciones"><input className="campo" value={l.notas} onChange={(e) => cambiar({ notas: e.target.value })} /></Campo>
-          </div>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1 border-t border-borde px-3 py-2">
-        <Boton tam="s" variante="fantasma" onClick={duplicar}><Copy className="size-3.5" />Duplicar con otro color</Boton>
-        <Boton tam="s" variante="fantasma" className="ml-auto hover:text-red-600" onClick={quitar}><Trash2 className="size-3.5" />Quitar</Boton>
-      </div>
-    </div>
-  );
-}
-
-/* ───────── Personalización ───────── */
-function TarjetaPers({ z, lineas, calc, tecnicas, cambiar, quitar, usarTarifa }: {
-  z: PersEd; lineas: LineaEd[]; calc?: { unidades: number; coste: number; venta: number }; tecnicas: { id: string; nombre: string }[];
-  cambiar: (c: Partial<PersEd>) => void; quitar: () => void; usarTarifa: () => void;
-}) {
-  const { empresa } = useSesion();
-  const { aviso } = useAvisos();
-  const [subiendo, setSubiendo] = useState(false);
-  const [img, setImg] = useState<string | null>(null);
-  useEffect(() => { urlArchivo(z.diseno_path).then(setImg); }, [z.diseno_path]);
-  const alternar = (k: string) => cambiar({ lineas: z.lineas.includes(k) ? z.lineas.filter((x) => x !== k) : [...z.lineas, k] });
-
-  return (
-    <div className="tarjeta animar p-4 sm:p-5">
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_100px]">
-        <Campo etiqueta="Técnica">
-          <select className="campo" value={z.tecnica_id ?? ""} onChange={(e) => { const tc = tecnicas.find((x) => x.id === e.target.value); cambiar({ tecnica_id: tc?.id ?? null, tecnica: tc?.nombre ?? z.tecnica, precio_manual: false }); }}>
-            {tecnicas.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
-          </select>
-        </Campo>
-        <Campo etiqueta="Ubicación"><input className="campo" list="ubicaciones" value={z.ubicacion} onChange={(e) => cambiar({ ubicacion: e.target.value })} /></Campo>
-        <Campo etiqueta="Nº aplic."><input type="number" min={1} className="campo num text-center" value={z.aplicaciones} onChange={(e) => cambiar({ aplicaciones: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} /></Campo>
-        <datalist id="ubicaciones">{UBICACIONES.map((x) => <option key={x} value={x} />)}</datalist>
-      </div>
-
-      <p className="mb-2 mt-4 text-[12px] font-medium text-texto2">Se aplica a</p>
-      <div className="flex flex-wrap gap-2">
-        {lineas.map((l) => {
-          const on = z.lineas.includes(l.clave);
-          return (
-            <button key={l.clave} onClick={() => alternar(l.clave)} aria-pressed={on}
-              className={cx("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium", on ? "border-acento bg-acento text-sobre-acento" : "border-borde text-texto2")}>
-              {on && <Check className="size-3.5" />}{[l.tipo, l.color].filter(Boolean).join(" · ") || "Prenda"}
-            </button>
-          );
-        })}
-        {lineas.length > 1 && <button className="h-8 px-2 text-[12px] text-azul" onClick={() => cambiar({ lineas: z.lineas.length === lineas.length ? [] : lineas.map((l) => l.clave) })}>{z.lineas.length === lineas.length ? "Ninguna" : "Todas"}</button>}
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <Campo etiqueta="Precio / ud" ayuda={z.precio_manual ? undefined : `Tarifa para ${calc?.unidades ?? 0} uds`}><CampoImporte valor={z.precio_ud} cambiar={(v) => cambiar({ precio_ud: v ?? 0, precio_manual: true })} /></Campo>
-        <div className="flex flex-col justify-end"><span className="mb-1.5 text-[12px] font-medium text-texto2">Importe</span><span className="num flex h-10 items-center text-[15px] font-semibold">{euros(calc?.venta ?? 0)}</span></div>
-        <div className="flex items-end">{z.precio_manual && <Boton tam="s" variante="fantasma" onClick={usarTarifa}>Usar tarifa</Boton>}</div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-borde px-3 py-2 text-[13px] text-texto2 hover:bg-suave">
-          {subiendo ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
-          {z.diseno_path ? "Cambiar diseño" : "Adjuntar diseño o logotipo"}
-          <input type="file" accept="image/*,.pdf,.ai,.eps,.svg,.dst,.emb,.pes" className="sr-only" onChange={async (e) => {
-            const f = e.target.files?.[0]; if (!f) return; setSubiendo(true);
-            try { cambiar({ diseno_path: await subirArchivo(empresa!.id, "disenos", f) }); } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendo(false); }
-          }} />
-        </label>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {img && (/\.(png|jpe?g|gif|webp|svg)$/i.test(z.diseno_path ?? "") ? <a href={img} target="_blank" rel="noreferrer"><img src={img} alt="Diseño" className="h-10 rounded-lg border border-borde object-contain" /></a> : <a href={img} target="_blank" rel="noreferrer" className="text-[13px] text-azul">Ver archivo</a>)}
-        {z.diseno_path && <button aria-label="Quitar diseño" className="text-texto2 hover:text-red-600" onClick={() => cambiar({ diseno_path: null })}><X className="size-4" /></button>}
-        <input className="campo min-w-[180px] flex-1" placeholder="Observaciones (colores de hilo, medidas…)" value={z.notas} onChange={(e) => cambiar({ notas: e.target.value })} aria-label="Observaciones de la personalización" />
-        <Boton tam="s" variante="fantasma" className="hover:text-red-600" onClick={quitar}><Trash2 className="size-3.5" />Quitar</Boton>
-      </div>
-    </div>
-  );
-}
 

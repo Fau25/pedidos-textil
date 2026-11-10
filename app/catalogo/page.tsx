@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Shirt, Trash2, Truck } from "lucide-react";
+import { Camera, Loader2, Plus, Shirt, Trash2, Truck } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Campo, CampoImporte, Cargando, Hoja, Pestanas, Tarjeta, Vacio, cx, useAvisos } from "@/components/ui";
 import { ImportarTarifa } from "@/components/importar-tarifa";
 import { Muestra } from "@/components/muestra";
-import { sb, textoError } from "@/lib/supabase";
+import { sb, subirArchivo, textoError } from "@/lib/supabase";
+import { FotoPrenda } from "@/components/bloques-pedido";
 import { useCarga } from "@/lib/usar";
 import { euros, precioVentaUd } from "@/lib/calculo";
 import { TIPOS_PRENDA, type Prenda, type Proveedor, type TarifaFila } from "@/lib/tipos";
@@ -28,6 +29,7 @@ function Prendas() {
   const { aviso, confirmar } = useAvisos();
   const [ed, setEd] = useState<Partial<Prenda> | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [q, setQ] = useState("");
   const [todas, setTodas] = useState(false);
   const { datos, recargar, setDatos, error } = useCarga(async () => ((await sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000)).data ?? []) as Prenda[]);
@@ -43,7 +45,7 @@ function Prendas() {
   }
   async function guardar(e: React.FormEvent) {
     e.preventDefault(); if (!ed) return; setGuardando(true);
-    const fila = { tipo: ed.tipo || "Prenda", marca: ed.marca || null, modelo: ed.modelo || null, referencia: ed.referencia || null, colores: ed.colores ?? [], tallas: ed.tallas ?? [], proveedor_id: ed.proveedor_id || null, precio_compra: ed.precio_compra ?? 0, precio_venta: ed.precio_venta ?? null, notas: ed.notas || null };
+    const fila = { tipo: ed.tipo || "Prenda", marca: ed.marca || null, modelo: ed.modelo || null, referencia: ed.referencia || null, colores: ed.colores ?? [], tallas: ed.tallas ?? [], proveedor_id: ed.proveedor_id || null, precio_compra: ed.precio_compra ?? 0, precio_venta: ed.precio_venta ?? null, notas: ed.notas || null, imagen_path: ed.imagen_path ?? null };
     const r = ed.id ? await sb.from("catalogo").update(fila).eq("id", ed.id) : await sb.from("catalogo").insert({ ...fila, empresa_id: empresa!.id, favorito: true });
     setGuardando(false);
     if (r.error) return aviso(textoError(r.error), "error");
@@ -69,6 +71,7 @@ function Prendas() {
             <div key={p.id} className="flex items-center gap-3 px-4 py-3">
               <button aria-label={p.favorito ? "Quitar de habituales" : "Añadir a habituales"} title={p.favorito ? "Habitual" : "Marcar como habitual"} onClick={() => estrella(p)}
                 className={cx("grid size-8 shrink-0 place-items-center rounded-lg text-[18px] hover:bg-suave", p.favorito ? "text-amber-500" : "text-texto2/40")}>{p.favorito ? "★" : "☆"}</button>
+              <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} className="size-12 shrink-0 rounded-xl" />
               <button className="min-w-0 flex-1 text-left" onClick={() => setEd({ ...p, precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) })}>
                 <p className="truncate font-medium">{[p.marca, p.modelo].filter(Boolean).join(" ")} <span className="font-normal text-texto2">· {p.tipo}{p.referencia ? " · " + p.referencia : ""}</span></p>
                 <p className="flex items-center gap-1 truncate text-[12px] text-texto2">
@@ -90,6 +93,15 @@ function Prendas() {
         </>}>
         {ed && (
           <form id="f-prenda" onSubmit={guardar} className="space-y-4">
+            <label className="group relative mx-auto block w-fit cursor-pointer" title="Foto del producto">
+              <FotoPrenda path={ed.imagen_path ?? null} tipo={ed.tipo ?? ""} color={ed.colores?.[0] ?? ""} className="size-36" />
+              <span className="absolute bottom-2 right-2 grid size-9 place-items-center rounded-full bg-superficie text-texto2 shadow group-hover:text-azul">{subiendoFoto ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}</span>
+              <input type="file" accept="image/*" className="sr-only" aria-label="Subir foto del producto" onChange={async (e) => {
+                const f = e.target.files?.[0]; if (!f) return; setSubiendoFoto(true);
+                try { const path = await subirArchivo(empresa!.id, "catalogo", f); setEd((x) => (x ? { ...x, imagen_path: path } : x)); } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendoFoto(false); }
+              }} />
+            </label>
+            <p className="-mt-2 text-center text-[12px] text-texto2">Foto del producto: sale al elegir esta prenda en un pedido.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <Campo etiqueta="Marca"><input className="campo" value={ed.marca ?? ""} onChange={(e) => setEd({ ...ed, marca: e.target.value })} /></Campo>
               <Campo etiqueta="Modelo"><input className="campo" value={ed.modelo ?? ""} onChange={(e) => setEd({ ...ed, modelo: e.target.value })} /></Campo>

@@ -85,11 +85,14 @@ await prueba("la ficha «Nuevo pedido» abre el editor y guarda todo en una sola
   assert.equal(await p.getByText("Entrega prevista").count(), 0, "sin fecha de entrega");
   assert.equal(await p.getByText(/Precio de compra|Coste \/ ud/).count(), 0, "sin precio de coste");
   await p.getByLabel("Buscar cliente").click(); await p.getByRole("option", { name: /Club Deportivo/ }).click();
-  await p.getByRole("button", { name: "Desde el catálogo" }).click();
-  await p.getByRole("dialog").getByRole("button", { name: "Blanco" }).click();
+  await p.getByLabel("Buscar prenda 1").fill("beagle");
+  await p.getByRole("option", { name: /Roly Beagle/ }).click();
+  assert.match(await p.locator("main").innerText(), /Roly Beagle/, "rellena el modelo");
+  await p.getByRole("button", { name: "Blanco", exact: true }).click();
   await p.getByLabel("Cantidad talla M").fill("10"); await p.getByLabel("Cantidad talla L").fill("5");
   await p.getByLabel("Precio / ud").fill("4,50");
-  await p.getByRole("button", { name: "Añadir personalización" }).click();
+  await p.getByRole("radio", { name: "Bordado" }).click();
+  assert.match(await p.locator("main").innerText(), /Ubicación/, "al elegir la técnica salen sus características");
   await p.getByRole("button", { name: "Guardar pedido" }).click(); await p.waitForTimeout(1000);
   const g = escrituras.filter((x) => x.tabla === "guardar_pedido");
   assert.equal(g.length, 1, "una sola llamada");

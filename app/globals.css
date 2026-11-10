@@ -65,6 +65,7 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .num { font-variant-numeric: tabular-nums; }
+@layer components {
 .tarjeta {
   background: var(--superficie);
   border: 1px solid color-mix(in srgb, var(--borde) 60%, transparent);
@@ -81,6 +82,7 @@ select.campo { appearance: none; padding-right: 32px;
   background-repeat: no-repeat; background-position: right 10px center; }
 .campo:focus { border-color: var(--azul); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul) 20%, transparent); }
 .campo::placeholder { color: color-mix(in srgb, var(--texto2) 75%, transparent); }
+}
 input[type="number"].sin-flechas::-webkit-inner-spin-button, input[type="number"].sin-flechas::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"].sin-flechas { -moz-appearance: textfield; }
 :focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
