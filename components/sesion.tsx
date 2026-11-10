@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session } from "@supabase/supabase-js";
 import { sb } from "@/lib/supabase";
 import type { Empresa, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
-import { MODELOS_ROLY, REFERENCIAS_ROLY } from "@/lib/roly";
+import { CATALOGO_ROLY, MODELOS_ROLY, REFERENCIAS_ROLY, TALLAS_ADULTO, TALLAS_NINO } from "@/lib/roly";
 
 type Datos = {
   sesion: Session | null;
@@ -86,22 +86,35 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     if (temporizador.current) clearTimeout(temporizador.current);
     temporizador.current = setTimeout(() => setVersion((v) => v + 1), 250);
   }, []);
-  // Una vez por empresa: completa las referencias de Roly que faltaban en catálogos antiguos
+  // Una vez por empresa: referencias, colores y fotos de Roly (catálogo 2026) y alta de los modelos que falten
   useEffect(() => {
-    if (!empresa) return;
-    const clave = "refs-roly-1:" + empresa.id;
+    if (!empresa || (rol !== "propietario" && rol !== "editor")) return;
+    const clave = "roly-2026:" + empresa.id;
     try { if (localStorage.getItem(clave)) return; } catch { return; }
     (async () => {
-      const { data } = await sb.from("catalogo").select("id, modelo, referencia, notas").eq("empresa_id", empresa.id).ilike("marca", "roly");
-      for (const p of data ?? []) {
-        const ref = REFERENCIAS_ROLY[p.modelo ?? ""];
-        if (!ref || p.referencia === ref) continue;
-        const notas = p.notas === "Revisa referencia y colores" ? "Revisa los colores" : p.notas;
-        await sb.from("catalogo").update({ referencia: ref, notas }).eq("id", p.id);
+      const norm = (x?: string | null) => (x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const { data, error } = await sb.from("catalogo").select("id, modelo, referencia, notas, imagen_path").eq("empresa_id", empresa.id).ilike("marca", "roly");
+      if (error) return;
+      const filas = data ?? [];
+      // primero, referencias de los modelos antiguos que no la tenían
+      for (const p of filas) { const r = REFERENCIAS_ROLY[p.modelo ?? ""]; if (r && !p.referencia) p.referencia = r; }
+      const nuevos = [];
+      for (const m of CATALOGO_ROLY) {
+        const p = filas.find((f) => f.referencia === m.ref) ?? filas.find((f) => !f.referencia && norm(f.modelo) === norm(m.modelo));
+        const cambios: Record<string, unknown> = { referencia: m.ref };
+        if (m.colores.length) cambios.colores = m.colores;
+        if (p) {
+          if (!p.imagen_path) cambios.imagen_path = "roly:" + m.ref;
+          if (p.notas === "Revisa referencia y colores" || p.notas === "Revisa los colores") cambios.notas = null;
+          const { error: e } = await sb.from("catalogo").update(cambios).eq("id", p.id);
+          if (e) return;
+        } else nuevos.push({ empresa_id: empresa.id, marca: "Roly", tipo: m.tipo, modelo: m.modelo, referencia: m.ref, colores: m.colores,
+          tallas: m.ninos ? TALLAS_NINO : TALLAS_ADULTO, favorito: false, precio_compra: 0, imagen_path: "roly:" + m.ref, notas: m.colores.length ? null : "Revisa los colores" });
       }
+      if (nuevos.length) { const { error: e } = await sb.from("catalogo").insert(nuevos); if (e) return; }
       try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento */ }
     })().catch(() => {});
-  }, [empresa]);
+  }, [empresa, rol]);
 
   useEffect(() => {
     if (!empresa) return;

@@ -44,7 +44,7 @@ async function abrir({ caido = false } = {}) {
   await ctx.route("**/*.supabase.co/**", async (r) => {
     if (caido) return r.abort("internetdisconnected");
     const req = r.request(); const u = new URL(req.url()); const tabla = u.pathname.match(/rest\/v1\/(?:rpc\/)?(\w+)/)?.[1];
-    if (req.method() !== "GET") { escrituras.push({ tabla, cuerpo: req.postDataJSON?.() ?? null }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : "[]" }); }
+    if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : "[]" }); }
     if (!tabla) return r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
     let filas = T[tabla] ?? [];
     for (const [k, v] of u.searchParams) if (v.startsWith("eq.") && ["id", "pedido_id", "favorito", "entregado"].includes(k)) filas = filas.filter((x) => String(x[k]) === v.slice(3));
@@ -154,6 +154,22 @@ await prueba("el catálogo enlaza cada modelo con Roly", async () => {
   await ir(p, "catalogo/");
   const href = await p.getByRole("link", { name: "Ver Beagle en Roly" }).getAttribute("href");
   assert.match(href, /roly\.es/); await ctx.close();
+});
+
+await prueba("el catálogo de Roly se completa con colores y fotos, y las fotos se suben en bloque", async () => {
+  const { ctx, p, errores, escrituras } = await abrir();
+  await ir(p, "");
+  await p.waitForTimeout(1500);
+  const ins = escrituras.filter((x) => x.tabla === "catalogo" && x.metodo === "POST").flatMap((x) => x.cuerpo);
+  const beagle = escrituras.find((x) => x.tabla === "catalogo" && x.metodo === "PATCH");
+  assert.equal(ins.length, 94, "añade los modelos que faltan");
+  assert.ok(ins.every((n) => n.imagen_path === "roly:" + n.referencia && n.favorito === false));
+  assert.equal(beagle.cuerpo.colores.length, 36); assert.equal(beagle.cuerpo.imagen_path, "roly:CA6554");
+  await ir(p, "ajustes/");
+  await p.getByLabel("Subir fotos de Roly").setInputFiles([{ name: "Camiseta CA6554.jpg", mimeType: "image/jpeg", buffer: Buffer.from([255, 216, 255]) }, { name: "logo.svg", mimeType: "image/svg+xml", buffer: Buffer.from("<svg/>") }]);
+  await p.getByText(/1 fotos subidas/).waitFor();
+  assert.ok(escrituras.some((x) => /storage\/v1\/object\/roly\/CA6554\.jpg/.test(x.url)));
+  assert.deepEqual(errores, []); await ctx.close();
 });
 
 await navegador.close(); servidor.close();

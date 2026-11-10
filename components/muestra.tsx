@@ -1,3 +1,4 @@
+import { HEX_ROLY } from "@/lib/roly";
 const COLORES_TELA: Record<string, string> = {
   blanco: "#ffffff", negro: "#1d1d1f", marino: "#1f2a44", "azul marino": "#1f2a44", "azul royal": "#2449a8", royal: "#2449a8", rojo: "#c8232c", "gris vigoré": "#b9bcc0", "gris jaspeado": "#a9adb2",
   gris: "#9ea3aa", "gris plomo": "#55595f", "verde botella": "#1f4d36", "verde kelly": "#1f9a4a", naranja: "#f07b1a", amarillo: "#f5c518", granate: "#6e1f2a", celeste: "#8fc1e8",
@@ -5,7 +6,12 @@ const COLORES_TELA: Record<string, string> = {
   ébano: "#2b2622", "verde militar": "#4b5233", aguamarina: "#55c2b5", lima: "#b6d43a", "verde fluor": "#7cf24a", "amarillo fluor": "#e8f53a", "naranja fluor": "#ff7a2a", beige: "#d9c6a5", arena: "#d8c8a8",
 };
 /** Color de la tela por su nombre (o null si no se conoce) */
-export const colorTela = (nombre?: string | null) => (nombre ? COLORES_TELA[nombre.trim().toLowerCase()] ?? null : null);
+export const colorTela = (nombre?: string | null): string | null => {
+  if (!nombre) return null;
+  const n = nombre.trim().toLowerCase();
+  if (n.includes("/")) return colorTela(n.split("/")[0]); // combinados: el principal
+  return HEX_ROLY[n] ?? COLORES_TELA[n] ?? null;
+};
 
 export function Muestra({ color }: { color: string }) {
   const c = colorTela(color);
@@ -16,7 +22,8 @@ export function Muestra({ color }: { color: string }) {
 export function Prenda({ tipo, color, className }: { tipo?: string | null; color?: string | null; className?: string }) {
   const t = (tipo ?? "").toLowerCase();
   const relleno = colorTela(color) ?? "#cfd3da";
-  const claro = ["#ffffff", "#f2efe8", "#f5c518", "#e8f53a", "#f4c2cf", "#d9c6a5", "#d8c8a8", "#b6d43a", "#7cf24a"].includes(relleno);
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(relleno.slice(i, i + 2), 16));
+  const claro = 0.299 * r + 0.587 * g + 0.114 * b > 170;
   const trazo = claro ? "rgba(0,0,0,.18)" : "rgba(0,0,0,.28)";
   const brillo = "rgba(255,255,255,.18)";
   if (/gorra/.test(t)) return (

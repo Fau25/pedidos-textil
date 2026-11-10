@@ -26,11 +26,17 @@ export function textoError(e: unknown): string {
   return m;
 }
 
-/** URL firmada (1 h) de un archivo privado */
+const cacheUrl = new Map<string, { url: string; hasta: number }>();
+
+/** URL firmada (1 h) de un archivo privado. «roly:REF» = foto compartida de Roly */
 export async function urlArchivo(path?: string | null): Promise<string | null> {
   if (!path) return null;
-  if (/^https?:\/\//i.test(path)) return path; // foto enlazada desde otra web (p. ej. Roly)
-  const { data } = await sb.storage.from("archivos").createSignedUrl(path, 3600);
+  if (/^https?:\/\//i.test(path)) return path;
+  const hit = cacheUrl.get(path);
+  if (hit && hit.hasta > Date.now()) return hit.url;
+  const [bucket, ruta] = path.startsWith("roly:") ? ["roly", path.slice(5) + ".jpg"] : ["archivos", path];
+  const { data } = await sb.storage.from(bucket).createSignedUrl(ruta, 3600);
+  if (data?.signedUrl) cacheUrl.set(path, { url: data.signedUrl, hasta: Date.now() + 50 * 60_000 });
   return data?.signedUrl ?? null;
 }
 
@@ -47,4 +53,17 @@ export function enlaceRoly(p: { marca?: string | null; modelo?: string | null; r
   if (!/roly/i.test(p.marca ?? "")) return null;
   const q = ["site:roly.es", p.modelo, (p.referencia ?? "").replace(/^[A-Z]+/i, "")].filter(Boolean).join(" ");
   return "https://www.google.com/search?q=" + encodeURIComponent(q);
+}
+
+/** Sube fotos de Roly a la carpeta privada compartida. El nombre debe llevar la referencia (p. ej. «Camiseta CA6554.jpg») */
+export async function subirFotosRoly(files: File[], avance: (hechas: number) => void): Promise<{ ok: number; sinRef: string[] }> {
+  let ok = 0; const sinRef: string[] = [];
+  for (const f of files) {
+    const ref = f.name.toUpperCase().match(/[A-Z]{2}\d{4}/)?.[0];
+    if (!ref || !/^image\//.test(f.type)) { sinRef.push(f.name); continue; }
+    const { error } = await sb.storage.from("roly").upload(ref + ".jpg", f, { upsert: true, contentType: f.type });
+    if (error) throw error;
+    cacheUrl.delete("roly:" + ref); ok++; avance(ok);
+  }
+  return { ok, sinRef };
 }

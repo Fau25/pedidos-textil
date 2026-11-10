@@ -6,8 +6,8 @@ import { z } from "zod";
 import { ImagePlus, Loader2 } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
-import { Boton, Campo, Tarjeta, useAvisos } from "@/components/ui";
-import { sb, subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
+import { Boton, Campo, Tarjeta, cx, useAvisos } from "@/components/ui";
+import { sb, subirArchivo, subirFotosRoly, textoError, urlArchivo } from "@/lib/supabase";
 import { borrarEjemplo, cargarEjemplo } from "@/lib/ejemplo";
 import { descargarCopia } from "@/lib/copia";
 import { Invitados } from "@/components/invitados";
@@ -21,7 +21,7 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "2.4.2";
+const VERSION = "2.5.0";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();
@@ -84,6 +84,8 @@ export default function Ajustes() {
 
         <Invitados />
 
+        <FotosRoly />
+
         <Tarjeta titulo="Copia de seguridad">
           <p className="mb-4 text-[13px] text-texto2">Descarga todos tus pedidos, prendas, clientes y catálogo en un Excel. Hazlo de vez en cuando y guárdalo en tu ordenador.{ultima ? ` Última copia en este dispositivo: ${ultima}.` : ""}</p>
           <Boton variante="primario" cargando={copiando} onClick={async () => {
@@ -122,3 +124,26 @@ export default function Ajustes() {
   );
 }
 
+
+/** Subida en bloque de las fotos de Roly a la carpeta privada compartida por la familia */
+function FotosRoly() {
+  const { aviso } = useAvisos();
+  const [subiendo, setSubiendo] = useState<{ hechas: number; total: number } | null>(null);
+  return (
+    <Tarjeta titulo="Fotos de Roly">
+      <p className="mb-4 text-[13px] text-texto2">Elige todas las fotos a la vez (puedes seleccionar varias carpetas, una tras otra). Cada foto se coloca sola en su prenda por la referencia del nombre, por ejemplo «Camiseta CA6554.jpg». Son privadas: solo las ve tu familia dentro de la app.</p>
+      <label className={cx("inline-flex h-11 cursor-pointer items-center gap-2 rounded-full bg-acento px-5 text-[14px] font-medium text-sobre-acento", subiendo && "pointer-events-none opacity-60")}>
+        {subiendo ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+        {subiendo ? `Subiendo ${subiendo.hechas} de ${subiendo.total}…` : "Subir fotos"}
+        <input type="file" accept="image/*" multiple className="sr-only" aria-label="Subir fotos de Roly" onChange={async (ev) => {
+          const files = Array.from(ev.target.files ?? []); ev.target.value = ""; if (!files.length) return;
+          setSubiendo({ hechas: 0, total: files.length });
+          try {
+            const r = await subirFotosRoly(files, (hechas) => setSubiendo({ hechas, total: files.length }));
+            aviso(`${r.ok} fotos subidas` + (r.sinRef.length ? ` · ${r.sinRef.length} sin referencia en el nombre` : ""));
+          } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendo(null); }
+        }} />
+      </label>
+    </Tarjeta>
+  );
+}
