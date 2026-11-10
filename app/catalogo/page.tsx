@@ -31,11 +31,12 @@ function Prendas() {
   const [guardando, setGuardando] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [q, setQ] = useState("");
-  const [todas, setTodas] = useState(false);
+  const [todas, setTodas] = useState(true);
   const { datos, recargar, setDatos, error } = useCarga(async () => ((await sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000)).data ?? []) as Prenda[]);
   const margen = Number(empresa!.margen);
   const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const lista = (datos ?? []).filter((p) => (q ? n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(n(q)) : todas || p.favorito));
+  const lista = (datos ?? []).filter((p) => (q ? n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(n(q)) : todas || p.favorito))
+    .sort((a, b) => Number(b.favorito) - Number(a.favorito)); // habituales primero
   const total = datos?.length ?? 0;
 
   async function estrella(p: Prenda) {

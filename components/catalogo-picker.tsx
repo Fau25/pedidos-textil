@@ -13,7 +13,7 @@ export function Catalogo({ abierto, cerrar, elegir, margen }: { abierto: boolean
   const [lista, setLista] = useState<Prenda[] | null>(null);
   const [q, setQ] = useState("");
   useEffect(() => { if (abierto) sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("tipo").then(({ data }) => setLista((data ?? []) as Prenda[])); }, [abierto, empresa]);
-  const f = (lista ?? []).filter((p) => (q ? [p.tipo, p.marca, p.modelo, p.referencia].join(" ").toLowerCase().includes(q.toLowerCase()) : p.favorito))
+  const f = (lista ?? []).filter((p) => (q ? [p.tipo, p.marca, p.modelo, p.referencia].join(" ").toLowerCase().includes(q.toLowerCase()) : true))
     .sort((a, b) => Number(b.favorito) - Number(a.favorito));
   return (
     <Hoja abierta={abierto} cerrar={cerrar} titulo="Prendas del catálogo">
