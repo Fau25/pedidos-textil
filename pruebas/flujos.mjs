@@ -1,0 +1,145 @@
+// Pruebas de pantallas con datos simulados (sin tocar la base de datos real).
+// Uso: npm run build && node pruebas/flujos.mjs   (necesita Google Chrome instalado)
+import { chromium } from "playwright-core";
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import assert from "node:assert/strict";
+
+const RAIZ = path.resolve("out");
+const TIPOS = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".woff2": "font/woff2", ".png": "image/png", ".svg": "image/svg+xml", ".json": "application/json", ".webmanifest": "application/manifest+json", ".txt": "text/plain" };
+const servidor = http.createServer((q, r) => {
+  let f = path.join(RAIZ, decodeURIComponent(q.url.split("?")[0]).replace(/^\/pedidos-textil/, ""));
+  if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, "index.html");
+  if (!fs.existsSync(f)) { r.writeHead(404); return r.end(); }
+  r.writeHead(200, { "content-type": TIPOS[path.extname(f)] ?? "application/octet-stream" }); fs.createReadStream(f).pipe(r);
+}).listen(0);
+const BASE = `http://localhost:${servidor.address().port}/pedidos-textil/`;
+
+const dia = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const E = "00000000-0000-0000-0000-0000000000e1";
+const ped = (i, uds, entrega, cliente, extra = {}) => ({ id: "p" + i, numero: "P-2026-000" + i, fecha: dia(-5), entrega, total: "123.40", unidades: uds, referencia: null, entregado: false, entregado_en: null, actualizado: new Date().toISOString(), clientes: { nombre: cliente }, cliente_id: "k1", empresa_id: E, descuento_pct: 0, gastos_coste: 0, gastos_venta: 0, iva: 21, coste: 0, base: 100, notas: null, ...extra });
+const T = {
+  miembros: [{ empresa_id: E, rol: "propietario" }],
+  empresas: [{ id: E, nombre: "Bordados Prueba", iva: 21, margen: 40, validez_dias: 30, condiciones: "Condiciones", nif: null, direccion: null, email: null, telefono: null, web: null, logo_path: null }],
+  tecnicas: [{ id: "t1", nombre: "Bordado", orden: 1 }],
+  tarifas: [{ id: "r1", tecnica_id: "t1", desde: 1, hasta: null, complejidad: "Normal", coste: 1, precio: 2.5 }],
+  proveedores: [],
+  invitados: [{ email: "prueba@ejemplo.es", creado: "2026-11-10" }],
+  catalogo: [{ id: "c1", tipo: "Camiseta", marca: "Roly", modelo: "Beagle", referencia: "CA6554", colores: ["Blanco", "Negro"], tallas: ["S", "M", "L", "XL"], favorito: true, precio_compra: 0, precio_venta: null, proveedor_id: null, imagen_path: null, notas: null }],
+  clientes: [{ id: "k1", nombre: "Club Deportivo Arenal", contacto: "Marta", telefono: "612", email: "a@b.es" }],
+  pedidos: [ped(1, 43, dia(-1), "Club Deportivo Arenal", { descuento_pct: 5 }), ped(2, 10, dia(0), "Bar La Esquina"), ped(3, 30, null, "Peña Ciclista")],
+  pedido_lineas: [{ id: "l1", pedido_id: "p1", orden: 0, tipo: "Camiseta", marca: "Roly", modelo: "Beagle", color: "Marino", proveedor_id: null, precio_compra: 2, precio_venta: 4.5, imagen_path: null, notas: null, estado: "pendiente", linea_tallas: [{ talla: "M", cantidad: 20, orden: 3 }, { talla: "L", cantidad: 23, orden: 4 }] }],
+  personalizaciones: [{ id: "x1", pedido_id: "p1", orden: 0, tecnica_id: "t1", tecnica: "Bordado", ubicacion: "Pecho izquierdo", aplicaciones: 1, diseno_path: null, coste_ud: 1, precio_ud: 2.5, precio_manual: false, notas: null, estado: "pendiente", personalizacion_lineas: [{ linea_id: "l1" }] }],
+};
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+const exp = Math.floor(Date.now() / 1000) + 3600;
+const sesion = { access_token: `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: "u1", exp, role: "authenticated" })}.x`, refresh_token: "r", token_type: "bearer", expires_in: 3600, expires_at: exp, user: { id: "u1", email: "prueba@ejemplo.es", aud: "authenticated", role: "authenticated" } };
+
+const navegador = await chromium.launch({ executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+async function abrir({ caido = false } = {}) {
+  const ctx = await navegador.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true, locale: "es-ES", timezoneId: "Europe/Madrid" });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-sqartxsdlynecelkufyq-auth-token", JSON.stringify(sesion)]);
+  const escrituras = [];
+  await ctx.route("**/*.supabase.co/**", async (r) => {
+    if (caido) return r.abort("internetdisconnected");
+    const req = r.request(); const u = new URL(req.url()); const tabla = u.pathname.match(/rest\/v1\/(?:rpc\/)?(\w+)/)?.[1];
+    if (req.method() !== "GET") { escrituras.push({ tabla, cuerpo: req.postDataJSON?.() ?? null }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : "[]" }); }
+    if (!tabla) return r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    let filas = T[tabla] ?? [];
+    for (const [k, v] of u.searchParams) if (v.startsWith("eq.") && ["id", "pedido_id", "favorito", "entregado"].includes(k)) filas = filas.filter((x) => String(x[k]) === v.slice(3));
+    const uno = (req.headers()["accept"] ?? "").includes("vnd.pgrst.object");
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(uno ? filas[0] ?? null : filas) });
+  });
+  const p = await ctx.newPage(); const errores = [];
+  p.on("pageerror", (e) => errores.push(e.message));
+  p.on("console", (m) => m.type() === "error" && !/WebSocket|realtime|ERR_INTERNET_DISCONNECTED|Failed to load resource/i.test(m.text()) && errores.push(m.text()));
+  return { ctx, p, errores, escrituras };
+}
+const ir = async (p, ruta) => { await p.goto(BASE + ruta, { waitUntil: "networkidle" }); await p.waitForTimeout(500); };
+let fallos = 0;
+async function prueba(nombre, fn) {
+  try { await fn(); console.log("ok -", nombre); }
+  catch (e) { fallos++; console.log("FALLO -", nombre, "\n   ", e.message.split("\n")[0]); }
+}
+
+await prueba("todas las pantallas cargan sin errores", async () => {
+  const { ctx, p, errores } = await abrir();
+  for (const r of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/", "clientes/", "clientes/ver/?id=k1", "catalogo/", "ajustes/"]) await ir(p, r);
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("al saltar de un pedido a otro con el buscador se ve el nuevo", async () => {
+  const { ctx, p } = await abrir();
+  await ir(p, "pedidos/ver/?id=p1");
+  assert.match(await p.locator("h1").innerText(), /Club Deportivo/);
+  await p.keyboard.press("Control+k"); await p.getByPlaceholder(/Buscar pedido/).fill("Bar"); await p.waitForTimeout(800);
+  await p.locator("[role=dialog] button", { hasText: "Bar La Esquina" }).first().click(); await p.waitForTimeout(800);
+  await p.getByText("P-2026-0002").first().waitFor({ timeout: 5000 });
+  assert.doesNotMatch(await p.locator("main").innerText(), /P-2026-0001/); await ctx.close();
+});
+await prueba("pedido rápido guarda tallas, precio y bordado en una sola llamada", async () => {
+  const { ctx, p, escrituras } = await abrir();
+  await ir(p, "");
+  await p.getByLabel("Buscar cliente").click(); await p.getByRole("option", { name: /Club Deportivo/ }).click();
+  await p.getByLabel("Prenda 1").selectOption("c1");
+  await p.getByLabel("Precio por unidad").fill("4,50");
+  await p.getByLabel("Cantidad talla M").fill("10"); await p.getByLabel("Cantidad talla L").fill("5");
+  await p.getByRole("button", { name: "Bordado", exact: true }).click();
+  await p.getByRole("button", { name: "Crear pedido" }).click(); await p.waitForTimeout(800);
+  const g = escrituras.filter((x) => x.tabla === "guardar_pedido");
+  assert.equal(g.length, 1);
+  const d = g[0].cuerpo.p;
+  assert.deepEqual(d.lineas[0].tallas.map((t) => `${t.talla}=${t.cantidad}`), ["M=10", "L=5"]);
+  assert.equal(d.lineas[0].precio_venta, 4.5);
+  assert.equal(d.pers[0].tecnica, "Bordado");
+  assert.equal(d.total, 127.05, "total " + d.total); // (15×4,50 + 15×2,50) × 1,21 = 105 × 1,21
+  assert.ok(escrituras.some((x) => x.tabla === "catalogo"), "recuerda el precio en el catálogo");
+  await ctx.close();
+});
+await prueba("marcar entregado ofrece deshacer", async () => {
+  const { ctx, p, escrituras } = await abrir();
+  await ir(p, "");
+  await p.getByRole("button", { name: /Marcar P-2026-0002 como entregado/ }).click();
+  await p.getByRole("button", { name: "Deshacer" }).click(); await p.waitForTimeout(400);
+  const e = escrituras.filter((x) => x.tabla === "pedidos").map((x) => x.cuerpo.entregado);
+  assert.deepEqual(e, [true, false]); await ctx.close();
+});
+await prueba("el PDF del presupuesto se descarga", async () => {
+  const { ctx, p } = await abrir();
+  await ir(p, "pedidos/ver/?id=p1");
+  const [d] = await Promise.all([p.waitForEvent("download", { timeout: 30000 }), p.getByRole("button", { name: "PDF" }).click()]);
+  const f = await d.path(); assert.ok(fs.statSync(f).size > 2000); await ctx.close();
+});
+await prueba("sin conexión avisa en vez de pedir crear el taller", async () => {
+  const { ctx, p } = await abrir({ caido: true });
+  await p.goto(BASE, { waitUntil: "load" }); await p.getByText("Sin conexión").first().waitFor({ timeout: 20000 }).catch(() => {});
+  const t = await p.locator("body").innerText();
+  assert.match(t, /Sin conexión/); assert.doesNotMatch(t, /Tu taller/); await ctx.close();
+});
+
+await prueba("importar una tarifa en Excel agrupa modelos, colores y tallas", async () => {
+  const { default: escribir } = await import("write-excel-file/node");
+  const f = path.join(fs.mkdtempSync(path.join(process.env.TMPDIR ?? "/tmp", "tarifa-")), "tarifa.xlsx");
+  const filas = [["Referencia", "Descripción", "Color", "Talla", "Precio"],
+    ["CA6554", "Camiseta Beagle", "Blanco", "S", 1.5], ["CA6554", "Camiseta Beagle", "Negro", "M", 1.75], ["SU1109", "Sudadera Aneto", "Marino", "L", 9.9]];
+  await escribir(filas).toFile(f);
+  const { ctx, p, escrituras, errores } = await abrir();
+  await ir(p, "catalogo/");
+  await p.locator("input[type=file]").setInputFiles(f);
+  await p.getByRole("button", { name: /Importar 3 filas/ }).click(); await p.waitForTimeout(1000);
+  const ins = escrituras.filter((x) => x.tabla === "catalogo");
+  const nuevos = ins.flatMap((x) => (Array.isArray(x.cuerpo) ? x.cuerpo : [x.cuerpo]));
+  assert.ok(nuevos.some((n) => n.referencia === "SU1109" && n.precio_compra === 9.9), JSON.stringify(nuevos).slice(0, 200));
+  assert.ok(ins.length >= 2, "actualiza Beagle e inserta Aneto");
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("la copia de seguridad se descarga en Excel", async () => {
+  const { ctx, p } = await abrir();
+  await ir(p, "ajustes/");
+  const [d] = await Promise.all([p.waitForEvent("download", { timeout: 30000 }), p.getByRole("button", { name: "Descargar copia en Excel" }).click()]);
+  assert.match(d.suggestedFilename(), /^Copia .*\.xlsx$/); assert.ok(fs.statSync(await d.path()).size > 3000); await ctx.close();
+});
+
+await navegador.close(); servidor.close();
+if (fallos) { console.log(`\n${fallos} prueba(s) fallida(s)`); process.exit(1); }
+console.log("\nTodas las pruebas de pantalla pasan");

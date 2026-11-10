@@ -19,7 +19,7 @@ export default function Ficha() {
   const router = useRouter();
   const [ocupado, setOcupado] = useState("");
 
-  const { datos, recargar } = useCarga(async () => {
+  const { datos, recargar, error } = useCarga(async () => {
     if (!pid) return null;
     const r = await cargarPedido(pid);
     if (!r) return { falta: true as const };
@@ -28,7 +28,7 @@ export default function Ficha() {
   }, [pid]);
 
   const t = useMemo(() => (datos && !("falta" in datos) ? calcular(aCalc(datos.ed, Number(empresa!.margen))) : null), [datos, empresa]);
-  if (!pid || !datos) return <Cargando />;
+  if (!pid || !datos) return <Cargando error={error} reintentar={recargar} />;
   if ("falta" in datos) return <Vacio titulo="Este pedido no existe o se ha borrado" accion={<Link href="/pedidos/"><Boton>Ver pedidos</Boton></Link>} />;
   const { ed, pedido, cliente } = datos;
   const d = diasHasta(ed.entrega);
@@ -101,6 +101,9 @@ export default function Ficha() {
                       <p className="font-medium">{describirLinea(l)}</p>
                       <p className="num text-[13px] text-texto2">{textoTallas(l.tallas) || "Sin tallas"}</p>
                       {l.notas && <p className="text-[12px] text-texto2">{l.notas}</p>}
+                      {ed.pers.filter((z) => z.lineas.includes(l.clave)).map((z) => (
+                        <span key={z.clave} className="mr-1.5 mt-1 inline-flex h-6 items-center rounded-full bg-acento-suave px-2 text-[11px] font-medium text-acento">{z.tecnica} · {z.ubicacion}</span>
+                      ))}
                     </div>
                     <div className="num text-right text-[13px]"><b>{t?.lineas[l.clave]?.unidades ?? 0}</b> uds<span className="block text-texto2">{euros(t?.lineas[l.clave]?.venta ?? 0)}</span></div>
                   </li>
@@ -164,5 +167,6 @@ function Diseno({ path }: { path: string | null }) {
   useEffect(() => { urlArchivo(path).then(setU); }, [path]);
   if (!u) return <div className="grid size-12 place-items-center rounded-xl bg-suave text-texto2"><Paperclip className="size-4" /></div>;
   // eslint-disable-next-line @next/next/no-img-element
-  return <a href={u} target="_blank" rel="noreferrer">{/\.(png|jpe?g|gif|webp|svg)$/i.test(path ?? "") ? <img src={u} alt="Diseño" className="size-12 rounded-xl border border-borde bg-white object-contain p-1" /> : <span className="grid size-12 place-items-center rounded-xl bg-suave text-[11px] text-acento">Archivo</span>}</a>;
+  const ext = (path ?? "").split(".").pop()?.toUpperCase() ?? "";
+  return <a href={u} target="_blank" rel="noreferrer" title="Abrir el diseño">{/^(PNG|JPE?G|GIF|WEBP|SVG)$/.test(ext) ? <img src={u} alt="Diseño" className="size-12 rounded-xl border border-borde bg-white object-contain p-1" /> : <span className="grid size-12 place-items-center rounded-xl bg-suave text-[11px] font-semibold text-acento">{ext || "Archivo"}</span>}</a>;
 }

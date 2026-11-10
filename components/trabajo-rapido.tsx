@@ -3,28 +3,28 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X, Sparkles, ArrowRight } from "lucide-react";
 import { useSesion } from "./sesion";
-import { Boton, cx, useAvisos } from "./ui";
+import { Boton, CampoImporte, cx, useAvisos } from "./ui";
 import { SelectorCliente } from "./editor-pedido";
 import { sb, textoError } from "@/lib/supabase";
-import { calcular, euros, tarifaPara } from "@/lib/calculo";
-import { aCalc, guardarPedido, hoy, id, lineaVacia, type PedidoEd } from "@/lib/pedidos";
+import { calcular, euros, precioVentaUd, tarifaPara } from "@/lib/calculo";
+import { aCalc, claveBorrador, diaLocal, guardarPedido, hoy, id, lineaVacia, type PedidoEd } from "@/lib/pedidos";
 import { TALLAS, type Cliente, type Prenda } from "@/lib/tipos";
 
 const UBIC = ["Pecho izquierdo", "Pecho centro", "Espalda", "Manga"];
-const masDias = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const masDias = diaLocal;
 
-type Bloque = { clave: string; prenda: Prenda | null; color: string; tallas: Record<string, number> };
+type Bloque = { clave: string; prenda: Prenda | null; color: string; tallas: Record<string, number>; precio: number | null; recordar: boolean };
 
 /** Formulario corto para crear un pedido desde el panel principal */
 export function TrabajoRapido() {
-  const { empresa, tecnicas, tarifas, tocar } = useSesion();
+  const { empresa, tecnicas, tarifas, tocar, sesion } = useSesion();
   const { aviso } = useAvisos();
   const router = useRouter();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [catalogo, setCatalogo] = useState<Prenda[]>([]);
   const [cliente, setCliente] = useState<string | null>(null);
   const [entrega, setEntrega] = useState<string>(masDias(7));
-  const [bloques, setBloques] = useState<Bloque[]>([{ clave: id(), prenda: null, color: "", tallas: {} }]);
+  const [bloques, setBloques] = useState<Bloque[]>([{ clave: id(), prenda: null, color: "", tallas: {}, precio: null, recordar: true }]);
   const [tecnica, setTecnica] = useState<string | null>(null);
   const [ubicacion, setUbicacion] = useState("Pecho izquierdo");
   const [guardando, setGuardando] = useState(false);
@@ -39,7 +39,7 @@ export function TrabajoRapido() {
   const ped: PedidoEd = useMemo(() => {
     const lineas = bloques.filter((b) => b.prenda).map((b) => lineaVacia(margen, {
       clave: b.clave, tipo: b.prenda!.tipo, marca: b.prenda!.marca ?? "", modelo: b.prenda!.modelo ?? "", color: b.color, proveedor_id: b.prenda!.proveedor_id,
-      precio_compra: Number(b.prenda!.precio_compra), precio_venta: b.prenda!.precio_venta === null ? null : Number(b.prenda!.precio_venta), tallas: b.tallas, tallasModelo: b.prenda!.tallas,
+      precio_compra: Number(b.prenda!.precio_compra), precio_venta: b.precio, tallas: b.tallas, tallasModelo: b.prenda!.tallas,
     }));
     const tc = tecnicas.find((x) => x.id === tecnica);
     const uds = lineas.reduce((a, l) => a + Object.values(l.tallas).reduce((x, y) => x + y, 0), 0);
@@ -55,7 +55,7 @@ export function TrabajoRapido() {
 
   function reiniciar() {
     setCliente(null); setEntrega(masDias(7)); setTecnica(null); setUbicacion("Pecho izquierdo");
-    setBloques([{ clave: id(), prenda: null, color: "", tallas: {} }]);
+    setBloques([{ clave: id(), prenda: null, color: "", tallas: {}, precio: null, recordar: true }]);
   }
 
   async function crear() {
@@ -63,13 +63,21 @@ export function TrabajoRapido() {
     if (!t.unidades) return aviso("Pon alguna cantidad en las tallas", "error");
     setGuardando(true);
     const nuevo = { ...ped, id: id(), pers: ped.pers.map((x) => ({ ...x, clave: id() })) };
-    try { await guardarPedido(nuevo, empresa!); aviso("Pedido creado"); reiniciar(); tocar(); }
+    try {
+      await guardarPedido(nuevo, empresa!);
+      // Recordar en el catálogo el precio de las prendas que no tenían
+      for (const b of bloques) if (b.prenda && b.precio !== null && b.recordar && !Number(b.prenda.precio_venta) && !Number(b.prenda.precio_compra)) {
+        await sb.from("catalogo").update({ precio_venta: b.precio }).eq("id", b.prenda.id);
+        setCatalogo((c) => c.map((x) => (x.id === b.prenda!.id ? { ...x, precio_venta: b.precio } : x)));
+      }
+      aviso("Pedido creado"); reiniciar(); tocar();
+    }
     catch (e) { aviso(textoError(e), "error"); } finally { setGuardando(false); }
   }
 
   function masOpciones() {
     const borrador = { ...ped, id: id(), pers: ped.pers.map((x) => ({ ...x, clave: id() })), lineas: ped.lineas.length ? ped.lineas : [lineaVacia(margen)] };
-    try { localStorage.setItem("pedido-borrador", JSON.stringify(borrador)); } catch {}
+    try { localStorage.setItem(claveBorrador(sesion!.user.id), JSON.stringify(borrador)); } catch {}
     router.push("/pedidos/nuevo/");
   }
 
@@ -103,14 +111,18 @@ export function TrabajoRapido() {
             <div key={b.clave} className="rounded-xl bg-suave/70 p-3">
               <div className="flex items-center gap-2">
                 <select className="campo flex-1 font-medium" value={b.prenda?.id ?? ""} aria-label={`Prenda ${i + 1}`}
-                  onChange={(e) => { const p = catalogo.find((x) => x.id === e.target.value) ?? null; setB(b.clave, { prenda: p, color: p?.colores[0] ?? "", tallas: {} }); }}>
+                  onChange={(e) => { const p = catalogo.find((x) => x.id === e.target.value) ?? null; setB(b.clave, { prenda: p, color: p?.colores[0] ?? "", tallas: {}, precio: precioDe(p, margen), recordar: true }); }}>
                   <option value="">Elige la prenda…</option>
                   {catalogo.map((p) => <option key={p.id} value={p.id}>{[p.marca, p.modelo].filter(Boolean).join(" ")} · {p.tipo}</option>)}
                 </select>
+                {b.prenda && <CampoImporte className="w-28 shrink-0" valor={b.precio} placeholder="Precio" aria-label="Precio por unidad" cambiar={(v) => setB(b.clave, { precio: v })} />}
                 {bloques.length > 1 && <button aria-label="Quitar prenda" className="grid size-9 place-items-center rounded-lg text-texto2 hover:bg-superficie" onClick={() => setBloques((bs) => bs.filter((x) => x.clave !== b.clave))}><X className="size-4" /></button>}
               </div>
               {b.prenda && (
                 <>
+                  {b.precio === null ? <p className="mt-2 text-[12px] text-amber-700 dark:text-amber-400">Esta prenda no tiene precio: escríbelo arriba (precio por unidad, sin IVA).</p>
+                    : !Number(b.prenda.precio_venta) && !Number(b.prenda.precio_compra) && (
+                      <label className="mt-2 flex items-center gap-2 text-[12px] text-texto2"><input type="checkbox" className="size-3.5 accent-[var(--acento)]" checked={b.recordar} onChange={(e) => setB(b.clave, { recordar: e.target.checked })} />Guardar este precio en el catálogo</label>)}
                   {!!b.prenda.colores.length && (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
                       {b.prenda.colores.map((c) => (
@@ -135,7 +147,7 @@ export function TrabajoRapido() {
             </div>
           );
         })}
-        <button className="flex items-center gap-1.5 text-[13px] text-acento" onClick={() => setBloques((bs) => [...bs, { clave: id(), prenda: null, color: "", tallas: {} }])}><Plus className="size-3.5" />Otra prenda</button>
+        <button className="flex items-center gap-1.5 text-[13px] text-acento" onClick={() => setBloques((bs) => [...bs, { clave: id(), prenda: null, color: "", tallas: {}, precio: null, recordar: true }])}><Plus className="size-3.5" />Otra prenda</button>
       </div>
 
       <div className="mt-4">
@@ -178,4 +190,12 @@ const COLORES_TELA: Record<string, string> = {
 export function Muestra({ color }: { color: string }) {
   const c = COLORES_TELA[color.toLowerCase()];
   return <span className="inline-block size-3 shrink-0 rounded-full border border-black/10" style={{ background: c ?? "conic-gradient(#ddd 0 25%, #fff 0 50%, #ddd 0 75%, #fff 0)" }} />;
+}
+
+/** Precio de venta por unidad que propone el catálogo (o null si no tiene) */
+function precioDe(p: Prenda | null, margen: number): number | null {
+  if (!p) return null;
+  if (p.precio_venta !== null && Number(p.precio_venta)) return Number(p.precio_venta);
+  if (Number(p.precio_compra)) return precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: null }, margen) / 100;
+  return null;
 }

@@ -9,6 +9,8 @@ import { Cabecera } from "@/components/marco";
 import { Boton, Campo, Tarjeta, useAvisos } from "@/components/ui";
 import { sb, subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
 import { borrarEjemplo, cargarEjemplo } from "@/lib/ejemplo";
+import { descargarCopia } from "@/lib/copia";
+import { Invitados } from "@/components/invitados";
 
 const esquema = z.object({
   nombre: z.string().trim().min(1, "Obligatorio"),
@@ -19,7 +21,7 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "2.0.0";
+const VERSION = "2.1.0";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();
@@ -28,6 +30,9 @@ export default function Ajustes() {
   const [subiendo, setSubiendo] = useState(false);
   const [ejemplo, setEjemplo] = useState("");
   const [clave, setClave] = useState("");
+  const [copiando, setCopiando] = useState(false);
+  const [ultima, setUltima] = useState<string | null>(null);
+  useEffect(() => { try { const u = localStorage.getItem(`ultima-copia-${empresa!.id}`); if (u) setUltima(new Date(u + "T12:00:00").toLocaleDateString("es-ES")); } catch {} }, [empresa]);
   useEffect(() => { urlArchivo(empresa!.logo_path).then(setLogo); }, [empresa]);
 
   const e = empresa!;
@@ -77,6 +82,17 @@ export default function Ajustes() {
           </form>
         </Tarjeta>
 
+        <Invitados />
+
+        <Tarjeta titulo="Copia de seguridad">
+          <p className="mb-4 text-[13px] text-texto2">Descarga todos tus pedidos, prendas, clientes y catálogo en un Excel. Hazlo de vez en cuando y guárdalo en tu ordenador.{ultima ? ` Última copia en este dispositivo: ${ultima}.` : ""}</p>
+          <Boton variante="primario" cargando={copiando} onClick={async () => {
+            setCopiando(true);
+            try { await descargarCopia(e.id, e.nombre); setUltima(new Date().toLocaleDateString("es-ES")); aviso("Copia descargada"); }
+            catch (err) { aviso(textoError(err), "error"); } finally { setCopiando(false); }
+          }}>Descargar copia en Excel</Boton>
+        </Tarjeta>
+
         <Tarjeta titulo="Datos de ejemplo">
           <p className="mb-4 text-[13px] text-texto2">Clientes, prendas y pedidos de muestra para probar. Solo se borran los de ejemplo, nunca los tuyos.</p>
           <div className="flex flex-wrap gap-2">
@@ -96,10 +112,10 @@ export default function Ajustes() {
             if (error) return aviso(textoError(error), "error");
             setClave(""); aviso("Contraseña cambiada");
           }}>
-            <input className="campo" type="password" autoComplete="new-password" minLength={6} required placeholder="Contraseña nueva" value={clave} onChange={(ev) => setClave(ev.target.value)} />
+            <input className="campo" type="password" autoComplete="new-password" minLength={8} required placeholder="Contraseña nueva (mín. 8)" value={clave} onChange={(ev) => setClave(ev.target.value)} />
             <Boton type="submit">Cambiar</Boton>
           </form>
-          <p className="mt-4 text-[12px] text-texto2">Cada persona de la familia crea su propia cuenta desde la pantalla de acceso y tiene sus datos separados. Versión {VERSION}.</p>
+          <p className="mt-4 text-[12px] text-texto2">Cada persona invitada crea su propia cuenta desde la pantalla de acceso y tiene sus datos separados. Versión {VERSION}.</p>
         </Tarjeta>
       </div>
     </>

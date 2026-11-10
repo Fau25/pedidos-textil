@@ -31,6 +31,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [tarifas, setTarifas] = useState<TarifaFila[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [cargado, setCargado] = useState(false);
+  const [fallo, setFallo] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const uid = sesion?.user.id;
 
@@ -45,7 +46,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
   const recargar = useCallback(async () => {
     if (!uid) return;
-    const { data: m } = await sb.from("miembros").select("empresa_id, rol").eq("user_id", uid).limit(1).maybeSingle();
+    setFallo(null);
+    try {
+    const { data: m, error: em } = await sb.from("miembros").select("empresa_id, rol").eq("user_id", uid).limit(1).maybeSingle();
+    if (em) throw em;
     if (!m) { setEmpresa(null); setCargado(true); return; }
     const e = m.empresa_id;
     const [emp, tec, tar, prov] = await Promise.all([
@@ -58,11 +62,23 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     setEmpresa(emp.data as Empresa);
     setTecnicas((tec.data ?? []) as Tecnica[]);
     setTarifas(((tar.data ?? []) as TarifaFila[]).map((t) => ({ ...t, coste: Number(t.coste), precio: Number(t.precio) })));
+    if (emp.error) throw emp.error;
     setProveedores((prov.data ?? []) as Proveedor[]);
     setCargado(true);
+    } catch (e) {
+      // Un error de conexión NO es «no tienes empresa»: se avisa y se reintenta
+      setFallo(textoError(e)); setCargado(true);
+    }
   }, [uid]);
 
   useEffect(() => { if (uid) { setCargado(false); recargar(); } else { setEmpresa(null); setCargado(true); } }, [uid, recargar]);
+  useEffect(() => {
+    if (!fallo) return;
+    const r = () => recargar();
+    window.addEventListener("online", r);
+    const t = setInterval(r, 15000);
+    return () => { window.removeEventListener("online", r); clearInterval(t); };
+  }, [fallo, recargar]);
 
   // Tiempo real + actualizar al volver a la app (sin tener que pulsar refrescar)
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,6 +103,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   if (recuperacion && sesion) return <NuevaContrasena hecho={() => setRecuperacion(false)} />;
   if (!sesion) return <Entrar />;
   if (!cargado) return <PantallaCarga />;
+  if (fallo && !empresa) return <SinConexion texto={fallo} reintentar={() => { setCargado(false); recargar(); }} />;
   if (!empresa) return <AltaEmpresa hecho={recargar} />;
 
   return (
@@ -102,7 +119,24 @@ import { Logo } from "./logo";
 import { cargarEjemplo } from "@/lib/ejemplo";
 
 function PantallaCarga() {
-  return <div className="grid min-h-dvh place-items-center"><Logo grande /></div>;
+  // Si tarda (servidor despertando o conexión lenta), decirlo en vez de dejar la pantalla en blanco
+  const [lento, setLento] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setLento(true), 2500); return () => clearTimeout(t); }, []);
+  return (
+    <div className="grid min-h-dvh place-items-center">
+      <div className="flex flex-col items-center gap-4"><Logo grande />{lento && <p className="animar text-[13px] text-texto2" role="status">Conectando…</p>}</div>
+    </div>
+  );
+}
+
+function SinConexion({ texto, reintentar }: { texto: string; reintentar: () => void }) {
+  return (
+    <Marco titulo="Sin conexión" sub="Tus datos están a salvo. No se ha podido contactar con el servidor.">
+      <p className="mb-4 text-[13px] text-texto2">{texto} Si hace más de una semana que nadie abre la app, el servidor puede tardar un minuto en despertar.</p>
+      <Boton variante="primario" className="w-full" onClick={reintentar}>Reintentar</Boton>
+      <button className="mt-4 w-full text-center text-[13px] text-texto2 hover:underline" onClick={() => sb.auth.signOut()}>Salir</button>
+    </Marco>
+  );
 }
 
 function Marco({ titulo, sub, children }: { titulo: string; sub?: string; children: ReactNode }) {
@@ -151,8 +185,8 @@ function Entrar() {
       <form onSubmit={enviar} className="space-y-4">
         <Campo etiqueta="Email"><input className="campo" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Campo>
         {modo !== "olvido" && (
-          <Campo etiqueta="Contraseña" ayuda={modo === "alta" ? "Mínimo 6 caracteres." : undefined}>
-            <input className="campo" type="password" autoComplete={modo === "alta" ? "new-password" : "current-password"} required minLength={6} value={clave} onChange={(e) => setClave(e.target.value)} />
+          <Campo etiqueta="Contraseña" ayuda={modo === "alta" ? "Mínimo 8 caracteres." : undefined}>
+            <input className="campo" type="password" autoComplete={modo === "alta" ? "new-password" : "current-password"} required minLength={modo === "alta" ? 8 : 6} value={clave} onChange={(e) => setClave(e.target.value)} />
           </Campo>
         )}
         {msg && <p role="status" className={msg.ok ? "rounded-lg bg-emerald-50 p-3 text-[13px] text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" : "rounded-lg bg-red-50 p-3 text-[13px] text-red-700 dark:bg-red-950/50 dark:text-red-300"}>{msg.t}</p>}
@@ -183,7 +217,7 @@ function NuevaContrasena({ hecho }: { hecho: () => void }) {
         setCargando(false);
         if (error) setError(textoError(error)); else hecho();
       }}>
-        <Campo etiqueta="Contraseña nueva" error={error}><input className="campo" type="password" autoComplete="new-password" minLength={6} required value={clave} onChange={(e) => setClave(e.target.value)} /></Campo>
+        <Campo etiqueta="Contraseña nueva" error={error}><input className="campo" type="password" autoComplete="new-password" minLength={8} required value={clave} onChange={(e) => setClave(e.target.value)} /></Campo>
         <Boton variante="primario" className="w-full" cargando={cargando} type="submit">Guardar</Boton>
       </form>
     </Marco>

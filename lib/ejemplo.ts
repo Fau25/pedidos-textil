@@ -1,11 +1,11 @@
 import { sb } from "./supabase";
-import { guardarPedido, hoy, id, lineaVacia, type PedidoEd, type PersEd } from "./pedidos";
+import { diaLocal, guardarPedido, hoy, id, lineaVacia, type PedidoEd, type PersEd } from "./pedidos";
 import { tarifaPara } from "./calculo";
 import type { TarifaFila, Tecnica } from "./tipos";
 
 export const MARCA_EJEMPLO = "[ejemplo]";
 
-const dias = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const dias = (n: number) => diaLocal(n);
 
 /** Datos de ejemplo realistas. Se marcan con [ejemplo] en las notas para poder borrarlos. */
 export async function cargarEjemplo(empresaId: string) {

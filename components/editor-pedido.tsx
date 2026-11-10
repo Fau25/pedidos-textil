@@ -1,18 +1,22 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Copy, Trash2, ImagePlus, Paperclip, Shirt, Check, ChevronDown, Search, Loader2, Sparkles, X } from "lucide-react";
+import { Plus, Copy, Trash2, ImagePlus, Paperclip, Shirt, Check, Loader2, Sparkles, X } from "lucide-react";
 import { useSesion } from "./sesion";
-import { Boton, Campo, CampoImporte, Hoja, Tarjeta, cx, useAvisos } from "./ui";
+import { Boton, Campo, CampoImporte, Tarjeta, cx, useAvisos } from "./ui";
 import { sb, subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
 import { calcular, euros, tarifaPara, precioVentaUd, sumaUnidades } from "@/lib/calculo";
-import { aCalc, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, ordenTalla, cargarPedido, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
-import { TALLAS, TALLAS_NINO, TIPOS_PRENDA, UBICACIONES, type Cliente, type Prenda } from "@/lib/tipos";
+import { aCalc, claveBorrador, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, ordenTalla, cargarPedido, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
+import { SelectorCliente } from "./selector-cliente";
+import { Catalogo } from "./catalogo-picker";
+export { SelectorCliente };
+import { TALLAS, TALLAS_NINO, TIPOS_PRENDA, UBICACIONES, type Cliente } from "@/lib/tipos";
 
-const BORRADOR = "pedido-borrador";
 
 export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null; duplicarDe: string | null }) {
-  const { empresa, tecnicas, tarifas, proveedores } = useSesion();
+  const { empresa, tecnicas, tarifas, proveedores, sesion } = useSesion();
+  const BORRADOR = claveBorrador(sesion!.user.id);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { aviso, confirmar } = useAvisos();
   const router = useRouter();
   const margen = Number(empresa!.margen);
@@ -58,12 +62,13 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     if (!p || !cambiado.current) return;
     if (p.nuevo) { try { localStorage.setItem(BORRADOR, JSON.stringify(p)); } catch {} return; }
     setGuardando("guardando");
-    const h = setTimeout(async () => {
+    temporizador.current = setTimeout(async () => {
+      temporizador.current = null;
       try { await guardarPedido(p, empresa!); setGuardando("guardado"); }
       catch (e) { setGuardando("error"); aviso(textoError(e), "error"); }
     }, 900);
-    return () => clearTimeout(h);
-  }, [p, empresa, aviso]);
+    return () => { if (temporizador.current) clearTimeout(temporizador.current); };
+  }, [p, empresa, aviso, BORRADOR]);
 
   const set = useCallback((f: (x: PedidoEd) => PedidoEd) => { cambiado.current = true; setP((x) => (x ? f(x) : x)); }, []);
   const setLinea = (clave: string, cambio: Partial<LineaEd>) => set((x) => ({ ...x, lineas: x.lineas.map((l) => (l.clave === clave ? { ...l, ...cambio } : l)) }));
@@ -86,6 +91,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     if (!p) return;
     if (!p.cliente_id) { setErrorCliente(true); document.getElementById("bloque-cliente")?.scrollIntoView({ behavior: "smooth", block: "center" }); return aviso("Elige un cliente para guardar el pedido", "error"); }
     setEnviando(true);
+    if (temporizador.current) { clearTimeout(temporizador.current); temporizador.current = null; } // sin guardados solapados
     try {
       await guardarPedido(p, empresa!);
       if (p.nuevo) try { localStorage.removeItem(BORRADOR); } catch {}
@@ -241,85 +247,6 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 }
 
 const Fila = ({ t, v }: { t: string; v: string }) => <div className="flex justify-between gap-3"><dt className="text-texto2">{t}</dt><dd className="num">{v}</dd></div>;
-
-/* ───────── Cliente ───────── */
-export function SelectorCliente({ clientes, valor, cambiar, creado, error }: { clientes: Cliente[]; valor: string | null; cambiar: (id: string) => void; creado: (c: Cliente) => void; error?: boolean }) {
-  const { empresa } = useSesion();
-  const { aviso } = useAvisos();
-  const [abierto, setAbierto] = useState(false);
-  const [q, setQ] = useState("");
-  const [sel, setSel] = useState(0);
-  const [alta, setAlta] = useState<{ nombre: string; telefono: string; email: string; contacto: string } | null>(null);
-  const [creando, setCreando] = useState(false);
-  const caja = useRef<HTMLDivElement>(null);
-  const actual = clientes.find((c) => c.id === valor);
-  const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const lista = clientes.filter((c) => !q || norm([c.nombre, c.contacto, c.telefono, c.email].join(" ")).includes(norm(q))).slice(0, 8);
-  const opciones = [...lista.map((c) => ({ c })), ...(q.trim() ? [{ nuevo: q.trim() }] : [{ nuevo: "" }])];
-
-  useEffect(() => {
-    const f = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
-    document.addEventListener("mousedown", f);
-    return () => document.removeEventListener("mousedown", f);
-  }, []);
-
-  const elegir = (o: (typeof opciones)[number]) => {
-    if ("c" in o) { cambiar(o.c.id); setAbierto(false); setQ(""); }
-    else { setAlta({ nombre: o.nuevo, telefono: "", email: "", contacto: "" }); setAbierto(false); }
-  };
-
-  return (
-    <div ref={caja} className="relative">
-      <span className="mb-1.5 block text-[12px] font-medium text-texto2">Cliente</span>
-      <div className={cx("campo flex items-center gap-2 px-3", error && "border-red-500")}>
-        <Search className="size-4 shrink-0 text-texto2" />
-        <input role="combobox" aria-expanded={abierto} aria-label="Buscar cliente" className="h-full flex-1 bg-transparent outline-none"
-          placeholder={actual ? actual.nombre : "Buscar o crear cliente…"} value={abierto ? q : actual?.nombre ?? q}
-          onFocus={() => { setAbierto(true); setQ(""); setSel(0); }}
-          onChange={(e) => { setQ(e.target.value); setAbierto(true); setSel(0); }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(s + 1, opciones.length - 1)); }
-            if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
-            if (e.key === "Enter") { e.preventDefault(); elegir(opciones[sel]); }
-            if (e.key === "Escape") setAbierto(false);
-          }} />
-        <ChevronDown className="size-4 text-texto2" />
-      </div>
-      {error && <span className="mt-1 block text-[12px] text-red-600">Elige o crea un cliente</span>}
-      {abierto && (
-        <div className="animar absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-borde bg-superficie p-1 shadow-xl" role="listbox">
-          {opciones.map((o, i) => (
-            <button key={"c" in o ? o.c.id : "nuevo"} role="option" aria-selected={i === sel} onMouseEnter={() => setSel(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => elegir(o)}
-              className={cx("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left", i === sel && "bg-suave")}>
-              {"c" in o ? (<><span className="min-w-0 flex-1"><span className="block truncate">{o.c.nombre}</span>{o.c.contacto && <span className="block truncate text-[12px] text-texto2">{o.c.contacto}</span>}</span>{o.c.id === valor && <Check className="size-4 text-acento" />}</>)
-                : <span className="flex items-center gap-2 font-medium text-acento"><Plus className="size-4" />{o.nuevo ? `Crear «${o.nuevo}»` : "Crear cliente nuevo"}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-      <Hoja abierta={!!alta} cerrar={() => setAlta(null)} titulo="Nuevo cliente"
-        pie={<><Boton onClick={() => setAlta(null)}>Cancelar</Boton><Boton variante="primario" cargando={creando} form="alta-cliente" type="submit">Crear cliente</Boton></>}>
-        {alta && (
-          <form id="alta-cliente" className="space-y-4" onSubmit={async (e) => {
-            e.preventDefault(); setCreando(true);
-            const { data, error } = await sb.from("clientes").insert({ empresa_id: empresa!.id, nombre: alta.nombre.trim(), contacto: alta.contacto || null, telefono: alta.telefono || null, email: alta.email || null }).select("*").single();
-            setCreando(false);
-            if (error) return aviso(textoError(error), "error");
-            creado(data as Cliente); setAlta(null); aviso("Cliente creado");
-          }}>
-            <Campo etiqueta="Nombre o empresa"><input className="campo" required value={alta.nombre} onChange={(e) => setAlta({ ...alta, nombre: e.target.value })} /></Campo>
-            <Campo etiqueta="Persona de contacto"><input className="campo" value={alta.contacto} onChange={(e) => setAlta({ ...alta, contacto: e.target.value })} /></Campo>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Campo etiqueta="Teléfono"><input className="campo" type="tel" value={alta.telefono} onChange={(e) => setAlta({ ...alta, telefono: e.target.value })} /></Campo>
-              <Campo etiqueta="Email"><input className="campo" type="email" value={alta.email} onChange={(e) => setAlta({ ...alta, email: e.target.value })} /></Campo>
-            </div>
-            <p className="text-[12px] text-texto2">El resto de datos (NIF, dirección, facturación) los puedes completar después en Clientes.</p>
-          </form>
-        )}
-      </Hoja>
-    </div>
-  );
-}
 
 /* ───────── Prenda con matriz de tallas ───────── */
 function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar }: {
@@ -478,35 +405,3 @@ function TarjetaPers({ z, lineas, calc, tecnicas, cambiar, quitar, usarTarifa }:
   );
 }
 
-/* ───────── Catálogo ───────── */
-export function Catalogo({ abierto, cerrar, elegir, margen }: { abierto: boolean; cerrar: () => void; elegir: (p: Prenda, color: string) => void; margen: number }) {
-  const { empresa } = useSesion();
-  const [lista, setLista] = useState<Prenda[] | null>(null);
-  const [q, setQ] = useState("");
-  useEffect(() => { if (abierto) sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("tipo").then(({ data }) => setLista((data ?? []) as Prenda[])); }, [abierto, empresa]);
-  const f = (lista ?? []).filter((p) => (q ? [p.tipo, p.marca, p.modelo, p.referencia].join(" ").toLowerCase().includes(q.toLowerCase()) : p.favorito))
-    .sort((a, b) => Number(b.favorito) - Number(a.favorito));
-  return (
-    <Hoja abierta={abierto} cerrar={cerrar} titulo="Prendas del catálogo">
-      <input className="campo mb-4" placeholder="Buscar modelo o referencia (también en toda la tarifa)…" value={q} onChange={(e) => setQ(e.target.value)} />
-      {!q && <p className="-mt-2 mb-3 text-[12px] text-texto2">Tus prendas habituales. Escribe para buscar en todo el catálogo.</p>}
-      {!lista ? <Loader2 className="mx-auto size-5 animate-spin text-texto2" /> : !f.length ? <p className="py-8 text-center text-[13px] text-texto2">No hay prendas en el catálogo. Añádelas en Catálogo para tenerlas a un clic.</p> : (
-        <ul className="space-y-2">
-          {f.map((p) => (
-            <li key={p.id} className="rounded-xl border border-borde p-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-medium">{[p.marca, p.modelo].filter(Boolean).join(" ")}<span className="font-normal text-texto2"> · {p.tipo}{p.referencia ? " · " + p.referencia : ""}</span></span>
-                <span className="num text-[12px] text-texto2">{euros(Math.round(Number(p.precio_compra) * 100))} → {euros(precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }, margen))}</span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {(p.colores.length ? p.colores : [""]).map((c) => (
-                  <button key={c || "sin"} onClick={() => elegir(p, c)} className="h-7 rounded-full border border-borde px-3 text-[12px] hover:border-acento hover:text-acento">{c || "Añadir"}</button>
-                ))}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Hoja>
-  );
-}

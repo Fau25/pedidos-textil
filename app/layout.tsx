@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   manifest: "/pedidos-textil/manifest.webmanifest",
   icons: { icon: "/pedidos-textil/icono.svg", apple: "/pedidos-textil/icono-180.png" },
   appleWebApp: { capable: true, title: "Pedidos", statusBarStyle: "default" },
+  robots: { index: false, follow: false },
 };
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1,
@@ -21,6 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <html lang="es" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: TEMA }} />
+        <link rel="preconnect" href="https://sqartxsdlynecelkufyq.supabase.co" crossOrigin="" />
         <link rel="preload" href="/pedidos-textil/fuentes/pjs-400.woff2" as="font" type="font/woff2" crossOrigin="" />
         <link rel="preload" href="/pedidos-textil/fuentes/pjs-600.woff2" as="font" type="font/woff2" crossOrigin="" />
       </head>

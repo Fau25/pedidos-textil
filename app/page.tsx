@@ -14,7 +14,7 @@ import type { Pedido } from "@/lib/tipos";
 export default function Inicio() {
   const { empresa } = useSesion();
   const { aviso } = useAvisos();
-  const { datos, setDatos } = useCarga(async () => {
+  const { datos, setDatos, error, recargar } = useCarga(async () => {
     const { data, error } = await sb.from("pedidos").select("id, numero, fecha, entrega, total, unidades, referencia, entregado, entregado_en, clientes(nombre)")
       .eq("empresa_id", empresa!.id).eq("entregado", false).order("entrega", { ascending: true, nullsFirst: false }).limit(500);
     if (error) throw error;
@@ -23,8 +23,10 @@ export default function Inicio() {
 
   async function entregar(p: Pedido) {
     setDatos((d) => d?.filter((x) => x.id !== p.id) ?? null);
-    try { await marcarEntregado([p.id], true); aviso(`${p.clientes?.nombre ?? p.numero}: entregado`); }
-    catch (e) { aviso(textoError(e), "error"); }
+    try {
+      await marcarEntregado([p.id], true);
+      aviso(`${p.clientes?.nombre ?? p.numero}: entregado`, "ok", { texto: "Deshacer", fn: async () => { await marcarEntregado([p.id], false); recargar(); } });
+    } catch (e) { aviso(textoError(e), "error"); recargar(); }
   }
 
   const grupos = useMemo(() => {
@@ -53,7 +55,7 @@ export default function Inicio() {
         <div className="space-y-6">
           <TrabajoRapido />
           <Tarjeta titulo="Pendientes" accion={<Link href="/pedidos/?ver=entregados" className="text-[13px] text-acento">Entregados</Link>} sinPadding>
-            {!datos ? <Cargando /> : !datos.length ? <p className="px-5 pb-8 pt-4 text-center text-texto2">No hay nada pendiente. 🎉</p> : (
+            {!datos ? <Cargando error={error} reintentar={recargar} /> : !datos.length ? <p className="px-5 pb-8 pt-4 text-center text-texto2">No hay nada pendiente. 🎉</p> : (
               <div className="pb-2">
                 {grupos.map((g) => (
                   <div key={g.t}>

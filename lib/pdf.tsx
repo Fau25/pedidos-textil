@@ -81,7 +81,7 @@ function Doc({ p, logo }: { p: Presupuesto; logo: string | null }) {
         <View style={{ alignSelf: "flex-end", width: 230, marginTop: 14 }} wrap={false}>
           {d.descuento > 0 && <>
             <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>Suma</Text><Text>{e(d.bruto)}</Text></View>
-            <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>Descuento {d.descuento_pct} %</Text><Text>−{e(d.descuento)}</Text></View>
+            <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>Descuento {d.descuento_pct} %</Text><Text>-{e(d.descuento)}</Text></View>
           </>}
           <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>Base imponible</Text><Text>{e(d.base)}</Text></View>
           <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>IVA {d.iva_pct} %</Text><Text>{e(d.iva)}</Text></View>

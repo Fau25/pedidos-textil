@@ -16,7 +16,7 @@ export default function FichaCliente() {
   const { aviso, confirmar } = useAvisos();
   const router = useRouter();
   const [editar, setEditar] = useState(false);
-  const { datos, recargar } = useCarga(async () => {
+  const { datos, recargar, error } = useCarga(async () => {
     if (!cid) return null;
     const [c, p] = await Promise.all([
       sb.from("clientes").select("*").eq("id", cid).maybeSingle(),
@@ -25,7 +25,7 @@ export default function FichaCliente() {
     return { cliente: c.data as Cliente | null, pedidos: (p.data ?? []) as Pedido[] };
   }, [cid]);
 
-  if (!cid || !datos) return <Cargando />;
+  if (!cid || !datos) return <Cargando error={error} reintentar={recargar} />;
   const { cliente, pedidos } = datos;
   if (!cliente) return <Vacio titulo="Este cliente no existe" accion={<Link href="/clientes/"><Boton>Ver clientes</Boton></Link>} />;
   const total = pedidos.reduce((a, p) => a + aCent(p.total), 0);

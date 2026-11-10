@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, type ReactNode } from "react";
+import { Suspense, useEffect, type ReactNode } from "react";
 import { ProveedorSesion } from "./sesion";
 import { ProveedorAvisos } from "./ui";
 import { Marco } from "./marco";
@@ -12,7 +12,7 @@ export function Raiz({ children }: { children: ReactNode }) {
   return (
     <ProveedorAvisos>
       <ProveedorSesion>
-        <Marco>{children}</Marco>
+        <Marco><Suspense>{children}</Suspense></Marco>
       </ProveedorSesion>
     </ProveedorAvisos>
   );

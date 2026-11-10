@@ -15,7 +15,7 @@ export default function Clientes() {
   const { empresa } = useSesion();
   const [q, setQ] = useState("");
   const [form, setForm] = useState(false);
-  const { datos, recargar } = useCarga(async () => {
+  const { datos, recargar, error } = useCarga(async () => {
     const [c, p] = await Promise.all([
       sb.from("clientes").select("*").eq("empresa_id", empresa!.id).order("nombre"),
       sb.from("pedidos").select("cliente_id, total").eq("empresa_id", empresa!.id),
@@ -34,7 +34,7 @@ export default function Clientes() {
     <>
       <Cabecera titulo="Clientes" sub={datos ? `${datos.clientes.length} clientes` : undefined} acciones={<Boton variante="primario" onClick={() => setForm(true)}><Plus className="size-4" />Nuevo cliente</Boton>} />
       <input className="campo mb-4 sm:max-w-sm" placeholder="Buscar por nombre, contacto, teléfono, email o NIF" value={q} onChange={(e) => setQ(e.target.value)} />
-      {!datos ? <Cargando /> : !datos.clientes.length ? (
+      {!datos ? <Cargando error={error} reintentar={recargar} /> : !datos.clientes.length ? (
         <div className="tarjeta"><Vacio icono={<Users className="size-5" />} titulo="Aún no hay clientes" texto="También puedes crearlos directamente al hacer un pedido." accion={<Boton variante="primario" onClick={() => setForm(true)}><Plus className="size-4" />Nuevo cliente</Boton>} /></div>
       ) : (
         <div className="tarjeta divide-y divide-borde">

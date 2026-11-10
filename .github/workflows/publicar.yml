@@ -23,6 +23,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Pruebas de pantallas (datos simulados)
+        run: npm run prueba:pantallas
+        env: { CHROME: /usr/bin/google-chrome }
       - name: Versión del service worker
         run: sed -i "s/__VERSION__/${GITHUB_SHA::8}/" out/sw.js && touch out/.nojekyll
       - uses: actions/configure-pages@v5

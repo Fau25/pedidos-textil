@@ -24,7 +24,11 @@ export type PedidoEd = {
   lineas: LineaEd[]; pers: PersEd[];
 };
 
-export const hoy = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+/** Fecha local (no UTC) en formato AAAA-MM-DD, desplazada n días */
+export function diaLocal(n = 0) { const d = new Date(); d.setDate(d.getDate() + n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+export const hoy = () => diaLocal(0);
+/** El borrador de «nuevo pedido» es de cada usuario (por si varios comparten dispositivo) */
+export const claveBorrador = (uid: string) => `pedido-borrador-${uid}`;
 export const id = () => crypto.randomUUID();
 
 export function lineaVacia(margen: number, base?: Partial<LineaEd>): LineaEd {
@@ -79,51 +83,35 @@ export async function cargarPedido(pid: string): Promise<{ ed: PedidoEd; pedido:
   return { ed, pedido: ped };
 }
 
-const ok = <T,>(r: { error: unknown; data?: unknown }) => { if (r.error) throw r.error; return r.data as T; };
-
-/** Guarda el pedido completo (cabecera, prendas, tallas y personalizaciones). Devuelve el número. */
-export async function guardarPedido(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">): Promise<string> {
+/** Guarda el pedido completo en una sola transacción (función guardar_pedido de la base de datos).
+ *  Los guardados se ponen en cola para que nunca se solapen (autoguardado + botón). Devuelve el número. */
+let cola: Promise<unknown> = Promise.resolve();
+export function guardarPedido(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">): Promise<string> {
+  const r = cola.then(() => guardarAhora(p, empresa));
+  cola = r.catch(() => {});
+  return r;
+}
+async function guardarAhora(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">): Promise<string> {
   const t = calcular(aCalc(p, Number(empresa.margen)));
-  const cab = {
-    id: p.id, empresa_id: empresa.id, cliente_id: p.cliente_id, fecha: p.fecha, entrega: p.entrega || null,
-    entregado: p.entregado, referencia: p.referencia || null, notas: p.notas || null,
-    descuento_pct: p.descuento_pct || 0, gastos_coste: p.gastos_coste || 0, gastos_venta: p.gastos_venta || 0, iva: p.iva,
-    coste: aEuros(t.coste), base: aEuros(t.base), total: aEuros(t.total), unidades: t.unidades,
+  const clavesL = new Set(p.lineas.map((l) => l.clave));
+  const datos = {
+    id: p.id, empresa_id: empresa.id, cliente_id: p.cliente_id, fecha: p.fecha, entrega: p.entrega || null, entregado: p.entregado,
+    referencia: p.referencia, notas: p.notas, descuento_pct: p.descuento_pct || 0, gastos_coste: p.gastos_coste || 0,
+    gastos_venta: p.gastos_venta || 0, iva: p.iva, coste: aEuros(t.coste), base: aEuros(t.base), total: aEuros(t.total), unidades: t.unidades,
+    lineas: p.lineas.map((l, i) => ({
+      id: l.clave, orden: i, tipo: l.tipo, marca: l.marca, modelo: l.modelo, color: l.color, proveedor_id: l.proveedor_id,
+      precio_compra: l.precio_compra || 0, precio_venta: l.precio_venta, notas: l.notas, imagen_path: l.imagen_path,
+      tallas: Object.entries(l.tallas).filter(([, c]) => c > 0).map(([talla, cantidad], k) => ({ talla, cantidad, orden: ordenTalla(talla, k) })),
+    })),
+    pers: p.pers.map((x, i) => ({
+      id: x.clave, orden: i, tecnica_id: x.tecnica_id, tecnica: x.tecnica, ubicacion: x.ubicacion, aplicaciones: x.aplicaciones || 1,
+      coste_ud: x.coste_ud || 0, precio_ud: x.precio_ud || 0, precio_manual: x.precio_manual, diseno_path: x.diseno_path, notas: x.notas,
+      lineas: x.lineas.filter((k) => clavesL.has(k)),
+    })),
   };
-  const ped = ok<{ numero: string }>(await sb.from("pedidos").upsert(cab).select("numero").single());
-
-  const clavesL = p.lineas.map((l) => l.clave);
-  const clavesP = p.pers.map((x) => x.clave);
-  // Borrar lo que se ha quitado
-  let q = sb.from("pedido_lineas").delete().eq("pedido_id", p.id);
-  if (clavesL.length) q = q.not("id", "in", `(${clavesL.join(",")})`);
-  ok(await q);
-  let qp = sb.from("personalizaciones").delete().eq("pedido_id", p.id);
-  if (clavesP.length) qp = qp.not("id", "in", `(${clavesP.join(",")})`);
-  ok(await qp);
-
-  if (p.lineas.length) {
-    ok(await sb.from("pedido_lineas").upsert(p.lineas.map((l, i) => ({
-      id: l.clave, pedido_id: p.id, orden: i, tipo: l.tipo || "Prenda", marca: l.marca || null, modelo: l.modelo || null,
-      color: l.color || null, proveedor_id: l.proveedor_id, precio_compra: l.precio_compra || 0, precio_venta: l.precio_venta,
-      notas: l.notas || null, imagen_path: l.imagen_path, estado: l.estado,
-    }))));
-    ok(await sb.from("linea_tallas").delete().in("linea_id", clavesL));
-    const tallas = p.lineas.flatMap((l) =>
-      Object.entries(l.tallas).filter(([, c]) => c > 0).map(([talla, cantidad], i) => ({ linea_id: l.clave, talla, cantidad, orden: ordenTalla(talla, i) })));
-    if (tallas.length) ok(await sb.from("linea_tallas").insert(tallas));
-  }
-  if (p.pers.length) {
-    ok(await sb.from("personalizaciones").upsert(p.pers.map((x, i) => ({
-      id: x.clave, pedido_id: p.id, orden: i, tecnica_id: x.tecnica_id, tecnica: x.tecnica, ubicacion: x.ubicacion,
-      aplicaciones: x.aplicaciones || 1, coste_ud: x.coste_ud || 0, precio_ud: x.precio_ud || 0, precio_manual: x.precio_manual,
-      diseno_path: x.diseno_path, notas: x.notas || null, estado: x.estado,
-    }))));
-    ok(await sb.from("personalizacion_lineas").delete().in("personalizacion_id", clavesP));
-    const enlaces = p.pers.flatMap((x) => x.lineas.filter((k) => clavesL.includes(k)).map((linea_id) => ({ personalizacion_id: x.clave, linea_id })));
-    if (enlaces.length) ok(await sb.from("personalizacion_lineas").insert(enlaces));
-  }
-  return ped.numero;
+  const { data, error } = await sb.rpc("guardar_pedido", { p: datos });
+  if (error) throw error;
+  return data as string;
 }
 
 const ORDEN_TALLAS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"];

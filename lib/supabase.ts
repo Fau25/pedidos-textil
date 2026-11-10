@@ -17,8 +17,9 @@ export function textoError(e: unknown): string {
   const m = (e as { message?: string })?.message ?? String(e);
   if (/Invalid login credentials/i.test(m)) return "Email o contraseña incorrectos.";
   if (/Email not confirmed/i.test(m)) return "Falta confirmar el email: revisa tu correo y pulsa el enlace.";
+  if (/no está invitado/i.test(m)) return m;
   if (/User already registered/i.test(m)) return "Ya existe una cuenta con ese email. Prueba a entrar.";
-  if (/Password should be at least/i.test(m)) return "La contraseña debe tener al menos 6 caracteres.";
+  if (/Password should be at least/i.test(m)) return "La contraseña debe tener al menos 8 caracteres.";
   if (/Failed to fetch|NetworkError|network/i.test(m)) return "Sin conexión. Comprueba internet y vuelve a intentarlo.";
   if (/violates foreign key.*clientes/i.test(m) || /restrict/i.test(m)) return "No se puede borrar: tiene pedidos asociados.";
   if (/row-level security/i.test(m)) return "No tienes permiso para hacer este cambio.";

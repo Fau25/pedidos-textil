@@ -1,6 +1,6 @@
 import { sb } from "./supabase";
 import { calcular } from "./calculo";
-import { aCalc, cargarPedido, datosPresupuesto } from "./pedidos";
+import { aCalc, cargarPedido, datosPresupuesto, diaLocal } from "./pedidos";
 import type { Cliente, Empresa, Presupuesto } from "./tipos";
 
 /** Presupuesto en PDF con los datos actuales del pedido (sin seguimiento) */
@@ -11,11 +11,10 @@ export async function presupuestoDe(pedidoId: string, empresa: Empresa): Promise
   const cli = ed.cliente_id ? ((await sb.from("clientes").select("*").eq("id", ed.cliente_id).single()).data as Cliente) : null;
   const t = calcular(aCalc(ed, Number(empresa.margen)));
   const hoy = new Date();
-  const val = new Date(); val.setDate(val.getDate() + Number(empresa.validez_dias || 30));
   const datos = datosPresupuesto(ed, t, empresa, cli);
   return {
     id: ed.id, pedido_id: ed.id, numero: ed.numero ?? "", version: 1, estado: "borrador",
-    fecha: hoy.toISOString().slice(0, 10), validez: val.toISOString().slice(0, 10), datos,
+    fecha: diaLocal(0), validez: diaLocal(Number(empresa.validez_dias || 30)), datos,
     base: datos.base, iva: datos.iva, total: datos.total, notas: null, creado: hoy.toISOString(),
   };
 }

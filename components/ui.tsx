@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { createPortal } from "react-dom";
 
 export function cx(...c: (string | false | null | undefined)[]) { return c.filter(Boolean).join(" "); }
 
@@ -80,8 +81,16 @@ export function Vacio({ icono, titulo, texto, accion }: { icono?: ReactNode; tit
   );
 }
 
-export function Cargando({ texto = "Cargando…" }: { texto?: string }) {
-  return <div className="flex items-center justify-center gap-2 py-16 text-texto2"><Loader2 className="size-4 animate-spin" />{texto}</div>;
+export function Cargando({ texto = "Cargando…", error, reintentar }: { texto?: string; error?: string | null; reintentar?: () => void }) {
+  if (error) return (
+    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center" role="alert">
+      <AlertCircle className="size-6 text-red-500" />
+      <p className="font-medium">No se han podido cargar los datos</p>
+      <p className="max-w-sm text-[13px] text-texto2">{error} Comprueba la conexión a internet.</p>
+      {reintentar && <Boton onClick={reintentar}>Reintentar</Boton>}
+    </div>
+  );
+  return <div className="flex items-center justify-center gap-2 py-16 text-texto2" role="status"><Loader2 className="size-4 animate-spin" />{texto}</div>;
 }
 
 /** Hoja lateral (escritorio) / inferior (móvil). Cierra con Escape y devuelve el foco. */
@@ -94,11 +103,22 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
     document.addEventListener("keydown", k);
     document.body.style.overflow = "hidden";
     setTimeout(() => ref.current?.querySelector<HTMLElement>("input,select,textarea,button:not([data-cerrar])")?.focus(), 30);
-    return () => { document.removeEventListener("keydown", k); document.body.style.overflow = ""; previo?.focus?.(); };
+    // El resto de la página queda inerte mientras la hoja está abierta y el tabulador no sale de ella
+    const fondo = [...document.body.children].filter((el) => !el.contains(ref.current) && !el.hasAttribute("aria-live")) as HTMLElement[];
+    for (const el of fondo) el.inert = true;
+    const tab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !ref.current) return;
+      const f = [...ref.current.querySelectorAll<HTMLElement>("a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex='-1'])")];
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    };
+    document.addEventListener("keydown", tab);
+    return () => { document.removeEventListener("keydown", k); document.removeEventListener("keydown", tab); for (const el of fondo) el.inert = false; document.body.style.overflow = ""; previo?.focus?.(); };
   }, [abierta, cerrar]);
   if (!abierta) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-stretch sm:justify-end" role="dialog" aria-modal="true" aria-label={titulo}>
+  return createPortal(
+    <div data-hoja className="fixed inset-0 z-50 flex items-end justify-center sm:items-stretch sm:justify-end" role="dialog" aria-modal="true" aria-label={titulo}>
       <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={cerrar} />
       <div ref={ref} className={cx("animar relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-superficie shadow-2xl sm:max-h-none sm:rounded-none sm:rounded-l-2xl", ancho)}>
         <div className="flex items-center justify-between border-b border-borde px-5 py-4">
@@ -109,22 +129,23 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
         {pie && <div className="flex justify-end gap-2 border-t border-borde px-5 py-3">{pie}</div>}
       </div>
     </div>
-  );
+  , document.body);
 }
 
 /** Confirmación propia (sin alert/confirm del navegador) */
 type Confirm = { titulo: string; texto?: string; ok?: string; peligro?: boolean; resolver: (v: boolean) => void };
-type Toast = { id: number; texto: string; tipo: "ok" | "error" };
-const Ctx = createContext<{ aviso: (t: string, tipo?: "ok" | "error") => void; confirmar: (o: Omit<Confirm, "resolver">) => Promise<boolean> } | null>(null);
+type Accion = { texto: string; fn: () => void };
+type Toast = { id: number; texto: string; tipo: "ok" | "error"; accion?: Accion };
+const Ctx = createContext<{ aviso: (t: string, tipo?: "ok" | "error", accion?: Accion) => void; confirmar: (o: Omit<Confirm, "resolver">) => Promise<boolean> } | null>(null);
 export const useAvisos = () => useContext(Ctx)!;
 
 export function ProveedorAvisos({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [conf, setConf] = useState<Confirm | null>(null);
-  const aviso = useCallback((texto: string, tipo: "ok" | "error" = "ok") => {
+  const aviso = useCallback((texto: string, tipo: "ok" | "error" = "ok", accion?: Accion) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, texto, tipo }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tipo === "error" ? 6000 : 3000);
+    setToasts((t) => [...t, { id, texto, tipo, accion }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tipo === "error" || accion ? 6000 : 3000);
   }, []);
   const confirmar = useCallback((o: Omit<Confirm, "resolver">) => new Promise<boolean>((resolver) => setConf({ ...o, resolver })), []);
   const cerrar = (v: boolean) => { conf?.resolver(v); setConf(null); };
@@ -136,6 +157,7 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
           <div key={t.id} className="animar pointer-events-auto flex max-w-md items-center gap-2 rounded-xl bg-[#1e2024] px-4 py-3 text-[13px] text-white shadow-lg dark:bg-[#ecedef] dark:text-[#1e2024]">
             {t.tipo === "ok" ? <CheckCircle2 className="size-4 text-emerald-400 dark:text-emerald-600" /> : <AlertCircle className="size-4 text-red-400 dark:text-red-600" />}
             {t.texto}
+            {t.accion && <button className="ml-2 font-semibold text-[#8fb0ff] underline-offset-2 hover:underline dark:text-[#2b59c3]" onClick={() => { t.accion!.fn(); setToasts((x) => x.filter((y) => y.id !== t.id)); }}>{t.accion.texto}</button>}
           </div>
         ))}
       </div>

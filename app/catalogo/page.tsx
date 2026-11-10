@@ -30,7 +30,7 @@ function Prendas() {
   const [guardando, setGuardando] = useState(false);
   const [q, setQ] = useState("");
   const [todas, setTodas] = useState(false);
-  const { datos, recargar, setDatos } = useCarga(async () => ((await sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000)).data ?? []) as Prenda[]);
+  const { datos, recargar, setDatos, error } = useCarga(async () => ((await sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000)).data ?? []) as Prenda[]);
   const margen = Number(empresa!.margen);
   const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const lista = (datos ?? []).filter((p) => (q ? n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(n(q)) : todas || p.favorito));
@@ -63,7 +63,7 @@ function Prendas() {
           <Boton variante="primario" onClick={() => setEd({ tipo: "Camiseta", marca: "Roly", colores: [], tallas: [], precio_compra: 0, precio_venta: null })}><Plus className="size-4" />Añadir</Boton>
         </div>
       </div>
-      {!datos ? <Cargando /> : !lista.length ? <div className="tarjeta"><Vacio icono={<Shirt className="size-5" />} titulo={q ? "Sin resultados" : "Sin prendas habituales"} texto={q ? undefined : "Marca con la estrella las prendas que más usas, o importa la tarifa de tu proveedor."} /></div> : (
+      {!datos ? <Cargando error={error} reintentar={recargar} /> : !lista.length ? <div className="tarjeta"><Vacio icono={<Shirt className="size-5" />} titulo={q ? "Sin resultados" : "Sin prendas habituales"} texto={q ? undefined : "Marca con la estrella las prendas que más usas, o importa la tarifa de tu proveedor."} /></div> : (
         <div className="tarjeta divide-y divide-borde">
           {lista.slice(0, 300).map((p) => (
             <div key={p.id} className="flex items-center gap-3 px-4 py-3">

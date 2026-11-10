@@ -7,7 +7,7 @@ import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Cargando, Vacio, cx, diasHasta, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError } from "@/lib/supabase";
-import { useCarga } from "@/lib/usar";
+import { useCarga, useParam } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
 import { marcarEntregado } from "@/lib/pedidos";
 import type { Pedido } from "@/lib/tipos";
@@ -24,12 +24,10 @@ export default function Pedidos() {
   const [orden, setOrden] = useState<Orden>("entrega");
   const [sel, setSel] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const f = new URLSearchParams(location.search).get("ver");
-    if (f === "entregados" || f === "todos") { setFiltro(f); setOrden("fecha"); }
-  }, []);
+  const ver = useParam("ver");
+  useEffect(() => { if (ver === "entregados" || ver === "todos") { setFiltro(ver); setOrden("fecha"); } }, [ver]);
 
-  const { datos, setDatos } = useCarga(async () => {
+  const { datos, setDatos, error, recargar } = useCarga(async () => {
     const { data, error } = await sb.from("pedidos").select("id, numero, fecha, entrega, total, unidades, referencia, entregado, entregado_en, actualizado, clientes(nombre)")
       .eq("empresa_id", empresa!.id).order("fecha", { ascending: false }).limit(2000);
     if (error) throw error;
@@ -54,7 +52,12 @@ export default function Pedidos() {
   async function entregar(ids: string[], v: boolean) {
     const prev = datos;
     setDatos((d) => d?.map((p) => (ids.includes(p.id) ? { ...p, entregado: v } : p)) ?? null);
-    try { await marcarEntregado(ids, v); aviso(v ? (ids.length > 1 ? `${ids.length} pedidos entregados` : "Marcado como entregado") : "Vuelve a pendientes"); setSel(new Set()); }
+    try {
+      await marcarEntregado(ids, v);
+      aviso(v ? (ids.length > 1 ? `${ids.length} pedidos entregados` : "Marcado como entregado") : "Vuelve a pendientes", "ok",
+        { texto: "Deshacer", fn: async () => { await marcarEntregado(ids, !v); recargar(); } });
+      setSel(new Set());
+    }
     catch (e) { setDatos(prev); aviso(textoError(e), "error"); }
   }
 
@@ -79,7 +82,7 @@ export default function Pedidos() {
         </label>
       </div>
 
-      {!datos ? <Cargando /> : !datos.length ? (
+      {!datos ? <Cargando error={error} reintentar={recargar} /> : !datos.length ? (
         <div className="tarjeta"><Vacio icono={<Inbox className="size-5" />} titulo="Aún no hay pedidos" accion={<Link href="/pedidos/nuevo/"><Boton variante="primario"><Plus className="size-4" />Nuevo pedido</Boton></Link>} /></div>
       ) : (
         <div className="tarjeta overflow-hidden">

@@ -1,0 +1,19 @@
+name: Mantener Supabase despierto
+# El plan gratis de Supabase pausa el proyecto tras 7 días sin actividad.
+# Esta consulta (sin datos: la clave pública no ve nada sin sesión) lo mantiene activo.
+on:
+  schedule:
+    - cron: "17 7 * * 1,4"   # lunes y jueves
+  workflow_dispatch:
+permissions: {}
+jobs:
+  despertar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consulta a la base de datos
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://sqartxsdlynecelkufyq.supabase.co/rest/v1/empresas?select=id&limit=1" \
+            -H "apikey: sb_publishable_yfnqiDl0NRnKi7u9_nHiWg_KF4fBPYJ")
+          echo "Respuesta: $code"
+          test "$code" -lt 500

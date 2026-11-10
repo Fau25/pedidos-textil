@@ -26,15 +26,21 @@ export function ImportarTarifa({ marca = "Roly", hecho }: { marca?: string; hech
   async function leer(f: File) {
     setCargando(true);
     try {
-      const XLSX = await import("xlsx");
-      const wb = XLSX.read(await f.arrayBuffer());
-      // Hoja con más filas
-      const hoja = wb.SheetNames.map((n) => wb.Sheets[n]).sort((a, b) => (XLSX.utils.sheet_to_json(b).length - XLSX.utils.sheet_to_json(a).length))[0];
-      const datos = XLSX.utils.sheet_to_json<Record<string, unknown>>(hoja, { defval: "" });
-      if (!datos.length) throw new Error("El archivo no tiene filas.");
-      const c = Object.keys(datos[0]);
+      let tabla: unknown[][];
+      if (/\.csv$|\.txt$/i.test(f.name)) tabla = leerCSV(await f.text());
+      else {
+        const { default: readExcelFile } = await import("read-excel-file/browser");
+        const hojas = await readExcelFile(f) as { sheet: string; data: unknown[][] }[];
+        tabla = hojas.sort((x, y) => y.data.length - x.data.length)[0]?.data ?? [];
+      }
+      // La cabecera es la primera fila con al menos 2 celdas de texto
+      const ini = tabla.findIndex((r) => r.filter((c) => typeof c === "string" && c.trim()).length >= 2);
+      if (ini < 0 || tabla.length - ini < 2) throw new Error("El archivo no tiene filas con datos.");
+      const c = tabla[ini].map((x, i) => String(x ?? "").trim() || `Columna ${i + 1}`);
+      const datos = tabla.slice(ini + 1).filter((r) => r.some((x) => x !== null && String(x).trim() !== ""))
+        .map((r) => Object.fromEntries(c.map((k, i) => [k, r[i] ?? ""])));
       const m: Partial<Record<Campos, string>> = {};
-      for (const k of Object.keys(PISTAS) as Campos[]) m[k] = c.find((x) => PISTAS[k].test(x.trim()) && !Object.values(m).includes(x));
+      for (const k of Object.keys(PISTAS) as Campos[]) m[k] = c.find((x) => PISTAS[k].test(x) && !Object.values(m).includes(x));
       setCols(c); setMapa(m); setFilas(datos);
     } catch (e) { aviso(textoError(e), "error"); } finally { setCargando(false); }
   }
@@ -101,4 +107,20 @@ export function ImportarTarifa({ marca = "Roly", hecho }: { marca?: string; hech
       </Hoja>
     </>
   );
+}
+
+/** CSV sencillo: separador «;» o «,», comillas dobles */
+function leerCSV(txt: string): string[][] {
+  const sep = (txt.split("\n")[0].match(/;/g)?.length ?? 0) >= (txt.split("\n")[0].match(/,/g)?.length ?? 0) ? ";" : ",";
+  const filas: string[][] = []; let fila: string[] = []; let celda = ""; let q = false;
+  for (let i = 0; i < txt.length; i++) {
+    const ch = txt[i];
+    if (q) { if (ch === '"' && txt[i + 1] === '"') { celda += '"'; i++; } else if (ch === '"') q = false; else celda += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { fila.push(celda); celda = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && txt[i + 1] === "\n") i++; fila.push(celda); filas.push(fila); fila = []; celda = ""; }
+    else celda += ch;
+  }
+  if (celda || fila.length) { fila.push(celda); filas.push(fila); }
+  return filas;
 }
