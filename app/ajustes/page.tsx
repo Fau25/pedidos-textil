@@ -21,7 +21,7 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();
@@ -74,7 +74,7 @@ export default function Ajustes() {
             <Campo etiqueta="Dirección fiscal"><input className="campo" {...register("direccion")} /></Campo>
             <div className="grid grid-cols-3 gap-4">
               <Campo etiqueta="IVA por defecto %" error={errors.iva?.message}><input className="campo num" inputMode="decimal" {...register("iva")} /></Campo>
-              <Campo etiqueta="Margen por defecto %" error={errors.margen?.message}><input className="campo num" inputMode="decimal" {...register("margen")} /></Campo>
+              <Campo etiqueta="Margen sobre tarifa %" error={errors.margen?.message}><input className="campo num" inputMode="decimal" {...register("margen")} /></Campo>
               <Campo etiqueta="Validez (días)" error={errors.validez_dias?.message}><input className="campo num" inputMode="numeric" {...register("validez_dias")} /></Campo>
             </div>
             <Campo etiqueta="Condiciones comerciales" ayuda="Aparecen al pie de los presupuestos."><textarea className="campo" rows={4} {...register("condiciones")} /></Campo>

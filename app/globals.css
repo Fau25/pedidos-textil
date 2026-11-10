@@ -8,27 +8,34 @@
 @font-face { font-family: "PJS"; src: url("/pedidos-textil/fuentes/pjs-700.woff2") format("woff2"); font-weight: 700; font-display: block; }
 
 :root {
-  --fondo: #f7f7f8;
+  /* Línea «negro + azul»: fondo gris muy claro, tarjetas blancas, negro para lo principal, azul para detalles */
+  --fondo: #f1f2f5;
   --superficie: #ffffff;
-  --suave: #f1f2f4;
-  --texto: #1e2024;
-  --texto2: #5b616e;
-  --borde: #e6e7ea;
-  --acento: #2b59c3;
-  --acento-h: #234aa7;
-  --acento-suave: #eaf0fc;
+  --suave: #eceef2;
+  --texto: #17181c;
+  --texto2: #5d626d;
+  --borde: #e4e6eb;
+  --acento: #17181c;
+  --acento-h: #2c2e35;
+  --acento-suave: #e6e8ed;
+  --sobre-acento: #ffffff;
+  --azul: #1f5bff;
+  --azul-suave: #e9efff;
   color-scheme: light;
 }
 .dark {
-  --fondo: #0f1012;
-  --superficie: #18191c;
-  --suave: #222428;
-  --texto: #ecedef;
-  --texto2: #a3a8b2;
-  --borde: #2b2d32;
-  --acento: #6b8ff0;
-  --acento-h: #87a4f3;
-  --acento-suave: #1d2640;
+  --fondo: #0d0e10;
+  --superficie: #17181b;
+  --suave: #212328;
+  --texto: #eeeff2;
+  --texto2: #a4a9b3;
+  --borde: #2a2c31;
+  --acento: #f1f2f5;
+  --acento-h: #d9dbe0;
+  --acento-suave: #2a2c32;
+  --sobre-acento: #17181c;
+  --azul: #6d93ff;
+  --azul-suave: #1a2442;
   color-scheme: dark;
 }
 
@@ -43,6 +50,9 @@
   --color-acento: var(--acento);
   --color-acento-h: var(--acento-h);
   --color-acento-suave: var(--acento-suave);
+  --color-sobre-acento: var(--sobre-acento);
+  --color-azul: var(--azul);
+  --color-azul-suave: var(--azul-suave);
 }
 
 html { -webkit-text-size-adjust: 100%; }
@@ -57,23 +67,23 @@ body {
 .num { font-variant-numeric: tabular-nums; }
 .tarjeta {
   background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 6px 16px -4px rgba(0, 0, 0, 0.04);
+  border: 1px solid color-mix(in srgb, var(--borde) 60%, transparent);
+  border-radius: 22px;
+  box-shadow: 0 1px 2px rgba(16, 18, 24, 0.03), 0 10px 30px -12px rgba(16, 18, 24, 0.08);
 }
 .campo {
-  height: 40px; width: 100%; border-radius: 10px; border: 1px solid var(--borde);
+  height: 44px; width: 100%; border-radius: 14px; border: 1px solid var(--borde);
   background: var(--superficie); padding: 0 12px; outline: none; transition: border-color .15s, box-shadow .15s;
 }
-textarea.campo { height: auto; padding: 10px 12px; min-height: 72px; resize: vertical; }
+textarea.campo { height: auto; padding: 12px 14px; min-height: 72px; resize: vertical; }
 select.campo { appearance: none; padding-right: 32px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238a8f99' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 10px center; }
-.campo:focus { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 18%, transparent); }
+.campo:focus { border-color: var(--azul); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul) 20%, transparent); }
 .campo::placeholder { color: color-mix(in srgb, var(--texto2) 75%, transparent); }
 input[type="number"].sin-flechas::-webkit-inner-spin-button, input[type="number"].sin-flechas::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"].sin-flechas { -moz-appearance: textfield; }
-:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--azul); outline-offset: 2px; }
 .campo:focus-visible { outline: none; }
 @media print { .no-imprimir { display: none !important; } }
 @keyframes entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

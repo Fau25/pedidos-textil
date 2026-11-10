@@ -20,7 +20,7 @@ export default function FichaCliente() {
     if (!cid) return null;
     const [c, p] = await Promise.all([
       sb.from("clientes").select("*").eq("id", cid).maybeSingle(),
-      sb.from("pedidos").select("id, numero, fecha, entrega, total, entregado, unidades, referencia").eq("cliente_id", cid).order("fecha", { ascending: false }),
+      sb.from("pedidos").select("id, numero, fecha, total, entregado, unidades, referencia").eq("cliente_id", cid).order("fecha", { ascending: false }),
     ]);
     return { cliente: c.data as Cliente | null, pedidos: (p.data ?? []) as Pedido[] };
   }, [cid]);
@@ -65,13 +65,13 @@ export default function FichaCliente() {
         </div>
         <Tarjeta titulo="Datos">
           <div className="space-y-2.5 text-[13px]">
-            {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex items-center gap-2 text-acento"><Phone className="size-4" />{cliente.telefono}</a>}
-            {cliente.email && <a href={`mailto:${cliente.email}`} className="flex items-center gap-2 break-all text-acento"><Mail className="size-4 shrink-0" />{cliente.email}</a>}
+            {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex items-center gap-2 text-azul"><Phone className="size-4" />{cliente.telefono}</a>}
+            {cliente.email && <a href={`mailto:${cliente.email}`} className="flex items-center gap-2 break-all text-azul"><Mail className="size-4 shrink-0" />{cliente.email}</a>}
             {cliente.direccion && <p className="flex gap-2"><MapPin className="size-4 shrink-0 text-texto2" />{cliente.direccion}</p>}
             {cliente.nif && <p><span className="text-texto2">NIF/CIF </span>{cliente.nif}</p>}
             {cliente.facturacion && <div><p className="text-texto2">Facturación</p><p className="whitespace-pre-line">{cliente.facturacion}</p></div>}
             {cliente.notas && <div><p className="text-texto2">Observaciones</p><p className="whitespace-pre-line">{cliente.notas}</p></div>}
-            {!cliente.telefono && !cliente.email && !cliente.nif && <button className="text-acento" onClick={() => setEditar(true)}>Completar datos</button>}
+            {!cliente.telefono && !cliente.email && !cliente.nif && <button className="text-azul" onClick={() => setEditar(true)}>Completar datos</button>}
           </div>
         </Tarjeta>
       </div>

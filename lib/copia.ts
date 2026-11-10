@@ -20,8 +20,8 @@ export async function descargarCopia(empresaId: string, nombre: string) {
   const s = (v: unknown) => (v === null || v === undefined ? "" : String(v));
   const cab = (xs: string[]) => xs.map((value) => ({ value, fontWeight: "bold" as const }));
   const hojas = [
-    { sheet: "Pedidos", data: [cab(["Número", "Fecha", "Entrega", "Cliente", "Estado", "Entregado el", "Unidades", "Base", "IVA %", "Total", "Referencia", "Notas"]),
-      ...pedidos.map((p) => [s(p.numero), s(p.fecha), s(p.entrega), s((p.clientes as R | null)?.nombre), p.entregado ? "Entregado" : "Pendiente", s(p.entregado_en), n(p.unidades), n(p.base), n(p.iva), n(p.total), s(p.referencia), s(p.notas)])] },
+    { sheet: "Pedidos", data: [cab(["Número", "Fecha", "Cliente", "Estado", "Entregado el", "Unidades", "Base", "IVA %", "Total", "Referencia", "Notas"]),
+      ...pedidos.map((p) => [s(p.numero), s(p.fecha), s((p.clientes as R | null)?.nombre), p.entregado ? "Entregado" : "Pendiente", s(p.entregado_en), n(p.unidades), n(p.base), n(p.iva), n(p.total), s(p.referencia), s(p.notas)])] },
     { sheet: "Prendas", data: [cab(["Pedido", "Tipo", "Marca", "Modelo", "Color", "Tallas", "Precio compra", "Precio venta", "Notas"]),
       ...lineas.map((l) => [s(num.get(l.pedido_id)), s(l.tipo), s(l.marca), s(l.modelo), s(l.color), textoTallas(tallasDe.get(l.id) ?? {}), n(l.precio_compra), n(l.precio_venta), s(l.notas)])] },
     { sheet: "Personalización", data: [cab(["Pedido", "Técnica", "Ubicación", "Aplicaciones", "Coste/ud", "Precio/ud", "Notas"]),

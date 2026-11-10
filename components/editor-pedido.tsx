@@ -124,7 +124,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_330px]">
         <div className="space-y-6">
           {/* 1 · Cliente y fechas */}
-          <Tarjeta titulo={<span id="bloque-cliente">Cliente</span>}>
+          <Tarjeta titulo={<span id="bloque-cliente">Cliente y fecha</span>}>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="sm:col-span-2">
                 <SelectorCliente clientes={clientes} valor={p.cliente_id} error={errorCliente}
@@ -133,7 +133,6 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
                 {cliente && <p className="mt-1.5 truncate text-[12px] text-texto2">{[cliente.contacto, cliente.telefono, cliente.email].filter(Boolean).join(" · ") || "Sin datos de contacto"}</p>}
               </div>
               <Campo etiqueta="Fecha del pedido"><input type="date" className="campo" value={p.fecha} onChange={(e) => set((x) => ({ ...x, fecha: e.target.value }))} /></Campo>
-              <Campo etiqueta="Entrega prevista"><input type="date" className="campo" value={p.entrega ?? ""} min={p.fecha} onChange={(e) => set((x) => ({ ...x, entrega: e.target.value || null }))} /></Campo>
               <Campo etiqueta="Referencia interna (opcional)" className="sm:col-span-2"><input className="campo" placeholder="Ej.: Temporada 26/27" value={p.referencia} onChange={(e) => set((x) => ({ ...x, referencia: e.target.value }))} /></Campo>
             </div>
           </Tarjeta>
@@ -212,18 +211,6 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
               </div>
               <div className="flex items-baseline justify-between pt-2"><dt className="font-semibold">Total</dt><dd className="num text-[24px] font-semibold tracking-[-0.02em]">{euros(t.total)}</dd></div>
             </dl>
-            <div className={cx("mt-4 rounded-xl p-3 text-[13px]", t.margen >= 0 ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300")}>
-              <div className="flex justify-between"><span>Margen bruto</span><b className="num">{euros(t.margen)} · {t.margenPct.toLocaleString("es-ES")} %</b></div>
-              <details className="mt-1">
-                <summary className="cursor-pointer text-[12px] opacity-80">Ver costes</summary>
-                <dl className="mt-2 space-y-1 text-[12px]">
-                  <Fila t="Coste prendas" v={euros(t.costePrendas)} />
-                  <Fila t="Coste personalización" v={euros(t.costePers)} />
-                  <div className="flex items-center justify-between gap-2"><dt>Otros gastos (coste)</dt><CampoImporte className="w-24" valor={p.gastos_coste || null} cambiar={(v) => set((x) => ({ ...x, gastos_coste: v ?? 0 }))} aria-label="Otros gastos de coste" /></div>
-                  <Fila t="Coste total" v={euros(t.coste)} />
-                </dl>
-              </details>
-            </div>
             <div className="mt-4 hidden flex-col gap-2 lg:flex">
               <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
               {p.nuevo && <Boton variante="fantasma" onClick={descartar}>Descartar</Boton>}
@@ -233,7 +220,8 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
       </div>
 
       {/* Barra de acciones (móvil) */}
-      <div className="no-imprimir fixed inset-x-0 bottom-16 z-20 flex items-center gap-3 border-t border-borde bg-superficie/95 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="h-20 lg:hidden" />
+      <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 flex items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur lg:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>
         <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>Guardar</Boton>
       </div>
@@ -271,7 +259,7 @@ function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar 
   return (
     <div className="tarjeta animar">
       <div className="flex items-start gap-3 border-b border-borde px-4 py-3 sm:px-5">
-        <label className="relative grid size-14 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-xl bg-suave text-texto2 hover:ring-2 hover:ring-acento/40" title="Imagen de la prenda">
+        <label className="relative grid size-14 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-xl bg-suave text-texto2 hover:ring-2 hover:ring-azul/40" title="Imagen de la prenda">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {img ? <img src={img} alt="" className="size-full object-cover" /> : subiendo ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
           <input type="file" accept="image/*" className="sr-only" aria-label="Subir imagen de la prenda" onChange={async (e) => {
@@ -300,7 +288,7 @@ function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar 
           {tallas.map((k) => (
             <label key={k} className="flex w-[58px] flex-col items-center gap-1">
               <span className="text-[11px] font-semibold text-texto2">{k}</span>
-              <input type="number" inputMode="numeric" min={0} className={cx("campo sin-flechas num h-10 px-1 text-center", (l.tallas[k] ?? 0) > 0 && "border-acento/50 bg-acento-suave font-semibold")}
+              <input type="number" inputMode="numeric" min={0} className={cx("campo sin-flechas num h-10 px-1 text-center", (l.tallas[k] ?? 0) > 0 && "border-azul/50 bg-azul-suave font-semibold")}
                 value={l.tallas[k] || ""} placeholder="0" aria-label={`Cantidad talla ${k}`}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => { const v = Math.max(0, Math.floor(Number(e.target.value) || 0)); const nt = { ...l.tallas }; if (v) nt[k] = v; else delete nt[k]; cambiar({ tallas: nt }); }} />
@@ -314,15 +302,14 @@ function TarjetaLinea({ l, n, margen, t, proveedores, cambiar, duplicar, quitar 
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <Campo etiqueta="Precio / ud" ayuda={l.precio_venta === null && l.precio_compra ? `Compra + ${margen} %` : undefined}>
+          <Campo etiqueta="Precio / ud" ayuda={l.precio_venta === null && l.precio_compra ? "Precio de tarifa" : undefined}>
             <CampoImporte valor={l.precio_venta} placeholder={pvSugerido.toFixed(2).replace(".", ",")} cambiar={(v) => cambiar({ precio_venta: v })} />
           </Campo>
           <div className="flex flex-col justify-end"><span className="mb-1.5 text-[12px] font-medium text-texto2">Importe</span><span className="num flex h-10 items-center text-[15px] font-semibold">{euros(t?.venta ?? 0)}</span></div>
-          <div className="col-span-2 flex items-end sm:col-span-1"><button className="h-10 text-[13px] text-acento" onClick={() => setMas((v) => !v)}>{mas ? "Menos" : "Más detalles"}</button></div>
+          <div className="col-span-2 flex items-end sm:col-span-1"><button className="h-10 text-[13px] text-azul" onClick={() => setMas((v) => !v)}>{mas ? "Menos" : "Más detalles"}</button></div>
         </div>
         {mas && (
-          <div className="animar mt-3 grid gap-3 sm:grid-cols-3">
-            <Campo etiqueta="Precio de compra / ud"><CampoImporte valor={l.precio_compra || null} cambiar={(v) => cambiar({ precio_compra: v ?? 0 })} /></Campo>
+          <div className="animar mt-3 grid gap-3 sm:grid-cols-2">
             <Campo etiqueta="Proveedor">
               <select className="campo" value={l.proveedor_id ?? ""} onChange={(e) => cambiar({ proveedor_id: e.target.value || null })}>
                 <option value="">—</option>{proveedores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
@@ -371,23 +358,22 @@ function TarjetaPers({ z, lineas, calc, tecnicas, cambiar, quitar, usarTarifa }:
           const on = z.lineas.includes(l.clave);
           return (
             <button key={l.clave} onClick={() => alternar(l.clave)} aria-pressed={on}
-              className={cx("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium", on ? "border-acento bg-acento-suave text-acento" : "border-borde text-texto2")}>
+              className={cx("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium", on ? "border-acento bg-acento text-sobre-acento" : "border-borde text-texto2")}>
               {on && <Check className="size-3.5" />}{[l.tipo, l.color].filter(Boolean).join(" · ") || "Prenda"}
             </button>
           );
         })}
-        {lineas.length > 1 && <button className="h-8 px-2 text-[12px] text-acento" onClick={() => cambiar({ lineas: z.lineas.length === lineas.length ? [] : lineas.map((l) => l.clave) })}>{z.lineas.length === lineas.length ? "Ninguna" : "Todas"}</button>}
+        {lineas.length > 1 && <button className="h-8 px-2 text-[12px] text-azul" onClick={() => cambiar({ lineas: z.lineas.length === lineas.length ? [] : lineas.map((l) => l.clave) })}>{z.lineas.length === lineas.length ? "Ninguna" : "Todas"}</button>}
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
-        <Campo etiqueta="Coste / ud"><CampoImporte valor={z.coste_ud} cambiar={(v) => cambiar({ coste_ud: v ?? 0, precio_manual: true })} /></Campo>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <Campo etiqueta="Precio / ud" ayuda={z.precio_manual ? undefined : `Tarifa para ${calc?.unidades ?? 0} uds`}><CampoImporte valor={z.precio_ud} cambiar={(v) => cambiar({ precio_ud: v ?? 0, precio_manual: true })} /></Campo>
         <div className="flex flex-col justify-end"><span className="mb-1.5 text-[12px] font-medium text-texto2">Importe</span><span className="num flex h-10 items-center text-[15px] font-semibold">{euros(calc?.venta ?? 0)}</span></div>
         <div className="flex items-end">{z.precio_manual && <Boton tam="s" variante="fantasma" onClick={usarTarifa}>Usar tarifa</Boton>}</div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-dashed border-borde px-3 py-2 text-[13px] text-texto2 hover:bg-suave">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-borde px-3 py-2 text-[13px] text-texto2 hover:bg-suave">
           {subiendo ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
           {z.diseno_path ? "Cambiar diseño" : "Adjuntar diseño o logotipo"}
           <input type="file" accept="image/*,.pdf,.ai,.eps,.svg,.dst,.emb,.pes" className="sr-only" onChange={async (e) => {
@@ -396,7 +382,7 @@ function TarjetaPers({ z, lineas, calc, tecnicas, cambiar, quitar, usarTarifa }:
           }} />
         </label>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {img && (/\.(png|jpe?g|gif|webp|svg)$/i.test(z.diseno_path ?? "") ? <a href={img} target="_blank" rel="noreferrer"><img src={img} alt="Diseño" className="h-10 rounded-lg border border-borde object-contain" /></a> : <a href={img} target="_blank" rel="noreferrer" className="text-[13px] text-acento">Ver archivo</a>)}
+        {img && (/\.(png|jpe?g|gif|webp|svg)$/i.test(z.diseno_path ?? "") ? <a href={img} target="_blank" rel="noreferrer"><img src={img} alt="Diseño" className="h-10 rounded-lg border border-borde object-contain" /></a> : <a href={img} target="_blank" rel="noreferrer" className="text-[13px] text-azul">Ver archivo</a>)}
         {z.diseno_path && <button aria-label="Quitar diseño" className="text-texto2 hover:text-red-600" onClick={() => cambiar({ diseno_path: null })}><X className="size-4" /></button>}
         <input className="campo min-w-[180px] flex-1" placeholder="Observaciones (colores de hilo, medidas…)" value={z.notas} onChange={(e) => cambiar({ notas: e.target.value })} aria-label="Observaciones de la personalización" />
         <Boton tam="s" variante="fantasma" className="hover:text-red-600" onClick={quitar}><Trash2 className="size-3.5" />Quitar</Boton>

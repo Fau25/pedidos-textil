@@ -80,7 +80,7 @@ export function ImportarTarifa({ marca = "Roly", hecho }: { marca?: string; hech
 
   return (
     <>
-      <label className="inline-flex cursor-pointer items-center gap-2 rounded-[10px] border border-borde bg-superficie px-4 h-10 text-[14px] font-medium hover:bg-suave">
+      <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-borde bg-superficie px-4 h-10 text-[14px] font-medium hover:bg-suave">
         {cargando && !filas ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}Importar tarifa
         <input type="file" accept=".xlsx,.xls,.csv" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) leer(f); e.target.value = ""; }} />
       </label>

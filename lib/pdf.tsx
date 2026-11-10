@@ -58,7 +58,6 @@ function Doc({ p, logo }: { p: Presupuesto; logo: string | null }) {
           <View style={[s.caja, { flex: 0.8 }]}>
             <Text style={s.peq}>Fecha</Text><Text>{f(p.fecha)}</Text>
             <Text style={[s.peq, { marginTop: 6 }]}>Válido hasta</Text><Text>{f(p.validez)}</Text>
-            {d.pedido.entrega && <><Text style={[s.peq, { marginTop: 6 }]}>Entrega prevista</Text><Text>{f(d.pedido.entrega)}</Text></>}
           </View>
         </View>
         {d.pedido.referencia && <Text style={{ marginBottom: 10 }}><Text style={s.gris}>Referencia: </Text>{d.pedido.referencia}</Text>}

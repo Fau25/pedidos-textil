@@ -12,9 +12,9 @@ export function Boton({ variante = "secundario", tam = "m", cargando, className,
       {...p}
       disabled={disabled || cargando}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap select-none",
-        tam === "m" ? "h-10 px-4 text-[14px]" : "h-8 px-3 text-[13px]",
-        variante === "primario" && "bg-acento text-white hover:bg-acento-h shadow-sm",
+        "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[background,transform] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap select-none",
+        tam === "m" ? "h-11 px-5 text-[14px]" : "h-9 px-3.5 text-[13px]",
+        variante === "primario" && "bg-acento text-sobre-acento hover:bg-acento-h shadow-[0_6px_16px_-6px_rgba(16,18,24,0.35)]",
         variante === "secundario" && "bg-superficie border border-borde hover:bg-suave",
         variante === "fantasma" && "text-texto2 hover:bg-suave hover:text-texto",
         variante === "peligro" && "bg-superficie border border-borde text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40",
@@ -41,8 +41,8 @@ export function Tarjeta({ titulo, accion, children, className, sinPadding }: { t
   return (
     <section className={cx("tarjeta", className)}>
       {(titulo || accion) && (
-        <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
-          <h2 className="text-[15px] font-semibold tracking-[-0.01em]">{titulo}</h2>
+        <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
+          <h2 className="text-[16px] font-semibold tracking-[-0.01em]">{titulo}</h2>
           {accion}
         </div>
       )}
@@ -73,7 +73,7 @@ export function Pastilla({ color = "gris", children, className }: { color?: stri
 export function Vacio({ icono, titulo, texto, accion }: { icono?: ReactNode; titulo: string; texto?: string; accion?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      {icono && <div className="mb-3 grid size-12 place-items-center rounded-2xl bg-suave text-texto2">{icono}</div>}
+      {icono && <div className="mb-3 grid size-14 place-items-center rounded-[20px] bg-suave text-texto2">{icono}</div>}
       <p className="font-semibold">{titulo}</p>
       {texto && <p className="mt-1 max-w-sm text-[13px] text-texto2">{texto}</p>}
       {accion && <div className="mt-4">{accion}</div>}
@@ -120,7 +120,7 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
   return createPortal(
     <div data-hoja className="fixed inset-0 z-50 flex items-end justify-center sm:items-stretch sm:justify-end" role="dialog" aria-modal="true" aria-label={titulo}>
       <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={cerrar} />
-      <div ref={ref} className={cx("animar relative flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-superficie shadow-2xl sm:max-h-none sm:rounded-none sm:rounded-l-2xl", ancho)}>
+      <div ref={ref} className={cx("animar relative flex max-h-[92dvh] w-full flex-col rounded-t-[28px] bg-superficie shadow-2xl sm:max-h-none sm:rounded-none sm:rounded-l-[28px]", ancho)}>
         <div className="flex items-center justify-between border-b border-borde px-5 py-4">
           <h2 className="text-[16px] font-semibold">{titulo}</h2>
           <button data-cerrar onClick={cerrar} aria-label="Cerrar" className="grid size-8 place-items-center rounded-lg text-texto2 hover:bg-suave"><X className="size-4" /></button>
@@ -208,12 +208,12 @@ export function CampoImporte({ valor, cambiar, className, placeholder, ...p }: {
 
 export function Pestanas<T extends string>({ valor, cambiar, opciones }: { valor: T; cambiar: (v: T) => void; opciones: { v: T; t: string; n?: number }[] }) {
   return (
-    <div className="flex gap-1 overflow-x-auto border-b border-borde" role="tablist">
+    <div className="flex gap-2 overflow-x-auto pb-1" role="tablist">
       {opciones.map((o) => (
         <button key={o.v} role="tab" aria-selected={valor === o.v} onClick={() => cambiar(o.v)}
-          className={cx("relative -mb-px whitespace-nowrap px-3 py-2.5 text-[13px] font-medium transition-colors",
-            valor === o.v ? "border-b-2 border-acento text-texto" : "text-texto2 hover:text-texto")}>
-          {o.t}{o.n !== undefined && <span className="ml-1.5 rounded-full bg-suave px-1.5 text-[11px] text-texto2">{o.n}</span>}
+          className={cx("h-9 shrink-0 whitespace-nowrap rounded-full px-4 text-[13px] font-medium transition-colors",
+            valor === o.v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>
+          {o.t}{o.n !== undefined && <span className="ml-1.5 text-[11px] opacity-70">{o.n}</span>}
         </button>
       ))}
     </div>

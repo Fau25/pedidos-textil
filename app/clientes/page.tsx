@@ -43,7 +43,7 @@ export default function Clientes() {
             const r = datos.resumen.get(c.id);
             return (
               <Link key={c.id} href={`/clientes/ver/?id=${c.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-suave/60">
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-acento-suave text-[13px] font-semibold text-acento">{c.nombre.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}</span>
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-acento-suave text-[13px] font-semibold text-azul">{c.nombre.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{c.nombre}</span>
                   <span className="block truncate text-[13px] text-texto2">{[c.contacto, c.telefono, c.email].filter(Boolean).join(" · ") || "Sin datos de contacto"}</span>

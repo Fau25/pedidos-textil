@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { Plus, Inbox, ArrowUpDown, Check } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
-import { Boton, Cargando, Vacio, cx, diasHasta, fecha, useAvisos } from "@/components/ui";
+import { Boton, Cargando, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError } from "@/lib/supabase";
 import { useCarga, useParam } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
 import { marcarEntregado } from "@/lib/pedidos";
 import type { Pedido } from "@/lib/tipos";
 
-type Orden = "entrega" | "fecha" | "total" | "cliente";
+type Orden = "antiguos" | "fecha" | "total" | "cliente";
 type Filtro = "pendientes" | "entregados" | "todos";
 
 export default function Pedidos() {
@@ -21,14 +21,14 @@ export default function Pedidos() {
   const router = useRouter();
   const [filtro, setFiltro] = useState<Filtro>("pendientes");
   const [texto, setTexto] = useState("");
-  const [orden, setOrden] = useState<Orden>("entrega");
+  const [orden, setOrden] = useState<Orden>("antiguos");
   const [sel, setSel] = useState<Set<string>>(new Set());
 
   const ver = useParam("ver");
   useEffect(() => { if (ver === "entregados" || ver === "todos") { setFiltro(ver); setOrden("fecha"); } }, [ver]);
 
   const { datos, setDatos, error, recargar } = useCarga(async () => {
-    const { data, error } = await sb.from("pedidos").select("id, numero, fecha, entrega, total, unidades, referencia, entregado, entregado_en, actualizado, clientes(nombre)")
+    const { data, error } = await sb.from("pedidos").select("id, numero, fecha, total, unidades, referencia, entregado, entregado_en, actualizado, clientes(nombre)")
       .eq("empresa_id", empresa!.id).order("fecha", { ascending: false }).limit(2000);
     if (error) throw error;
     return data as unknown as Pedido[];
@@ -39,7 +39,7 @@ export default function Pedidos() {
     const q = texto.trim().toLowerCase();
     if (q) l = l.filter((p) => [p.numero, p.referencia, p.clientes?.nombre].some((v) => v?.toLowerCase().includes(q)));
     const f = {
-      entrega: (a: Pedido, b: Pedido) => ((a.entrega ?? "9999") < (b.entrega ?? "9999") ? -1 : (a.entrega ?? "9999") > (b.entrega ?? "9999") ? 1 : a.numero < b.numero ? -1 : 1),
+      antiguos: (a: Pedido, b: Pedido) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.numero < b.numero ? -1 : 1),
       fecha: (a: Pedido, b: Pedido) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : a.numero < b.numero ? 1 : -1),
       total: (a: Pedido, b: Pedido) => Number(b.total) - Number(a.total),
       cliente: (a: Pedido, b: Pedido) => (a.clientes?.nombre ?? "").localeCompare(b.clientes?.nombre ?? "", "es"),
@@ -66,10 +66,10 @@ export default function Pedidos() {
       <Cabecera titulo="Pedidos" acciones={<Link href="/pedidos/nuevo/"><Boton variante="primario"><Plus className="size-4" />Nuevo pedido</Boton></Link>} />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex rounded-[10px] border border-borde bg-superficie p-0.5" role="tablist">
+        <div className="flex rounded-full border border-borde bg-superficie p-0.5" role="tablist">
           {(["pendientes", "entregados", "todos"] as Filtro[]).map((f) => (
-            <button key={f} role="tab" aria-selected={filtro === f} onClick={() => { setFiltro(f); setSel(new Set()); setOrden(f === "pendientes" ? "entrega" : "fecha"); }}
-              className={cx("h-8 flex-1 rounded-lg px-3 text-[13px] font-medium capitalize sm:flex-none", filtro === f ? "bg-acento-suave text-acento" : "text-texto2")}>
+            <button key={f} role="tab" aria-selected={filtro === f} onClick={() => { setFiltro(f); setSel(new Set()); setOrden(f === "pendientes" ? "antiguos" : "fecha"); }}
+              className={cx("h-8 flex-1 rounded-lg px-3 text-[13px] font-medium capitalize sm:flex-none", filtro === f ? "bg-acento text-sobre-acento" : "text-texto2")}>
               {f} <span className="num ml-0.5 text-[12px] opacity-70">{datos ? n(f) : ""}</span>
             </button>
           ))}
@@ -77,7 +77,7 @@ export default function Pedidos() {
         <input className="campo sm:max-w-xs" placeholder="Buscar nº, cliente o referencia" value={texto} onChange={(e) => setTexto(e.target.value)} />
         <label className="flex items-center gap-2 text-[13px] text-texto2 sm:ml-auto"><ArrowUpDown className="size-4" />
           <select className="campo w-auto" value={orden} onChange={(e) => setOrden(e.target.value as Orden)} aria-label="Ordenar por">
-            <option value="entrega">Fecha de entrega</option><option value="fecha">Más recientes</option><option value="total">Importe</option><option value="cliente">Cliente</option>
+            <option value="antiguos">Más antiguos primero</option><option value="fecha">Más recientes primero</option><option value="total">Importe</option><option value="cliente">Cliente</option>
           </select>
         </label>
       </div>
@@ -91,14 +91,12 @@ export default function Pedidos() {
               <b>{sel.size} seleccionado{sel.size > 1 ? "s" : ""}</b>
               {filtro !== "entregados" && <Boton tam="s" variante="primario" onClick={() => entregar([...sel], true)}><Check className="size-3.5" />Marcar entregados</Boton>}
               {filtro !== "pendientes" && <Boton tam="s" onClick={() => entregar([...sel], false)}>Volver a pendientes</Boton>}
-              <button className="text-acento" onClick={() => setSel(new Set())}>Cancelar</button>
+              <button className="text-azul" onClick={() => setSel(new Set())}>Cancelar</button>
             </div>
           )}
           {!lista.length ? <p className="py-12 text-center text-texto2">{texto ? "Sin resultados." : filtro === "pendientes" ? "¡Nada pendiente! 🎉" : "No hay pedidos aquí."}</p> : (
             <ul className="divide-y divide-borde">
               {lista.map((p) => {
-                const d = diasHasta(p.entrega);
-                const urgente = !p.entregado && d !== null && d <= 2;
                 return (
                   <li key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-suave/60">
                     <input type="checkbox" aria-label={`Seleccionar ${p.numero}`} className="size-4 shrink-0 accent-[var(--acento)]" checked={sel.has(p.id)}
@@ -110,8 +108,8 @@ export default function Pedidos() {
                       </span>
                       <span className="shrink-0 text-right">
                         <span className="num block text-[13px] font-medium">{euros(aCent(p.total))}</span>
-                        <span className={cx("block text-[12px]", p.entregado ? "text-emerald-700 dark:text-emerald-400" : d !== null && d < 0 ? "font-medium text-red-600" : urgente ? "font-medium text-amber-700 dark:text-amber-400" : "text-texto2")}>
-                          {p.entregado ? `Entregado ${fecha(p.entregado_en)}` : p.entrega ? (d === 0 ? "Hoy" : d === 1 ? "Mañana" : d! < 0 ? `Atrasado ${fecha(p.entrega)}` : fecha(p.entrega)) : "Sin fecha"}
+                        <span className={cx("block text-[12px]", p.entregado ? "text-emerald-700 dark:text-emerald-400" : "text-texto2")}>
+                          {p.entregado ? `Entregado ${fecha(p.entregado_en)}` : `Pedido ${fecha(p.fecha)}`}
                         </span>
                       </span>
                     </button>

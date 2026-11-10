@@ -77,24 +77,30 @@ await prueba("al saltar de un pedido a otro con el buscador se ve el nuevo", asy
   await p.getByText("P-2026-0002").first().waitFor({ timeout: 5000 });
   assert.doesNotMatch(await p.locator("main").innerText(), /P-2026-0001/); await ctx.close();
 });
-await prueba("pedido rápido guarda tallas, precio y bordado en una sola llamada", async () => {
-  const { ctx, p, escrituras } = await abrir();
+await prueba("la ficha «Nuevo pedido» abre el editor y guarda todo en una sola llamada", async () => {
+  const { ctx, p, escrituras, errores } = await abrir();
   await ir(p, "");
+  await p.getByRole("link", { name: /Nuevo pedido/ }).first().click();
+  await p.waitForURL(/pedidos\/nuevo/); await p.waitForTimeout(800);
+  assert.equal(await p.getByText("Entrega prevista").count(), 0, "sin fecha de entrega");
+  assert.equal(await p.getByText(/Precio de compra|Coste \/ ud/).count(), 0, "sin precio de coste");
   await p.getByLabel("Buscar cliente").click(); await p.getByRole("option", { name: /Club Deportivo/ }).click();
-  await p.getByLabel("Prenda 1").selectOption("c1");
-  await p.getByLabel("Precio por unidad").fill("4,50");
+  await p.getByRole("button", { name: "Desde el catálogo" }).click();
+  await p.getByRole("dialog").getByRole("button", { name: "Blanco" }).click();
   await p.getByLabel("Cantidad talla M").fill("10"); await p.getByLabel("Cantidad talla L").fill("5");
-  await p.getByRole("button", { name: "Bordado", exact: true }).click();
-  await p.getByRole("button", { name: "Crear pedido" }).click(); await p.waitForTimeout(800);
+  await p.getByLabel("Precio / ud").fill("4,50");
+  await p.getByRole("button", { name: "Añadir personalización" }).click();
+  await p.getByRole("button", { name: "Guardar pedido" }).click(); await p.waitForTimeout(1000);
   const g = escrituras.filter((x) => x.tabla === "guardar_pedido");
-  assert.equal(g.length, 1);
+  assert.equal(g.length, 1, "una sola llamada");
   const d = g[0].cuerpo.p;
+  assert.equal(d.entrega, null);
   assert.deepEqual(d.lineas[0].tallas.map((t) => `${t.talla}=${t.cantidad}`), ["M=10", "L=5"]);
   assert.equal(d.lineas[0].precio_venta, 4.5);
+  assert.equal(d.lineas[0].color, "Blanco");
   assert.equal(d.pers[0].tecnica, "Bordado");
-  assert.equal(d.total, 127.05, "total " + d.total); // (15×4,50 + 15×2,50) × 1,21 = 105 × 1,21
-  assert.ok(escrituras.some((x) => x.tabla === "catalogo"), "recuerda el precio en el catálogo");
-  await ctx.close();
+  assert.equal(d.total, 127.05, "total " + d.total); // (15×4,50 + 15×2,50) × 1,21
+  assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("marcar entregado ofrece deshacer", async () => {
   const { ctx, p, escrituras } = await abrir();

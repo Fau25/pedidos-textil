@@ -196,10 +196,10 @@ function Entrar() {
       </form>
       <div className="mt-5 flex flex-col items-center gap-2 text-[13px]">
         {modo === "entrar" && <>
-          <button className="text-acento hover:underline" onClick={() => { setModo("alta"); setMsg(null); }}>¿Primera vez? Crear cuenta</button>
+          <button className="text-azul hover:underline" onClick={() => { setModo("alta"); setMsg(null); }}>¿Primera vez? Crear cuenta</button>
           <button className="text-texto2 hover:underline" onClick={() => { setModo("olvido"); setMsg(null); }}>He olvidado la contraseña</button>
         </>}
-        {modo !== "entrar" && <button className="text-acento hover:underline" onClick={() => { setModo("entrar"); setMsg(null); }}>Volver a entrar</button>}
+        {modo !== "entrar" && <button className="text-azul hover:underline" onClick={() => { setModo("entrar"); setMsg(null); }}>Volver a entrar</button>}
       </div>
     </Marco>
   );

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2 } from "lucide-react";
 import { useSesion } from "@/components/sesion";
-import { Boton, Cargando, SelloFecha, Tarjeta, Vacio, cx, diasHasta, fecha, useAvisos } from "@/components/ui";
+import { Boton, Cargando, Tarjeta, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError, urlArchivo } from "@/lib/supabase";
 import { useCarga, useParam } from "@/lib/usar";
 import { calcular, euros } from "@/lib/calculo";
@@ -31,7 +31,6 @@ export default function Ficha() {
   if (!pid || !datos) return <Cargando error={error} reintentar={recargar} />;
   if ("falta" in datos) return <Vacio titulo="Este pedido no existe o se ha borrado" accion={<Link href="/pedidos/"><Boton>Ver pedidos</Boton></Link>} />;
   const { ed, pedido, cliente } = datos;
-  const d = diasHasta(ed.entrega);
   const nombres = new Map(ed.lineas.map((l) => [l.clave, [l.tipo, l.color].filter(Boolean).join(" · ")]));
 
   async function entregar(v: boolean) {
@@ -56,12 +55,11 @@ export default function Ficha() {
       <Link href="/pedidos/" className="mb-2 inline-block text-[13px] text-texto2 hover:text-texto">← Pedidos</Link>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          <SelloFecha d={ed.entrega} alerta={!ed.entregado && d !== null && d <= 2} />
           <div className="min-w-0">
             <h1 className="truncate text-[24px] font-semibold tracking-[-0.02em] sm:text-[28px]">
               {cliente ? <Link href={`/clientes/ver/?id=${cliente.id}`} className="hover:underline">{cliente.nombre}</Link> : "Sin cliente"}
             </h1>
-            <p className="text-texto2"><span className="num">{ed.numero}</span>{ed.referencia && <> · {ed.referencia}</>} · {t?.unidades ?? 0} uds · pedido el {fecha(ed.fecha)}</p>
+            <p className="text-texto2"><span className="num">{ed.numero}</span>{ed.referencia && <> · {ed.referencia}</>} · {t?.unidades ?? 0} uds</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -79,9 +77,7 @@ export default function Ficha() {
             <><p className="font-semibold text-emerald-800 dark:text-emerald-300">Entregado {pedido.entregado_en ? "el " + fecha(pedido.entregado_en, true) : ""}</p><p className="text-[13px] text-texto2">Trabajo terminado.</p></>
           ) : (
             <><p className="font-semibold">Pendiente</p>
-              <p className={cx("text-[13px]", d !== null && d < 0 ? "text-red-600" : d !== null && d <= 2 ? "text-amber-700 dark:text-amber-400" : "text-texto2")}>
-                {ed.entrega ? (d === 0 ? "Se entrega hoy" : d === 1 ? "Se entrega mañana" : d! < 0 ? `Atrasado ${-d!} día${d === -1 ? "" : "s"}` : `Entrega el ${fecha(ed.entrega, true)} (en ${d} días)`) : "Sin fecha de entrega"}
-              </p></>
+              <p className="text-[13px] text-texto2">Pedido el {fecha(ed.fecha, true)}</p></>
           )}
         </div>
         {ed.entregado
@@ -102,7 +98,7 @@ export default function Ficha() {
                       <p className="num text-[13px] text-texto2">{textoTallas(l.tallas) || "Sin tallas"}</p>
                       {l.notas && <p className="text-[12px] text-texto2">{l.notas}</p>}
                       {ed.pers.filter((z) => z.lineas.includes(l.clave)).map((z) => (
-                        <span key={z.clave} className="mr-1.5 mt-1 inline-flex h-6 items-center rounded-full bg-acento-suave px-2 text-[11px] font-medium text-acento">{z.tecnica} · {z.ubicacion}</span>
+                        <span key={z.clave} className="mr-1.5 mt-1 inline-flex h-6 items-center rounded-full bg-acento-suave px-2 text-[11px] font-medium text-azul">{z.tecnica} · {z.ubicacion}</span>
                       ))}
                     </div>
                     <div className="num text-right text-[13px]"><b>{t?.lineas[l.clave]?.unidades ?? 0}</b> uds<span className="block text-texto2">{euros(t?.lineas[l.clave]?.venta ?? 0)}</span></div>
@@ -145,8 +141,8 @@ export default function Ficha() {
             <Tarjeta titulo="Contacto">
               {cliente.contacto && <p className="mb-2 text-[13px]">{cliente.contacto}</p>}
               <div className="flex flex-col gap-1.5 text-[13px]">
-                {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex items-center gap-2 text-acento"><Phone className="size-3.5" />{cliente.telefono}</a>}
-                {cliente.email && <a href={`mailto:${cliente.email}`} className="flex items-center gap-2 truncate text-acento"><Mail className="size-3.5" />{cliente.email}</a>}
+                {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex items-center gap-2 text-azul"><Phone className="size-3.5" />{cliente.telefono}</a>}
+                {cliente.email && <a href={`mailto:${cliente.email}`} className="flex items-center gap-2 truncate text-azul"><Mail className="size-3.5" />{cliente.email}</a>}
               </div>
             </Tarjeta>
           )}
@@ -168,5 +164,5 @@ function Diseno({ path }: { path: string | null }) {
   if (!u) return <div className="grid size-12 place-items-center rounded-xl bg-suave text-texto2"><Paperclip className="size-4" /></div>;
   // eslint-disable-next-line @next/next/no-img-element
   const ext = (path ?? "").split(".").pop()?.toUpperCase() ?? "";
-  return <a href={u} target="_blank" rel="noreferrer" title="Abrir el diseño">{/^(PNG|JPE?G|GIF|WEBP|SVG)$/.test(ext) ? <img src={u} alt="Diseño" className="size-12 rounded-xl border border-borde bg-white object-contain p-1" /> : <span className="grid size-12 place-items-center rounded-xl bg-suave text-[11px] font-semibold text-acento">{ext || "Archivo"}</span>}</a>;
+  return <a href={u} target="_blank" rel="noreferrer" title="Abrir el diseño">{/^(PNG|JPE?G|GIF|WEBP|SVG)$/.test(ext) ? <img src={u} alt="Diseño" className="size-12 rounded-xl border border-borde bg-white object-contain p-1" /> : <span className="grid size-12 place-items-center rounded-xl bg-suave text-[11px] font-semibold text-azul">{ext || "Archivo"}</span>}</a>;
 }

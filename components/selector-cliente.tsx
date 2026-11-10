@@ -55,8 +55,8 @@ export function SelectorCliente({ clientes, valor, cambiar, creado, error }: { c
           {opciones.map((o, i) => (
             <button key={"c" in o ? o.c.id : "nuevo"} role="option" aria-selected={i === sel} onMouseEnter={() => setSel(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => elegir(o)}
               className={cx("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left", i === sel && "bg-suave")}>
-              {"c" in o ? (<><span className="min-w-0 flex-1"><span className="block truncate">{o.c.nombre}</span>{o.c.contacto && <span className="block truncate text-[12px] text-texto2">{o.c.contacto}</span>}</span>{o.c.id === valor && <Check className="size-4 text-acento" />}</>)
-                : <span className="flex items-center gap-2 font-medium text-acento"><Plus className="size-4" />{o.nuevo ? `Crear «${o.nuevo}»` : "Crear cliente nuevo"}</span>}
+              {"c" in o ? (<><span className="min-w-0 flex-1"><span className="block truncate">{o.c.nombre}</span>{o.c.contacto && <span className="block truncate text-[12px] text-texto2">{o.c.contacto}</span>}</span>{o.c.id === valor && <Check className="size-4 text-azul" />}</>)
+                : <span className="flex items-center gap-2 font-medium text-azul"><Plus className="size-4" />{o.nuevo ? `Crear «${o.nuevo}»` : "Crear cliente nuevo"}</span>}
             </button>
           ))}
         </div>

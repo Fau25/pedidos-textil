@@ -5,7 +5,7 @@ import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Campo, CampoImporte, Cargando, Hoja, Pestanas, Tarjeta, Vacio, cx, useAvisos } from "@/components/ui";
 import { ImportarTarifa } from "@/components/importar-tarifa";
-import { Muestra } from "@/components/trabajo-rapido";
+import { Muestra } from "@/components/muestra";
 import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { euros, precioVentaUd } from "@/lib/calculo";
@@ -54,9 +54,9 @@ function Prendas() {
     <>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input className="campo flex-1 sm:max-w-sm" placeholder={`Buscar en ${total} modelos…`} value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="flex rounded-[10px] border border-borde bg-superficie p-0.5 text-[13px]">
-          <button onClick={() => setTodas(false)} className={cx("h-8 rounded-lg px-3", !todas && "bg-acento-suave font-medium text-acento")}>Habituales</button>
-          <button onClick={() => setTodas(true)} className={cx("h-8 rounded-lg px-3", todas && "bg-acento-suave font-medium text-acento")}>Todas</button>
+        <div className="flex rounded-full border border-borde bg-superficie p-0.5 text-[13px]">
+          <button onClick={() => setTodas(false)} className={cx("h-8 rounded-lg px-3", !todas && "bg-acento-suave font-medium text-texto")}>Habituales</button>
+          <button onClick={() => setTodas(true)} className={cx("h-8 rounded-lg px-3", todas && "bg-acento-suave font-medium text-texto")}>Todas</button>
         </div>
         <div className="flex gap-2 sm:ml-auto">
           <ImportarTarifa hecho={recargar} />
@@ -77,7 +77,7 @@ function Prendas() {
                   {p.notas && <span className="ml-1 text-amber-700 dark:text-amber-400">· {p.notas}</span>}
                 </p>
               </button>
-              <span className="num shrink-0 text-right text-[13px]">{Number(p.precio_compra) ? <>{euros(Math.round(Number(p.precio_compra) * 100))}<span className="block text-[12px] text-texto2">→ {euros(precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }, margen))}</span></> : <span className="text-[12px] text-texto2">Sin precio</span>}</span>
+              <span className="num shrink-0 text-right text-[13px] font-medium">{precioDe(p, margen) !== null ? euros(Math.round(precioDe(p, margen)! * 100)) : <span className="text-[12px] font-normal text-texto2">Sin precio</span>}</span>
             </div>
           ))}
           {lista.length > 300 && <p className="px-4 py-3 text-center text-[12px] text-texto2">Mostrando 300 de {lista.length}. Afina la búsqueda.</p>}
@@ -99,10 +99,9 @@ function Prendas() {
             <datalist id="tipos-cat">{TIPOS_PRENDA.map((x) => <option key={x} value={x} />)}</datalist>
             <Campo etiqueta="Colores" ayuda="Separados por comas."><textarea className="campo" rows={2} value={(ed.colores ?? []).join(", ")} onChange={(e) => setEd({ ...ed, colores: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} /></Campo>
             <Campo etiqueta="Tallas" ayuda="Separadas por comas, en orden. Vacío = tallas estándar."><input className="campo" value={(ed.tallas ?? []).join(", ")} onChange={(e) => setEd({ ...ed, tallas: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} /></Campo>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Campo etiqueta="Precio de compra"><CampoImporte valor={ed.precio_compra ?? 0} cambiar={(v) => setEd({ ...ed, precio_compra: v ?? 0 })} /></Campo>
-              <Campo etiqueta="Precio de venta" ayuda={`Vacío = compra + ${margen} %`}><CampoImporte valor={ed.precio_venta ?? null} cambiar={(v) => setEd({ ...ed, precio_venta: v })} /></Campo>
-            </div>
+            <Campo etiqueta="Precio de venta por unidad (sin IVA)" ayuda={ed.precio_venta === null && Number(ed.precio_compra) ? `Vacío = precio de tarifa + ${margen} %` : undefined}>
+              <CampoImporte valor={ed.precio_venta ?? null} placeholder={precioDe(ed as Prenda, margen)?.toFixed(2).replace(".", ",") ?? "0,00"} cambiar={(v) => setEd({ ...ed, precio_venta: v })} />
+            </Campo>
             <Campo etiqueta="Proveedor">
               <select className="campo" value={ed.proveedor_id ?? ""} onChange={(e) => setEd({ ...ed, proveedor_id: e.target.value || null })}>
                 <option value="">—</option>{proveedores.map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
@@ -140,19 +139,18 @@ function Tarifas() {
             const { error } = await sb.from("tecnicas").delete().eq("id", tc.id); if (error) aviso(textoError(error), "error"); else recargar();
           }}><Trash2 className="size-4" /></Boton>}>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] text-[13px]">
-                <thead className="text-left text-[12px] text-texto2"><tr><th className="pb-2 font-medium">Desde</th><th className="pb-2 font-medium">Hasta</th><th className="pb-2 font-medium">Complejidad</th><th className="pb-2 font-medium">Coste / ud</th><th className="pb-2 font-medium">Precio / ud</th><th /></tr></thead>
+              <table className="w-full min-w-[440px] text-[13px]">
+                <thead className="text-left text-[12px] text-texto2"><tr><th className="pb-2 font-medium">Desde (uds)</th><th className="pb-2 font-medium">Hasta</th><th className="pb-2 font-medium">Complejidad</th><th className="pb-2 font-medium">Precio / ud</th><th /></tr></thead>
                 <tbody>
                   {tf.map((t) => (
                     <tr key={t.id}>
                       <td className="py-1 pr-2"><input type="number" min={1} className="campo num h-9 w-20" defaultValue={t.desde} onBlur={(e) => actualizar(t, { desde: Math.max(1, Number(e.target.value) || 1) })} aria-label="Desde unidades" /></td>
                       <td className="py-1 pr-2"><input type="number" min={1} className="campo num h-9 w-20" placeholder="∞" defaultValue={t.hasta ?? ""} onBlur={(e) => actualizar(t, { hasta: e.target.value ? Number(e.target.value) : null })} aria-label="Hasta unidades" /></td>
                       <td className="py-1 pr-2"><input className="campo h-9 w-28" defaultValue={t.complejidad} onBlur={(e) => actualizar(t, { complejidad: e.target.value || "Normal" })} aria-label="Complejidad" /></td>
-                      <td className="py-1 pr-2"><CampoImporte className="w-28" valor={t.coste} cambiar={(v) => setFilas((f) => f.map((x) => (x.id === t.id ? { ...x, coste: v ?? 0 } : x)))} aria-label="Coste" /></td>
                       <td className="py-1 pr-2"><CampoImporte className="w-28" valor={t.precio} cambiar={(v) => setFilas((f) => f.map((x) => (x.id === t.id ? { ...x, precio: v ?? 0 } : x)))} aria-label="Precio" /></td>
                       <td className="py-1 text-right">
-                        {tarifas.some((o) => o.id === t.id && (o.coste !== t.coste || o.precio !== t.precio)) &&
-                          <button className="mr-1 text-[12px] font-medium text-acento" onClick={() => { actualizar(t, { coste: t.coste, precio: t.precio }); aviso("Tarifa guardada"); }}>Guardar</button>}
+                        {tarifas.some((o) => o.id === t.id && o.precio !== t.precio) &&
+                          <button className="mr-1 text-[12px] font-medium text-azul" onClick={() => { actualizar(t, { precio: t.precio }); aviso("Tarifa guardada"); }}>Guardar</button>}
                         <button aria-label="Quitar tramo" className="p-1 text-texto2 hover:text-red-600" onClick={async () => { await sb.from("tarifas").delete().eq("id", t.id); recargar(); }}><Trash2 className="size-3.5" /></button>
                       </td>
                     </tr>
@@ -229,4 +227,11 @@ function rango(t: string[]) {
   const a = t.filter((x) => !/^\d/.test(x)), n = t.filter((x) => /^\d/.test(x));
   if (!t.length) return "tallas libres";
   return [a.length ? `${a[0]}–${a[a.length - 1]}` : "", n.length ? "niño" : ""].filter(Boolean).join(" + ");
+}
+
+/** Precio de venta por unidad: el indicado o el de tarifa + margen (null si no hay ninguno) */
+function precioDe(p: Pick<Prenda, "precio_compra" | "precio_venta">, margen: number): number | null {
+  if (p.precio_venta !== null && p.precio_venta !== undefined && Number(p.precio_venta)) return Number(p.precio_venta);
+  if (Number(p.precio_compra)) return precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: null }, margen) / 100;
+  return null;
 }

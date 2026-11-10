@@ -25,11 +25,11 @@ export function Catalogo({ abierto, cerrar, elegir, margen }: { abierto: boolean
             <li key={p.id} className="rounded-xl border border-borde p-3">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium">{[p.marca, p.modelo].filter(Boolean).join(" ")}<span className="font-normal text-texto2"> · {p.tipo}{p.referencia ? " · " + p.referencia : ""}</span></span>
-                <span className="num text-[12px] text-texto2">{euros(Math.round(Number(p.precio_compra) * 100))} → {euros(precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }, margen))}</span>
+                <span className="num text-[12px] font-medium">{Number(p.precio_venta) || Number(p.precio_compra) ? euros(precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }, margen)) : "Sin precio"}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {(p.colores.length ? p.colores : [""]).map((c) => (
-                  <button key={c || "sin"} onClick={() => elegir(p, c)} className="h-7 rounded-full border border-borde px-3 text-[12px] hover:border-acento hover:text-acento">{c || "Añadir"}</button>
+                  <button key={c || "sin"} onClick={() => elegir(p, c)} className="h-7 rounded-full border border-borde px-3 text-[12px] hover:border-acento hover:text-azul">{c || "Añadir"}</button>
                 ))}
               </div>
             </li>
