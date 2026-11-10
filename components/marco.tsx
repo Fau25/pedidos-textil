@@ -112,7 +112,7 @@ export function Marco({ children }: { children: ReactNode }) {
 export function Cabecera({ titulo, sub, acciones, volver }: { titulo: ReactNode; sub?: ReactNode; acciones?: ReactNode; volver?: { href: string; t: string } }) {
   return (
     <div className="mb-6">
-      {volver && <Link href={volver.href} className="mb-2 inline-block text-[13px] text-texto2 hover:text-texto">← {volver.t}</Link>}
+      {volver && <Link href={volver.href} className="-ml-1 mb-1 inline-flex h-10 items-center px-1 text-[13px] text-texto2 hover:text-texto">← {volver.t}</Link>}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-[24px] font-semibold leading-tight tracking-[-0.02em] sm:text-[28px]">{titulo}</h1>

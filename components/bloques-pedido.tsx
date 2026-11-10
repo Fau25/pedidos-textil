@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Check, Copy, Loader2, Minus, Paperclip, Pencil, Plus, Printer, Scissors, PaintRoller, Search, Spool, Sparkles, SprayCan, Stamp, Trash2, X } from "lucide-react";
 import { useSesion } from "./sesion";
 import { Boton, Campo, CampoImporte, cx, useAvisos } from "./ui";
-import { Muestra, Prenda as Dibujo } from "./muestra";
+import { Muestra, Prenda as Dibujo, colorTela } from "./muestra";
 import { subirArchivo, textoError, urlArchivo } from "@/lib/supabase";
 import { euros, precioVentaUd } from "@/lib/calculo";
 import { ordenTalla, type LineaEd, type PersEd } from "@/lib/pedidos";
@@ -52,6 +52,28 @@ export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, 
   const pvSugerido = precioVentaUd({ precio_compra: l.precio_compra, precio_venta: null }, margen) / 100;
   const elegida = !!(l.modelo || l.marca) || manual;
 
+  const bloqueColores = (
+<div className="mt-3">
+            {colores.length > 0 && <p className="mb-1.5 text-[12px] text-texto2">Color: <span className="font-medium text-texto">{l.color || "elige uno"}</span>{colores.length > 8 && <span> · {colores.length} colores</span>}</p>}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {colores.map((c) => colorTela(c) ? (
+                <button key={c} onClick={() => cambiar({ color: c })} aria-pressed={l.color === c} title={c} aria-label={c}
+                  className={cx("grid size-9 place-items-center rounded-full border-2 transition-colors", l.color === c ? "border-acento" : "border-transparent hover:border-borde")}>
+                  <span className="size-6 rounded-full border border-black/10" style={{ background: colorTela(c)! }} />
+                </button>
+              ) : (
+                <button key={c} onClick={() => cambiar({ color: c })} aria-pressed={l.color === c} title={c}
+                  className={cx("inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] transition-colors", l.color === c ? "border-acento bg-acento font-medium text-sobre-acento" : "border-borde bg-superficie text-texto2 hover:text-texto")}>
+                  <Muestra color={c} />{c}
+                </button>
+              ))}
+              {otroColor || (!colores.length && elegida) || (l.color && !colores.includes(l.color)) ? (
+                <input className="campo h-9 w-36 rounded-full text-[12px]" placeholder="Color" aria-label="Color" value={l.color} onChange={(e) => cambiar({ color: e.target.value })} />
+              ) : <button className="h-9 rounded-full px-2 text-[12px] text-azul" onClick={() => setOtroColor(true)}>Otro color</button>}
+            </div>
+            </div>
+  );
+
   function elegir(p: Prenda) {
     cambiar({
       tipo: p.tipo, marca: p.marca ?? "", modelo: p.modelo ?? "", color: p.colores.includes(l.color) ? l.color : p.colores[0] ?? "",
@@ -66,7 +88,7 @@ export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, 
       <div className="px-4 pt-4 sm:px-5 sm:pt-5"><BuscadorPrenda catalogo={catalogo} margen={margen} n={n} elegir={elegir} manual={() => setManual(true)} /></div>
       <div className="flex gap-4 p-4 sm:p-5">
         {/* Foto */}
-        <label className="group relative shrink-0 cursor-pointer" title="Cambiar foto">
+        <label className="group relative shrink-0 self-start cursor-pointer" title="Cambiar foto">
           <FotoPrenda path={l.imagen_path} tipo={l.tipo} color={l.color} className="size-[96px] sm:size-[128px]" />
           <span className="absolute bottom-1.5 right-1.5 grid size-8 place-items-center rounded-full bg-superficie/95 text-texto2 shadow-sm transition-colors group-hover:text-azul">
             {subiendo ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
@@ -83,7 +105,7 @@ export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, 
             <div className="mt-1">
               <p className="truncate text-[17px] font-semibold leading-tight tracking-[-0.01em]">{[l.marca, l.modelo].filter(Boolean).join(" ") || l.tipo}</p>
               <p className="truncate text-[13px] text-texto2">{l.tipo}{prenda?.referencia ? ` · ${prenda.referencia}` : ""}
-                <button className="ml-2 inline-flex items-center gap-1 text-azul" onClick={() => setManual(true)}><Pencil className="size-3" />Editar</button></p>
+                <button className="ml-1 inline-flex h-8 items-center gap-1 px-1 text-azul" onClick={() => setManual(true)}><Pencil className="size-3" />Editar</button></p>
             </div>
           ) : manual ? (
             <div className="mt-1 grid gap-2 sm:grid-cols-3">
@@ -95,22 +117,11 @@ export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, 
             </div>
           ) : <p className="mt-1 text-[13px] text-texto2">Busca la prenda: se rellenan solos el modelo, los colores, las tallas y el precio.</p>}
 
-          {/* Colores */}
-          {(colores.length > 0 || elegida) && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {colores.map((c) => (
-                <button key={c} onClick={() => cambiar({ color: c })} aria-pressed={l.color === c} title={c}
-                  className={cx("inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[12px] transition-colors", l.color === c ? "border-acento bg-acento font-medium text-sobre-acento" : "border-borde bg-superficie text-texto2 hover:text-texto")}>
-                  <Muestra color={c} />{c}
-                </button>
-              ))}
-              {otroColor || (!colores.length && elegida) || (l.color && !colores.includes(l.color)) ? (
-                <input className="campo h-8 w-36 rounded-full text-[12px]" placeholder="Color" aria-label="Color" value={l.color} onChange={(e) => cambiar({ color: e.target.value })} />
-              ) : <button className="h-8 rounded-full px-2 text-[12px] text-azul" onClick={() => setOtroColor(true)}>Otro color</button>}
-            </div>
-          )}
+          {colores.length > 0 || elegida ? <div className="hidden sm:block">{bloqueColores}</div> : null}
         </div>
       </div>
+
+      {(colores.length > 0 || elegida) && <div className="-mt-1 px-4 pb-4 sm:hidden">{bloqueColores}</div>}
 
       {/* Tallas */}
       <div className="border-t border-borde px-4 py-4 sm:px-5">
@@ -118,8 +129,8 @@ export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, 
           <span className="text-[12px] font-medium text-texto2">Cantidades por talla</span>
           {(!tallasModelo || (ninoModelo.length > 0 && adultoModelo.length > 0)) && (
             <div className="flex rounded-full bg-suave p-0.5 text-[12px]">
-              <button className={cx("rounded-full px-2.5 py-0.5", !nino && "bg-superficie shadow-sm")} onClick={() => setNino(false)}>Adulto</button>
-              <button className={cx("rounded-full px-2.5 py-0.5", nino && "bg-superficie shadow-sm")} onClick={() => setNino(true)}>Niño</button>
+              <button className={cx("h-9 rounded-full px-3.5", !nino && "bg-superficie shadow-sm")} onClick={() => setNino(false)}>Adulto</button>
+              <button className={cx("h-9 rounded-full px-3.5", nino && "bg-superficie shadow-sm")} onClick={() => setNino(true)}>Niño</button>
             </div>
           )}
         </div>

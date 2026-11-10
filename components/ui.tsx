@@ -123,7 +123,7 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
       <div ref={ref} className={cx("animar relative flex max-h-[92dvh] w-full flex-col rounded-t-[28px] bg-superficie shadow-2xl sm:max-h-none sm:rounded-none sm:rounded-l-[28px]", ancho)}>
         <div className="flex items-center justify-between border-b border-borde px-5 py-4">
           <h2 className="text-[16px] font-semibold">{titulo}</h2>
-          <button data-cerrar onClick={cerrar} aria-label="Cerrar" className="grid size-8 place-items-center rounded-lg text-texto2 hover:bg-suave"><X className="size-4" /></button>
+          <button data-cerrar onClick={cerrar} aria-label="Cerrar" className="-mr-1 grid size-10 place-items-center rounded-full text-texto2 hover:bg-suave"><X className="size-5" /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
         {pie && <div className="flex justify-end gap-2 border-t border-borde px-5 py-3">{pie}</div>}

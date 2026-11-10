@@ -52,7 +52,7 @@ export default function Ficha() {
 
   return (
     <>
-      <Link href="/pedidos/" className="mb-2 inline-block text-[13px] text-texto2 hover:text-texto">← Pedidos</Link>
+      <Link href="/pedidos/" className="-ml-1 mb-1 inline-flex h-10 items-center px-1 text-[13px] text-texto2 hover:text-texto">← Pedidos</Link>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <div className="min-w-0">
@@ -141,8 +141,8 @@ export default function Ficha() {
             <Tarjeta titulo="Contacto">
               {cliente.contacto && <p className="mb-2 text-[13px]">{cliente.contacto}</p>}
               <div className="flex flex-col gap-1.5 text-[13px]">
-                {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex items-center gap-2 text-azul"><Phone className="size-3.5" />{cliente.telefono}</a>}
-                {cliente.email && <a href={`mailto:${cliente.email}`} className="flex items-center gap-2 truncate text-azul"><Mail className="size-3.5" />{cliente.email}</a>}
+                {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex min-h-9 items-center gap-2 text-azul"><Phone className="size-3.5" />{cliente.telefono}</a>}
+                {cliente.email && <a href={`mailto:${cliente.email}`} className="flex min-h-9 items-center gap-2 truncate text-azul"><Mail className="size-3.5" />{cliente.email}</a>}
               </div>
             </Tarjeta>
           )}

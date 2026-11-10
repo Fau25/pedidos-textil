@@ -101,7 +101,7 @@ export default function Inicio() {
           <button key={v} onClick={() => setVista(v)} aria-pressed={vista === v}
             className={cx("h-10 rounded-full px-5 text-[13px] font-medium transition-colors", vista === v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>{t}</button>
         ))}
-        <Link href={`/pedidos/${vista === "entregados" ? "?ver=entregados" : ""}`} className="ml-auto flex items-center gap-1 text-[13px] font-medium text-azul">Ver lista <ArrowUpRight className="size-3.5" /></Link>
+        <Link href={`/pedidos/${vista === "entregados" ? "?ver=entregados" : ""}`} className="ml-auto flex h-10 items-center gap-1 px-1 text-[13px] font-medium text-azul">Ver lista <ArrowUpRight className="size-3.5" /></Link>
       </div>
 
       {/* Tarjetas de pedidos */}

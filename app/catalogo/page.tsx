@@ -96,7 +96,7 @@ function Prendas() {
                   </span>
                 </button>
                 <button aria-label={p.favorito ? "Quitar de habituales" : "Marcar como habitual"} title={p.favorito ? "Habitual" : "Marcar como habitual"} onClick={() => estrella(p)}
-                  className={cx("absolute right-4 top-4 grid size-8 place-items-center rounded-full bg-superficie text-[16px] shadow-sm", p.favorito ? "text-azul" : "text-texto2/50 hover:text-azul")}>{p.favorito ? "★" : "☆"}</button>
+                  className={cx("absolute right-3.5 top-3.5 grid size-10 place-items-center rounded-full bg-superficie text-[17px] shadow-sm", p.favorito ? "text-azul" : "text-texto2/50 hover:text-azul")}>{p.favorito ? "★" : "☆"}</button>
               </article>
             ))}
           </div>

@@ -65,17 +65,17 @@ export default function Pedidos() {
     <>
       <Cabecera titulo="Pedidos" acciones={<Link href="/pedidos/nuevo/"><Boton variante="primario"><Plus className="size-4" />Nuevo pedido</Boton></Link>} />
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex rounded-full border border-borde bg-superficie p-0.5" role="tablist">
           {(["pendientes", "entregados", "todos"] as Filtro[]).map((f) => (
             <button key={f} role="tab" aria-selected={filtro === f} onClick={() => { setFiltro(f); setSel(new Set()); setOrden(f === "pendientes" ? "antiguos" : "fecha"); }}
-              className={cx("h-8 flex-1 rounded-lg px-3 text-[13px] font-medium capitalize sm:flex-none", filtro === f ? "bg-acento text-sobre-acento" : "text-texto2")}>
+              className={cx("h-9 flex-1 rounded-full px-3 text-[13px] font-medium capitalize sm:flex-none", filtro === f ? "bg-acento text-sobre-acento" : "text-texto2")}>
               {f} <span className="num ml-0.5 text-[12px] opacity-70">{datos ? n(f) : ""}</span>
             </button>
           ))}
         </div>
-        <input className="campo sm:max-w-xs" placeholder="Buscar nº, cliente o referencia" value={texto} onChange={(e) => setTexto(e.target.value)} />
-        <label className="flex items-center gap-2 text-[13px] text-texto2 sm:ml-auto"><ArrowUpDown className="size-4" />
+        <input className="campo order-last w-full xl:order-none xl:w-auto xl:max-w-xs xl:flex-1" placeholder="Buscar nº, cliente o referencia" value={texto} onChange={(e) => setTexto(e.target.value)} />
+        <label className="ml-auto flex items-center gap-2 text-[13px] text-texto2"><ArrowUpDown className="size-4" />
           <select className="campo w-auto" value={orden} onChange={(e) => setOrden(e.target.value as Orden)} aria-label="Ordenar por">
             <option value="antiguos">Más antiguos primero</option><option value="fecha">Más recientes primero</option><option value="total">Importe</option><option value="cliente">Cliente</option>
           </select>
@@ -99,8 +99,8 @@ export default function Pedidos() {
               {lista.map((p) => {
                 return (
                   <li key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-suave/60">
-                    <input type="checkbox" aria-label={`Seleccionar ${p.numero}`} className="size-4 shrink-0 accent-[var(--acento)]" checked={sel.has(p.id)}
-                      onChange={(e) => setSel((s) => { const x = new Set(s); if (e.target.checked) x.add(p.id); else x.delete(p.id); return x; })} />
+                    <label className="-m-2 grid size-10 shrink-0 cursor-pointer place-items-center"><input type="checkbox" aria-label={`Seleccionar ${p.numero}`} className="size-[18px] accent-[var(--acento)]" checked={sel.has(p.id)}
+                      onChange={(e) => setSel((s) => { const x = new Set(s); if (e.target.checked) x.add(p.id); else x.delete(p.id); return x; })} /></label>
                     <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => router.push(`/pedidos/ver/?id=${p.id}`)}>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{p.clientes?.nombre ?? "Sin cliente"}</span>

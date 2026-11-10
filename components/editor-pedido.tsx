@@ -119,7 +119,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     <>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <button onClick={() => router.back()} className="mb-2 text-[13px] text-texto2 hover:text-texto">← Volver</button>
+          <button onClick={() => router.back()} className="-ml-1 mb-1 inline-flex h-10 items-center px-1 text-[13px] text-texto2 hover:text-texto">← Volver</button>
           <h1 className="text-[24px] font-semibold tracking-[-0.02em] sm:text-[28px]">{p.nuevo ? "Nuevo pedido" : `Editar ${p.numero}`}</h1>
         </div>
         <p className="text-[12px] text-texto2" aria-live="polite">
@@ -127,8 +127,8 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
         </p>
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[1fr_330px]">
-        <div className="space-y-6">
+      <div className="grid items-start gap-6 xl:grid-cols-[1fr_330px]">
+        <div className="min-w-0 space-y-6">
           {/* 1 · Cliente y fechas */}
           <Tarjeta titulo={<span id="bloque-cliente">Cliente y fecha</span>}>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -195,7 +195,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
         </div>
 
         {/* Resumen fijo */}
-        <aside className="lg:sticky lg:top-8">
+        <aside className="xl:sticky xl:top-8">
           <Tarjeta titulo="Resumen">
             <dl className="space-y-2 text-[13px]">
               <Fila t="Prendas" v={euros(t.ventaPrendas)} />
@@ -215,14 +215,14 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
               <Fila t="Base imponible" v={euros(t.base)} />
               <div className="flex items-center justify-between">
                 <dt className="flex items-center gap-1 text-texto2">IVA
-                  <select className="ml-1 rounded-md bg-suave px-1 py-0.5 text-[12px]" value={p.iva} onChange={(e) => set((x) => ({ ...x, iva: Number(e.target.value) }))} aria-label="Tipo de IVA">
+                  <select className="ml-1 h-9 rounded-lg bg-suave px-2 text-[13px]" value={p.iva} onChange={(e) => set((x) => ({ ...x, iva: Number(e.target.value) }))} aria-label="Tipo de IVA">
                     {[21, 10, 4, 0].map((v) => <option key={v} value={v}>{v} %</option>)}
                   </select>
                 </dt><dd className="num">{euros(t.iva)}</dd>
               </div>
               <div className="flex items-baseline justify-between pt-2"><dt className="font-semibold">Total</dt><dd className="num text-[24px] font-semibold tracking-[-0.02em]">{euros(t.total)}</dd></div>
             </dl>
-            <div className="mt-4 hidden flex-col gap-2 lg:flex">
+            <div className="mt-4 hidden flex-col gap-2 xl:flex">
               <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
               {p.nuevo && <Boton variante="fantasma" onClick={descartar}>Descartar</Boton>}
             </div>
@@ -231,8 +231,8 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
       </div>
 
       {/* Barra de acciones (móvil) */}
-      <div className="h-20 lg:hidden" />
-      <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 flex items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur lg:hidden">
+      <div className="h-20 xl:hidden" />
+      <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 mx-auto flex max-w-[640px] lg:bottom-4 lg:left-[260px] items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur xl:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>
         <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>Guardar</Boton>
       </div>

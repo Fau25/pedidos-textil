@@ -21,7 +21,7 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "2.6.0";
+const VERSION = "2.6.1";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();
@@ -44,7 +44,7 @@ export default function Ajustes() {
   return (
     <>
       <Cabecera titulo="Ajustes" />
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <Tarjeta titulo="Tu empresa" className="lg:row-span-2">
           <form className="space-y-4" onSubmit={handleSubmit(async (f) => {
             const fila = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v === "" ? null : v]));
@@ -53,7 +53,7 @@ export default function Ajustes() {
             await recargar(); aviso("Datos guardados");
           })}>
             <div className="flex items-center gap-4">
-              <label className="relative grid h-16 w-32 cursor-pointer place-items-center overflow-hidden rounded-xl border border-dashed border-borde bg-suave text-texto2 hover:border-acento">
+              <label className="relative grid h-16 w-32 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-xl border border-dashed border-borde bg-suave text-texto2 hover:border-acento">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {subiendo ? <Loader2 className="size-5 animate-spin" /> : logo ? <img src={logo} alt="Logotipo" className="size-full object-contain p-2" /> : <span className="flex items-center gap-1.5 text-[12px]"><ImagePlus className="size-4" />Logotipo</span>}
                 <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="sr-only" onChange={async (ev) => {

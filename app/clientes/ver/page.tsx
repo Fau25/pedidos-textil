@@ -47,16 +47,20 @@ export default function FichaCliente() {
           <Boton variante="fantasma" aria-label="Eliminar cliente" className="hover:text-red-600" onClick={borrar}><Trash2 className="size-4" /></Boton>
         </>} />
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Tarjeta titulo={`Pedidos · ${pedidos.length}`} accion={<span className="num text-[13px] text-texto2">{euros(total)}</span>} sinPadding>
             {!pedidos.length ? <p className="px-5 pb-5 text-texto2">Aún no tiene pedidos.</p> : (
               <ul className="divide-y divide-borde">
                 {pedidos.map((p) => { return (
-                  <li key={p.id}><Link href={`/pedidos/ver/?id=${p.id}`} className="flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-suave/60">
-                    <span className="num w-28 font-semibold">{p.numero}</span>
-                    <span className="flex-1 text-[13px] text-texto2">{fecha(p.fecha)} · {p.unidades} uds{p.referencia ? " · " + p.referencia : ""}</span>
-                    <span className="num text-[13px] font-medium">{euros(aCent(p.total))}</span>
-                    <Pastilla color={p.entregado ? "verde" : "ambar"}>{p.entregado ? "Entregado" : "Pendiente"}</Pastilla>
+                  <li key={p.id}><Link href={`/pedidos/ver/?id=${p.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-suave/60">
+                    <span className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-3">
+                      <span className="num block font-semibold sm:w-28 sm:shrink-0">{p.numero}</span>
+                      <span className="block truncate text-[13px] text-texto2 sm:flex-1">{fecha(p.fecha)} · {p.unidades} uds{p.referencia ? " · " + p.referencia : ""}</span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+                      <span className="num text-[13px] font-medium">{euros(aCent(p.total))}</span>
+                      <Pastilla color={p.entregado ? "verde" : "ambar"}>{p.entregado ? "Entregado" : "Pendiente"}</Pastilla>
+                    </span>
                   </Link></li>); })}
               </ul>
             )}
@@ -65,8 +69,8 @@ export default function FichaCliente() {
         </div>
         <Tarjeta titulo="Datos">
           <div className="space-y-2.5 text-[13px]">
-            {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex items-center gap-2 text-azul"><Phone className="size-4" />{cliente.telefono}</a>}
-            {cliente.email && <a href={`mailto:${cliente.email}`} className="flex items-center gap-2 break-all text-azul"><Mail className="size-4 shrink-0" />{cliente.email}</a>}
+            {cliente.telefono && <a href={`tel:${cliente.telefono.replace(/\s/g, "")}`} className="flex min-h-9 items-center gap-2 text-azul"><Phone className="size-4" />{cliente.telefono}</a>}
+            {cliente.email && <a href={`mailto:${cliente.email}`} className="flex min-h-9 items-center gap-2 break-all text-azul"><Mail className="size-4 shrink-0" />{cliente.email}</a>}
             {cliente.direccion && <p className="flex gap-2"><MapPin className="size-4 shrink-0 text-texto2" />{cliente.direccion}</p>}
             {cliente.nif && <p><span className="text-texto2">NIF/CIF </span>{cliente.nif}</p>}
             {cliente.facturacion && <div><p className="text-texto2">Facturación</p><p className="whitespace-pre-line">{cliente.facturacion}</p></div>}

@@ -165,6 +165,19 @@ await prueba("el catálogo de Roly se completa con colores y fotos, y las fotos 
   assert.deepEqual(errores, []); await ctx.close();
 });
 
+await prueba("ninguna pantalla se sale de lado en móvil ni tablet", async () => {
+  const { ctx, p, errores } = await abrir();
+  for (const w of [360, 390, 768, 1024]) {
+    await p.setViewportSize({ width: w, height: 900 });
+    for (const ruta of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/?id=p1", "clientes/", "clientes/ver/?id=k1", "catalogo/", "ajustes/"]) {
+      await ir(p, ruta);
+      const sobra = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      assert.ok(sobra <= 1, `${ruta || "inicio"} a ${w}px se sale ${sobra}px`);
+    }
+  }
+  assert.deepEqual(errores, []); await ctx.close();
+});
+
 await navegador.close(); servidor.close();
 if (fallos) { console.log(`\n${fallos} prueba(s) fallida(s)`); process.exit(1); }
 console.log("\nTodas las pruebas de pantalla pasan");

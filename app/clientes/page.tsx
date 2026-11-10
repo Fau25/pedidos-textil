@@ -32,7 +32,7 @@ export default function Clientes() {
 
   return (
     <>
-      <Cabecera titulo="Clientes" sub={datos ? `${datos.clientes.length} clientes` : undefined} acciones={<Boton variante="primario" onClick={() => setForm(true)}><Plus className="size-4" />Nuevo cliente</Boton>} />
+      <Cabecera titulo="Clientes" sub={datos ? `${datos.clientes.length} cliente${datos.clientes.length === 1 ? "" : "s"}` : undefined} acciones={<Boton variante="primario" onClick={() => setForm(true)}><Plus className="size-4" />Nuevo cliente</Boton>} />
       <input className="campo mb-4 sm:max-w-sm" placeholder="Buscar por nombre, contacto, teléfono, email o NIF" value={q} onChange={(e) => setQ(e.target.value)} />
       {!datos ? <Cargando error={error} reintentar={recargar} /> : !datos.clientes.length ? (
         <div className="tarjeta"><Vacio icono={<Users className="size-5" />} titulo="Aún no hay clientes" texto="También puedes crearlos directamente al hacer un pedido." accion={<Boton variante="primario" onClick={() => setForm(true)}><Plus className="size-4" />Nuevo cliente</Boton>} /></div>
