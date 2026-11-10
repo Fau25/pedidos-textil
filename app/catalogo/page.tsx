@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Camera, Loader2, Plus, Shirt, Trash2, Truck } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Camera, Loader2, Pencil, Plus, Shirt, Trash2, Truck, X } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Campo, CampoImporte, Cargando, Hoja, Pestanas, Tarjeta, Vacio, cx, useAvisos } from "@/components/ui";
@@ -31,6 +32,7 @@ function Prendas() {
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string | null>(null);
+  const [vista, setVista] = useState<Prenda | null>(null);
   const { datos, recargar, setDatos, error } = useCarga(async () => ((await sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000)).data ?? []) as Prenda[]);
   const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const cats = categorias(datos ?? []);
@@ -81,7 +83,7 @@ function Prendas() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 xl:gap-4">
             {lista.slice(0, 300).map((p) => (
               <article key={p.id} className="tarjeta relative flex flex-col gap-2.5 p-2.5">
-                <button className="flex flex-col gap-2.5 text-left" onClick={() => setEd({ ...p, precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) })}>
+                <button className="flex flex-col gap-2.5 text-left" aria-label={`Ver ${p.modelo || p.tipo} en grande`} onClick={() => setVista(p)}>
                   <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} cubrir className="aspect-square w-full rounded-2xl" />
                   <span className="flex flex-col gap-1.5 px-1 pb-1">
                     <span className="min-w-0">
@@ -103,6 +105,7 @@ function Prendas() {
           {lista.length > 300 && <p className="px-4 py-3 text-center text-[12px] text-texto2">Mostrando 300 de {lista.length}. Afina la búsqueda.</p>}
         </>
       )}
+      {vista && <VerPrenda p={vista} cerrar={() => setVista(null)} editar={() => { const p = vista; setVista(null); setEd({ ...p, precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }); }} />}
       <Hoja abierta={!!ed} cerrar={() => setEd(null)} titulo={ed?.id ? "Editar prenda" : "Nueva prenda"}
         pie={<>
           {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar prenda" onClick={async () => { if (!(await confirmar({ titulo: "¿Quitar del catálogo?", ok: "Quitar", peligro: true }))) return; await sb.from("catalogo").delete().eq("id", ed.id!); setEd(null); recargar(); }}><Trash2 className="size-4" /></Boton>}
@@ -272,4 +275,30 @@ function categorias(ps: Prenda[]): { nombre: string; n: number }[] {
   for (const p of ps) cuenta.set(categoria(p.tipo), (cuenta.get(categoria(p.tipo)) ?? 0) + 1);
   const fav = ps.filter((p) => p.favorito).length;
   return [...(fav ? [{ nombre: HABITUALES, n: fav }] : []), ...ORDEN_CATS.filter((c) => cuenta.has(c)).map((c) => ({ nombre: c, n: cuenta.get(c)! }))];
+}
+
+/** Foto de la prenda en grande; el lápiz abre sus datos para editarlos */
+function VerPrenda({ p, cerrar, editar }: { p: Prenda; cerrar: () => void; editar: () => void }) {
+  useEffect(() => {
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") cerrar(); };
+    document.addEventListener("keydown", tecla); const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", tecla); document.body.style.overflow = prev; };
+  }, [cerrar]);
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm animar" onClick={cerrar} role="dialog" aria-modal="true" aria-label={p.modelo || p.tipo}>
+      <div className="w-full max-w-[560px]" onClick={(e) => e.stopPropagation()}>
+        <div className="relative overflow-hidden rounded-[26px] bg-superficie">
+          <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} className="aspect-square w-full rounded-none" />
+          <button onClick={cerrar} aria-label="Cerrar" autoFocus className="absolute left-3 top-3 grid size-11 place-items-center rounded-full bg-superficie/95 text-texto shadow"><X className="size-5" /></button>
+          <button onClick={editar} aria-label="Editar los datos de la prenda" className="absolute right-3 top-3 grid size-11 place-items-center rounded-full bg-acento text-sobre-acento shadow"><Pencil className="size-[18px]" /></button>
+          <div className="flex items-end justify-between gap-3 px-5 py-4">
+            <div className="min-w-0">
+              <p className="truncate text-[18px] font-bold">{p.modelo || p.tipo}</p>
+              <p className="truncate text-[13px] text-texto2">{[p.tipo, p.referencia].filter(Boolean).join(" · ")}</p>
+            </div>
+            <span className="flex shrink-0 items-center gap-1">{p.colores.slice(0, 6).map((c) => <Muestra key={c} color={c} />)}{p.colores.length > 6 && <span className="ml-0.5 text-[12px] text-texto2">+{p.colores.length - 6}</span>}</span>
+          </div>
+        </div>
+      </div>
+    </div>, document.body);
 }

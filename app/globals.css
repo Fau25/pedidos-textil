@@ -90,3 +90,6 @@ input[type="number"].sin-flechas { -moz-appearance: textfield; }
 @media print { .no-imprimir { display: none !important; } }
 @keyframes entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .animar { animation: entrar .18s ease-out both; }
+
+/* iPhone/iPad hacen zoom si un campo tiene letra < 16px: en pantallas táctiles, 16px */
+@media (pointer: coarse) { input, select, textarea { font-size: 16px !important; } }

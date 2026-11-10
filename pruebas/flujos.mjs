@@ -178,6 +178,36 @@ await prueba("ninguna pantalla se sale de lado en móvil ni tablet", async () =>
   assert.deepEqual(errores, []); await ctx.close();
 });
 
+await prueba("editar un pedido no guarda hasta pulsar Guardar; Cancelar sale sin guardar", async () => {
+  const { ctx, p, escrituras, errores } = await abrir();
+  await ir(p, "pedidos/nuevo/?id=p1");
+  assert.equal(await p.getByRole("button", { name: /Desde el catálogo/ }).count(), 0, "sin botón azul de catálogo");
+  await p.getByRole("button", { name: /Cliente y fecha/ }).click();
+  await p.getByLabel("Referencia interna (opcional)").fill("Cambio de prueba"); await p.waitForTimeout(1500);
+  assert.equal(escrituras.filter((x) => x.tabla === "guardar_pedido").length, 0, "no se guarda solo");
+  await p.getByRole("button", { name: "Cancelar" }).first().click();
+  await p.getByRole("button", { name: "Salir sin guardar" }).click(); await p.waitForURL(/pedidos\/ver/);
+  assert.equal(escrituras.filter((x) => x.tabla === "guardar_pedido").length, 0, "cancelar no guarda");
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("en el catálogo la foto se ve en grande y el lápiz abre los datos", async () => {
+  const { ctx, p, errores } = await abrir();
+  await ir(p, "catalogo/");
+  await p.getByRole("button", { name: "Ver Beagle en grande" }).click();
+  assert.equal(await p.getByText("Editar prenda").count(), 0, "los datos no salen de primeras");
+  await p.getByRole("button", { name: "Editar los datos de la prenda" }).click();
+  await p.getByText("Editar prenda").waitFor();
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("en pantallas táctiles los campos tienen 16px (sin zoom al escribir)", async () => {
+  const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-sqartxsdlynecelkufyq-auth-token", JSON.stringify(sesion)]);
+  await ctx.route("**/*.supabase.co/**", (r) => { const t = new URL(r.request().url()).pathname.match(/rest\/v1\/(\w+)/)?.[1]; r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(T[t] ?? []) }); });
+  const p = await ctx.newPage(); await ir(p, "pedidos/");
+  const tam = await p.evaluate(() => [...document.querySelectorAll("input, select, textarea")].filter((e) => e.offsetParent).map((e) => parseFloat(getComputedStyle(e).fontSize)));
+  assert.ok(tam.length && tam.every((x) => x >= 16), JSON.stringify(tam)); await ctx.close();
+});
+
 await navegador.close(); servidor.close();
 if (fallos) { console.log(`\n${fallos} prueba(s) fallida(s)`); process.exit(1); }
 console.log("\nTodas las pruebas de pantalla pasan");

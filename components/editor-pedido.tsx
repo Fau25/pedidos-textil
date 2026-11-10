@@ -1,15 +1,14 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, BookOpen } from "lucide-react";
+import { Plus, Loader2, ChevronDown } from "lucide-react";
 import { useSesion } from "./sesion";
-import { Boton, Campo, CampoImporte, Tarjeta, useAvisos } from "./ui";
+import { Boton, Campo, CampoImporte, Tarjeta, cx, useAvisos } from "./ui";
 import { sb, textoError } from "@/lib/supabase";
 import { calcular, euros, tarifaPara, sumaUnidades } from "@/lib/calculo";
 import { aCalc, claveBorrador, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, cargarPedido, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
 import { SelectorCliente } from "./selector-cliente";
 import { SelectorTecnica, TarjetaLinea, TarjetaPers } from "./bloques-pedido";
-import { Catalogo } from "./catalogo-picker";
 export { SelectorCliente };
 import type { Cliente, Prenda } from "@/lib/tipos";
 
@@ -23,9 +22,10 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   const margen = Number(empresa!.margen);
   const [p, setP] = useState<PedidoEd | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [guardando, setGuardando] = useState<"" | "guardando" | "guardado" | "error">("");
+  const [guardando, setGuardando] = useState<"" | "pendiente">("");
   const [enviando, setEnviando] = useState(false);
-  const [catalogo, setCatalogo] = useState(false);
+  const [abiertos, setAbiertos] = useState<Record<string, boolean>>({ cliente: true, prendas: true, pers: true, notas: true });
+  const [lineasAbiertas, setLineasAbiertas] = useState<Set<string> | null>(null);
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [errorCliente, setErrorCliente] = useState(false);
   const cambiado = useRef(false);
@@ -67,14 +67,17 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   useEffect(() => {
     if (!p || !cambiado.current) return;
     if (p.nuevo) { try { localStorage.setItem(BORRADOR, JSON.stringify(p)); } catch {} return; }
-    setGuardando("guardando");
-    temporizador.current = setTimeout(async () => {
-      temporizador.current = null;
-      try { await guardarPedido(p, empresa!); setGuardando("guardado"); }
-      catch (e) { setGuardando("error"); aviso(textoError(e), "error"); }
-    }, 900);
-    return () => { if (temporizador.current) clearTimeout(temporizador.current); };
-  }, [p, empresa, aviso, BORRADOR]);
+    setGuardando("pendiente"); // los cambios de un pedido existente solo se guardan al pulsar Guardar
+  }, [p, BORRADOR]);
+
+  // Al abrir: pedido nuevo con todo desplegado; uno existente con las prendas plegadas
+  useEffect(() => {
+    if (!p || lineasAbiertas) return;
+    setLineasAbiertas(new Set(p.nuevo ? p.lineas.map((l) => l.clave) : []));
+    if (!p.nuevo) setAbiertos({ cliente: false, prendas: true, pers: true, notas: !!p.notas });
+  }, [p, lineasAbiertas]);
+  const alternar = (k: string) => setAbiertos((a) => ({ ...a, [k]: !a[k] }));
+  const alternarLinea = (k: string) => setLineasAbiertas((s) => { const x = new Set(s); if (x.has(k)) x.delete(k); else x.add(k); return x; });
 
   const set = useCallback((f: (x: PedidoEd) => PedidoEd) => { cambiado.current = true; setP((x) => (x ? f(x) : x)); }, []);
   const setLinea = (clave: string, cambio: Partial<LineaEd>) => set((x) => ({ ...x, lineas: x.lineas.map((l) => (l.clave === clave ? { ...l, ...cambio } : l)) }));
@@ -95,7 +98,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 
   async function guardar() {
     if (!p) return;
-    if (!p.cliente_id) { setErrorCliente(true); document.getElementById("bloque-cliente")?.scrollIntoView({ behavior: "smooth", block: "center" }); return aviso("Elige un cliente para guardar el pedido", "error"); }
+    if (!p.cliente_id) { setErrorCliente(true); setAbiertos((a) => ({ ...a, cliente: true })); await new Promise((r) => setTimeout(r, 50)); document.getElementById("bloque-cliente")?.scrollIntoView({ behavior: "smooth", block: "center" }); return aviso("Elige un cliente para guardar el pedido", "error"); }
     setEnviando(true);
     if (temporizador.current) { clearTimeout(temporizador.current); temporizador.current = null; } // sin guardados solapados
     try {
@@ -106,10 +109,16 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     } catch (e) { aviso(textoError(e), "error"); setEnviando(false); }
   }
 
-  async function descartar() {
-    if (!(await confirmar({ titulo: "¿Descartar este pedido?", texto: "Se perderá lo que has escrito.", ok: "Descartar", peligro: true }))) return;
-    try { localStorage.removeItem(BORRADOR); } catch {}
-    router.push("/pedidos/");
+  /** Salir sin guardar */
+  async function cancelar() {
+    if (!p) return;
+    if (p.nuevo) {
+      if (cambiado.current && !(await confirmar({ titulo: "¿Salir sin guardar?", texto: "El pedido no se creará y se perderá lo que has escrito.", ok: "Salir sin guardar", peligro: true }))) return;
+      try { localStorage.removeItem(BORRADOR); } catch {}
+      return router.push("/pedidos/");
+    }
+    if (cambiado.current && !(await confirmar({ titulo: "¿Salir sin guardar?", texto: "Los cambios que has hecho no se guardarán.", ok: "Salir sin guardar", peligro: true }))) return;
+    router.push(`/pedidos/ver/?id=${p.id}`);
   }
 
   if (!p || !t) return <div className="flex justify-center py-20 text-texto2"><Loader2 className="size-5 animate-spin" /></div>;
@@ -119,18 +128,19 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     <>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <button onClick={() => router.back()} className="-ml-1 mb-1 inline-flex h-10 items-center px-1 text-[13px] text-texto2 hover:text-texto">← Volver</button>
+          <button onClick={cancelar} className="-ml-1 mb-1 inline-flex h-10 items-center px-1 text-[13px] text-texto2 hover:text-texto">← Volver</button>
           <h1 className="text-[24px] font-semibold tracking-[-0.02em] sm:text-[28px]">{p.nuevo ? "Nuevo pedido" : `Editar ${p.numero}`}</h1>
         </div>
         <p className="text-[12px] text-texto2" aria-live="polite">
-          {p.nuevo ? "Borrador guardado en este dispositivo" : guardando === "guardando" ? "Guardando…" : guardando === "guardado" ? "✓ Guardado automáticamente" : guardando === "error" ? "No se pudo guardar" : ""}
+          {p.nuevo ? "Borrador guardado en este dispositivo" : guardando === "pendiente" ? "Cambios sin guardar" : ""}
         </p>
       </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_330px]">
         <div className="min-w-0 space-y-6">
           {/* 1 · Cliente y fechas */}
-          <Tarjeta titulo={<span id="bloque-cliente">Cliente y fecha</span>}>
+          <Seccion tarjeta id="bloque-cliente" titulo="Cliente y fecha" abierta={abiertos.cliente} alternar={() => alternar("cliente")}
+            resumen={[cliente?.nombre ?? "Sin cliente", fechaCorta(p.fecha), p.referencia].filter(Boolean).join(" · ")}>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="sm:col-span-2">
                 <SelectorCliente clientes={clientes} valor={p.cliente_id} error={errorCliente}
@@ -141,19 +151,14 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
               <Campo etiqueta="Fecha del pedido"><input type="date" className="campo" value={p.fecha} onChange={(e) => set((x) => ({ ...x, fecha: e.target.value }))} /></Campo>
               <Campo etiqueta="Referencia interna (opcional)" className="sm:col-span-2"><input className="campo" placeholder="Ej.: Temporada 26/27" value={p.referencia} onChange={(e) => set((x) => ({ ...x, referencia: e.target.value }))} /></Campo>
             </div>
-          </Tarjeta>
+          </Seccion>
 
           {/* 2 · Prendas */}
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[19px] font-semibold tracking-[-0.01em]">Prendas <span className="ml-1 text-[13px] font-normal text-texto2">{t.unidades} uds</span></h2>
-              <button onClick={() => setCatalogo(true)} className="inline-flex h-10 items-center gap-2 rounded-full bg-azul-suave pl-1 pr-4 text-[13px] font-medium text-azul hover:brightness-95" aria-label="Desde el catálogo">
-                <span className="grid size-8 place-items-center rounded-full bg-azul text-white"><BookOpen className="size-4" /></span><span className="hidden sm:inline">Catálogo</span>
-              </button>
-            </div>
+          <Seccion titulo={<>Prendas <span className="ml-1 text-[13px] font-normal text-texto2">{t.unidades} uds</span></>} abierta={abiertos.prendas} alternar={() => alternar("prendas")}
+            resumen={p.lineas.length ? p.lineas.map((l) => [l.modelo || l.tipo, l.color].filter(Boolean).join(" ")).filter(Boolean).join(" · ") || `${p.lineas.length} prenda(s)` : "Sin prendas"}>
             <div className="space-y-4">
               {p.lineas.map((l, i) => (
-                <TarjetaLinea key={l.clave} l={l} n={i + 1} margen={margen} t={t.lineas[l.clave]} catalogo={prendas} proveedores={proveedores}
+                <TarjetaLinea key={l.clave} abierta={!!lineasAbiertas?.has(l.clave)} alternar={() => alternarLinea(l.clave)} l={l} n={i + 1} margen={margen} t={t.lineas[l.clave]} catalogo={prendas} proveedores={proveedores}
                   cambiar={(c) => setLinea(l.clave, c)}
                   duplicar={() => set((x) => { const k = x.lineas.findIndex((z) => z.clave === l.clave); const nueva = { ...l, clave: id(), color: "", tallas: {}, estado: "pendiente" as const }; const ls = [...x.lineas]; ls.splice(k + 1, 0, nueva);
                     return { ...x, lineas: ls, pers: x.pers.map((z) => (z.lineas.includes(l.clave) ? { ...z, lineas: [...z.lineas, nueva.clave] } : z)) }; })}
@@ -162,16 +167,16 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
                     set((x) => ({ ...x, lineas: x.lineas.filter((z) => z.clave !== l.clave), pers: x.pers.map((z) => ({ ...z, lineas: z.lineas.filter((k) => k !== l.clave) })) }));
                   }} />
               ))}
-              <button onClick={() => set((x) => ({ ...x, lineas: [...x.lineas, lineaVacia(margen)] }))}
+              <button onClick={() => { const nueva = lineaVacia(margen); setLineasAbiertas(new Set([nueva.clave])); set((x) => ({ ...x, lineas: [...x.lineas, nueva] })); }}
                 className="flex h-14 w-full items-center justify-center gap-2 rounded-[22px] border-2 border-dashed border-borde text-[14px] font-medium text-texto2 hover:border-acento hover:text-texto">
                 <Plus className="size-4" />Añadir otra prenda
               </button>
             </div>
-          </section>
+          </Seccion>
 
           {/* 3 · Personalización */}
-          <section>
-            <h2 className="mb-3 text-[19px] font-semibold tracking-[-0.01em]">Personalización</h2>
+          <Seccion titulo="Personalización" abierta={abiertos.pers} alternar={() => alternar("pers")}
+            resumen={p.pers.length ? p.pers.map((z) => `${z.tecnica} · ${z.ubicacion}`).join(" · ") : "Sin personalización"}>
             <div className="space-y-4">
               {p.pers.map((z, i) => (
                 <TarjetaPers key={z.clave} z={z} lineas={p.lineas} calc={t.pers[i]} tecnicas={tecnicas}
@@ -187,11 +192,11 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
                 }] }))} />
               </div>
             </div>
-          </section>
+          </Seccion>
 
-          <Tarjeta titulo="Observaciones">
+          <Seccion tarjeta titulo="Observaciones" abierta={abiertos.notas} alternar={() => alternar("notas")} resumen={p.notas || "Sin observaciones"}>
             <textarea className="campo" rows={3} placeholder="Notas para el pedido (plazos, indicaciones del cliente…)" value={p.notas} onChange={(e) => set((x) => ({ ...x, notas: e.target.value }))} />
-          </Tarjeta>
+          </Seccion>
         </div>
 
         {/* Resumen fijo */}
@@ -224,7 +229,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
             </dl>
             <div className="mt-4 hidden flex-col gap-2 xl:flex">
               <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
-              {p.nuevo && <Boton variante="fantasma" onClick={descartar}>Descartar</Boton>}
+              <Boton onClick={cancelar}>Cancelar</Boton>
             </div>
           </Tarjeta>
         </aside>
@@ -234,16 +239,35 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
       <div className="h-20 xl:hidden" />
       <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 mx-auto flex max-w-[640px] lg:bottom-4 lg:left-[260px] items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur xl:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>
+        <Boton onClick={cancelar}>Cancelar</Boton>
         <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>Guardar</Boton>
       </div>
 
-      <Catalogo abierto={catalogo} cerrar={() => setCatalogo(false)} margen={margen}
-        elegir={(pr, color) => { set((x) => ({ ...x, lineas: [...x.lineas.filter((l) => !(sumaUnidades(Object.entries(l.tallas).map(([a, b]) => ({ talla: a, cantidad: b }))) === 0 && !l.marca && !l.modelo && !l.precio_compra)), lineaVacia(margen, {
-          tipo: pr.tipo, marca: pr.marca ?? "", modelo: pr.modelo ?? "", color, proveedor_id: pr.proveedor_id, precio_compra: Number(pr.precio_compra), precio_venta: pr.precio_venta === null ? null : Number(pr.precio_venta), imagen_path: pr.imagen_path, tallasModelo: pr.tallas,
-        })] })); setCatalogo(false); }} />
+
     </>
   );
 }
 
 const Fila = ({ t, v }: { t: string; v: string }) => <div className="flex justify-between gap-3"><dt className="text-texto2">{t}</dt><dd className="num">{v}</dd></div>;
 
+
+const fechaCorta = (f: string) => { try { return new Date(f + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }); } catch { return f; } };
+
+/** Bloque que se pliega: título (y resumen cuando está plegado) */
+function Seccion({ titulo, resumen, abierta, alternar, tarjeta, id, children }: {
+  titulo: React.ReactNode; resumen?: string; abierta: boolean; alternar: () => void; tarjeta?: boolean; id?: string; children: React.ReactNode;
+}) {
+  return (
+    <section className={cx(tarjeta && "tarjeta")}>
+      <button type="button" onClick={alternar} aria-expanded={abierta} id={id}
+        className={cx("flex w-full items-center gap-3 text-left", tarjeta ? "min-h-14 px-5 py-3.5" : cx("min-h-11", abierta && "mb-3"), !abierta && !tarjeta && "tarjeta min-h-14 px-5 py-3.5")}>
+        <span className="min-w-0 flex-1">
+          <span className={cx("block font-semibold tracking-[-0.01em]", tarjeta || !abierta ? "text-[16px]" : "text-[19px]")}>{titulo}</span>
+          {!abierta && resumen && <span className="mt-0.5 block truncate text-[13px] text-texto2">{resumen}</span>}
+        </span>
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-suave text-texto2"><ChevronDown className={cx("size-4 transition-transform", abierta && "rotate-180")} /></span>
+      </button>
+      {abierta && <div className={cx("animar", tarjeta && "px-5 pb-5")}>{children}</div>}
+    </section>
+  );
+}

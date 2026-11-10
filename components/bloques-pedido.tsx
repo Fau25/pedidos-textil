@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Check, Copy, Loader2, Minus, Paperclip, Pencil, Plus, Printer, Scissors, PaintRoller, Search, Spool, Sparkles, SprayCan, Stamp, Trash2, X } from "lucide-react";
+import { Camera, Check, ChevronDown, Copy, Loader2, Minus, Paperclip, Pencil, Plus, Printer, Scissors, PaintRoller, Search, Spool, Sparkles, SprayCan, Stamp, Trash2, X } from "lucide-react";
 import { useSesion } from "./sesion";
 import { Boton, Campo, CampoImporte, cx, useAvisos } from "./ui";
 import { Muestra, Prenda as Dibujo, colorTela } from "./muestra";
@@ -30,9 +30,10 @@ export function FotoPrenda({ path, tipo, color, className, cubrir }: { path: str
 }
 
 /* ───────── Prenda ───────── */
-export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, duplicar, quitar }: {
+export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, duplicar, quitar, abierta = true, alternar }: {
   l: LineaEd; n: number; margen: number; t?: { unidades: number; ventaUd: number; venta: number }; catalogo: Prenda[];
   proveedores: { id: string; nombre: string }[]; cambiar: (c: Partial<LineaEd>) => void; duplicar: () => void; quitar: () => void;
+  abierta?: boolean; alternar?: () => void;
 }) {
   const { empresa } = useSesion();
   const { aviso } = useAvisos();
@@ -83,9 +84,24 @@ export function TarjetaLinea({ l, n, margen, t, catalogo, proveedores, cambiar, 
     setManual(false);
   }
 
+  if (!abierta) return (
+    <button type="button" onClick={alternar} aria-expanded={false} className="tarjeta flex w-full items-center gap-3 p-3 text-left sm:p-3.5">
+      <FotoPrenda path={l.imagen_path} tipo={l.tipo} color={l.color} cubrir className="size-14 shrink-0 rounded-[14px]" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-semibold">{[l.marca, l.modelo].filter(Boolean).join(" ") || l.tipo || `Prenda ${n}`}</span>
+        <span className="flex items-center gap-1.5 truncate text-[12px] text-texto2">{l.color && <><Muestra color={l.color} />{l.color} · </>}{t?.unidades ?? 0} uds</span>
+      </span>
+      {t && t.venta > 0 && <span className="num shrink-0 text-[14px] font-semibold">{euros(t.venta)}</span>}
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-suave text-texto2"><ChevronDown className="size-4" /></span>
+    </button>
+  );
+
   return (
     <div className="tarjeta animar overflow-hidden">
-      <div className="px-4 pt-4 sm:px-5 sm:pt-5"><BuscadorPrenda catalogo={catalogo} margen={margen} n={n} elegir={elegir} manual={() => setManual(true)} /></div>
+      <div className="flex items-center gap-2 px-4 pt-4 sm:px-5 sm:pt-5">
+        <div className="min-w-0 flex-1"><BuscadorPrenda catalogo={catalogo} margen={margen} n={n} elegir={elegir} manual={() => setManual(true)} /></div>
+        {alternar && <button type="button" onClick={alternar} aria-expanded={true} aria-label={`Plegar prenda ${n}`} className="grid size-11 shrink-0 place-items-center rounded-full bg-suave text-texto2 hover:text-texto"><ChevronDown className="size-4 rotate-180" /></button>}
+      </div>
       <div className="flex gap-4 p-4 sm:p-5">
         {/* Foto */}
         <label className="group relative shrink-0 self-start cursor-pointer" title="Cambiar foto">
