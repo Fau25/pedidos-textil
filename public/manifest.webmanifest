@@ -1,0 +1,16 @@
+{
+  "name": "Mis pedidos textiles",
+  "short_name": "Pedidos",
+  "description": "Pedidos de ropa personalizada: clientes, prendas, bordados y presupuestos.",
+  "lang": "es",
+  "start_url": "/pedidos-textil/",
+  "scope": "/pedidos-textil/",
+  "display": "standalone",
+  "background_color": "#f7f7f8",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/pedidos-textil/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/pedidos-textil/icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/pedidos-textil/icono-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

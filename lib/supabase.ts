@@ -1,0 +1,41 @@
+import { createClient } from "@supabase/supabase-js";
+
+// Datos públicos del proyecto: la clave publicable está pensada para ir en el navegador.
+// La seguridad la ponen las reglas (RLS) de la base de datos.
+export const SUPABASE_URL = "https://sqartxsdlynecelkufyq.supabase.co";
+export const SUPABASE_KEY = "sb_publishable_yfnqiDl0NRnKi7u9_nHiWg_KF4fBPYJ";
+
+export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+});
+
+export const BASE = "/pedidos-textil";
+export const SITIO = "https://fau25.github.io/pedidos-textil/";
+
+/** Mensaje de error comprensible */
+export function textoError(e: unknown): string {
+  const m = (e as { message?: string })?.message ?? String(e);
+  if (/Invalid login credentials/i.test(m)) return "Email o contraseña incorrectos.";
+  if (/Email not confirmed/i.test(m)) return "Falta confirmar el email: revisa tu correo y pulsa el enlace.";
+  if (/User already registered/i.test(m)) return "Ya existe una cuenta con ese email. Prueba a entrar.";
+  if (/Password should be at least/i.test(m)) return "La contraseña debe tener al menos 6 caracteres.";
+  if (/Failed to fetch|NetworkError|network/i.test(m)) return "Sin conexión. Comprueba internet y vuelve a intentarlo.";
+  if (/violates foreign key.*clientes/i.test(m) || /restrict/i.test(m)) return "No se puede borrar: tiene pedidos asociados.";
+  if (/row-level security/i.test(m)) return "No tienes permiso para hacer este cambio.";
+  return m;
+}
+
+/** URL firmada (1 h) de un archivo privado */
+export async function urlArchivo(path?: string | null): Promise<string | null> {
+  if (!path) return null;
+  const { data } = await sb.storage.from("archivos").createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
+
+export async function subirArchivo(empresaId: string, carpeta: string, f: File): Promise<string> {
+  const ext = (f.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${empresaId}/${carpeta}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from("archivos").upload(path, f, { upsert: false, contentType: f.type || undefined });
+  if (error) throw error;
+  return path;
+}
