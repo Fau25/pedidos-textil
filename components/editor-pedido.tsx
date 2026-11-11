@@ -78,11 +78,13 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     return () => clearTimeout(t);
   }, [p, BORRADOR]);
 
-  // Al abrir: pedido nuevo con todo desplegado; uno existente con las prendas plegadas
+  // Al abrir: pedido nuevo con los bloques plegados; uno existente con cliente y prendas plegados
   useEffect(() => {
     if (!p || lineasAbiertas) return;
     setLineasAbiertas(new Set(p.nuevo ? p.lineas.map((l) => l.clave) : []));
-    if (!p.nuevo) setAbiertos({ cliente: false, prendas: true, pers: true, notas: !!p.notas });
+    // Pedido nuevo: todos los bloques plegados (al abrir Prendas, la prenda vacía ya sale lista para rellenar)
+    if (p.nuevo) setAbiertos({ cliente: false, prendas: false, pers: false, notas: false });
+    else setAbiertos({ cliente: false, prendas: true, pers: true, notas: !!p.notas });
   }, [p, lineasAbiertas]);
   const alternar = (k: string) => setAbiertos((a) => ({ ...a, [k]: !a[k] }));
   const alternarLinea = (k: string) => setLineasAbiertas((s) => { const x = new Set(s); if (x.has(k)) x.delete(k); else x.add(k); return x; });

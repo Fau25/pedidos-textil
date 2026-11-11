@@ -84,13 +84,18 @@ await prueba("la ficha «Nuevo pedido» abre el editor y guarda todo en una sola
   await p.waitForURL(/pedidos\/nuevo/); await p.waitForTimeout(800);
   assert.equal(await p.getByText("Entrega prevista").count(), 0, "sin fecha de entrega");
   assert.equal(await p.getByText(/Precio de compra|Coste \/ ud/).count(), 0, "sin precio de coste");
+  // en un pedido nuevo los bloques empiezan plegados
+  assert.equal(await p.getByLabel("Buscar cliente").count(), 0, "bloques plegados al empezar");
+  await p.getByRole("button", { name: /Cliente y fecha/ }).click();
   await p.getByLabel("Buscar cliente").click(); await p.getByRole("option", { name: /Club Deportivo/ }).click();
+  await p.getByRole("button", { name: /^Prendas/ }).click();
   await p.getByLabel("Buscar prenda 1").fill("beagle");
   await p.getByRole("option", { name: /Roly Beagle/ }).click();
   assert.match(await p.locator("main").innerText(), /Roly Beagle/, "rellena el modelo");
   await p.getByRole("button", { name: "Blanco", exact: true }).click();
   await p.getByLabel("Cantidad talla M").fill("10"); await p.getByLabel("Cantidad talla L").fill("5");
   await p.getByLabel("Precio / ud").fill("4,50");
+  await p.getByRole("button", { name: /^Personalización/ }).click();
   await p.getByRole("radio", { name: "Bordado" }).click();
   assert.match(await p.locator("main").innerText(), /Ubicación/, "al elegir la técnica salen sus características");
   await p.getByRole("button", { name: "Guardar pedido" }).click(); await p.waitForTimeout(1000);
