@@ -249,6 +249,24 @@ await prueba("el ticket del pedido se genera y se puede enviar o descargar", asy
   assert.deepEqual(errores, []); await ctx.close();
 });
 
+await prueba("borrar la cuenta pide escribir BORRAR, borra los archivos y llama a borrar_mi_cuenta", async () => {
+  const { ctx, p, escrituras, errores } = await abrir();
+  await ctx.route("**/storage/v1/object/list/archivos", async (r) => { const { prefix } = r.request().postDataJSON();
+    const d = { [E]: [{ name: "logo", id: null }, { name: "disenos", id: null }], [E + "/logo"]: [{ name: "a.png", id: "1" }], [E + "/disenos"]: [{ name: "b.pdf", id: "2" }] };
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(d[prefix] ?? []) }); });
+  let borrados = null;
+  await ctx.route("**/storage/v1/object/archivos", async (r) => { if (r.request().method() === "DELETE") borrados = r.request().postDataJSON().prefixes; r.fulfill({ status: 200, contentType: "application/json", body: "[]" }); });
+  await ir(p, "ajustes/");
+  await p.getByRole("button", { name: "Borrar mi cuenta" }).click();
+  const boton = p.getByRole("button", { name: "Borrar definitivamente" });
+  assert.ok(await boton.isDisabled(), "sin escribir BORRAR no se puede");
+  await p.getByLabel("Escribe BORRAR para confirmar").fill("borrar");
+  await boton.click(); await p.waitForTimeout(1500);
+  assert.deepEqual(borrados?.sort(), [E + "/disenos/b.pdf", E + "/logo/a.png"]);
+  assert.ok(escrituras.some((x) => /rpc\/borrar_mi_cuenta/.test(x.url)), "llama a la función de borrado");
+  await ctx.close();
+});
+
 await navegador.close(); servidor.close();
 if (fallos) { console.log(`\n${fallos} prueba(s) fallida(s)`); process.exit(1); }
 console.log("\nTodas las pruebas de pantalla pasan");

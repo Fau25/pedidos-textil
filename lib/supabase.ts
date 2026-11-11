@@ -111,3 +111,27 @@ export async function salir() {
   try { await caches.delete("pedidos-textil-fotos-1"); } catch { /* sin caché */ }
   await sb.auth.signOut();
 }
+
+/** Borra la cuenta del usuario y todos sus datos: archivos del taller (si es propietario), base de datos y acceso */
+export async function borrarCuenta(empresaId: string | null, propietario: boolean) {
+  if (empresaId && propietario) {
+    // Archivos del taller (logo, diseños, fotos de prendas): se listan carpeta a carpeta y se borran
+    const rutas: string[] = [];
+    const recorrer = async (carpeta: string) => {
+      for (let desde = 0; ; desde += 1000) {
+        const { data, error } = await sb.storage.from("archivos").list(carpeta, { limit: 1000, offset: desde });
+        if (error) throw error;
+        for (const x of data ?? []) { const r = `${carpeta}/${x.name}`; if (x.id) rutas.push(r); else await recorrer(r); }
+        if (!data || data.length < 1000) break;
+      }
+    };
+    await recorrer(empresaId);
+    for (let i = 0; i < rutas.length; i += 100) {
+      const { error } = await sb.storage.from("archivos").remove(rutas.slice(i, i + 100));
+      if (error) throw error;
+    }
+  }
+  const { error } = await sb.rpc("borrar_mi_cuenta");
+  if (error) throw error;
+  await salir();
+}

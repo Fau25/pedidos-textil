@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Campo, Tarjeta, cx, useAvisos } from "@/components/ui";
-import { sb, subirArchivo, subirFotosRoly, textoError, urlArchivo } from "@/lib/supabase";
+import { borrarCuenta, sb, subirArchivo, subirFotosRoly, textoError, urlArchivo } from "@/lib/supabase";
 import { borrarEjemplo, cargarEjemplo } from "@/lib/ejemplo";
 import { descargarCopia } from "@/lib/copia";
 import { Invitados } from "@/components/invitados";
@@ -21,7 +21,7 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "2.10.1";
+const VERSION = "2.11.0";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();
@@ -119,6 +119,8 @@ export default function Ajustes() {
           </form>
           <p className="mt-4 text-[12px] text-texto2">Cada persona invitada crea su propia cuenta desde la pantalla de acceso y tiene sus datos separados. Versión {VERSION}.</p>
         </Tarjeta>
+
+        <BorrarCuenta />
       </div>
     </>
   );
@@ -144,6 +146,44 @@ function FotosRoly() {
           } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendo(null); }
         }} />
       </label>
+    </Tarjeta>
+  );
+}
+
+/** Borrar la cuenta y todos sus datos, con confirmación escribiendo BORRAR */
+function BorrarCuenta() {
+  const { empresa, rol, sesion } = useSesion();
+  const { aviso } = useAvisos();
+  const [abierta, setAbierta] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [borrando, setBorrando] = useState(false);
+  const propietario = rol === "propietario";
+  return (
+    <Tarjeta titulo="Borrar cuenta">
+      <p className="mb-4 text-[13px] text-texto2">
+        {propietario
+          ? "Borra tu cuenta y todos los datos de tu taller: pedidos, clientes, catálogo, tarifas, logotipo y diseños. No se puede deshacer. Antes, descarga una copia en Excel por si la necesitas."
+          : "Borra tu cuenta y tu acceso a este taller. Los datos del taller son de su propietario y no se borran."}
+      </p>
+      {!abierta ? (
+        <Boton variante="peligro" onClick={() => { setAbierta(true); setTexto(""); }}><Trash2 className="size-4" />Borrar mi cuenta</Boton>
+      ) : (
+        <form className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30" onSubmit={async (ev) => {
+          ev.preventDefault(); if (texto.trim().toUpperCase() !== "BORRAR") return;
+          setBorrando(true);
+          try { await borrarCuenta(empresa?.id ?? null, propietario); location.replace("/pedidos-textil/"); }
+          catch (err) { aviso(textoError(err), "error"); setBorrando(false); }
+        }}>
+          <p className="text-[14px] font-semibold text-red-700 dark:text-red-300">Vas a borrar la cuenta {sesion?.user.email} {propietario ? "y todos los datos del taller" : ""}.</p>
+          <label className="block text-[13px] text-texto2">Escribe <b className="text-texto">BORRAR</b> para confirmar
+            <input className="campo mt-1.5" autoFocus autoComplete="off" value={texto} onChange={(ev) => setTexto(ev.target.value)} aria-label="Escribe BORRAR para confirmar" />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Boton type="submit" variante="peligro" cargando={borrando} disabled={texto.trim().toUpperCase() !== "BORRAR"}>Borrar definitivamente</Boton>
+            <Boton type="button" onClick={() => setAbierta(false)} disabled={borrando}>Cancelar</Boton>
+          </div>
+        </form>
+      )}
     </Tarjeta>
   );
 }
