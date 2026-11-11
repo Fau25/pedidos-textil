@@ -8,7 +8,6 @@ import { Home, ShoppingBag, Users, Shirt, Settings, Plus, Search, Moon, Sun, Log
 import { Logo } from "./logo";
 import { cx } from "./ui";
 import { useSesion } from "./sesion";
-import { sb } from "@/lib/supabase";
 import { salir } from "@/lib/supabase";
 
 const NAV = [

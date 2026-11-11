@@ -11,6 +11,7 @@ import { calcular, euros } from "@/lib/calculo";
 import { aCalc, cargarPedido, describirLinea, marcarEntregado, textoTallas } from "@/lib/pedidos";
 import { compartirPDF, ticketDe } from "@/lib/presupuestos";
 import { Ticket } from "@/components/ticket";
+import { IconoWhatsApp, enlaceWa } from "@/components/whatsapp";
 import type { Cliente } from "@/lib/tipos";
 
 export default function Ficha() {
@@ -45,6 +46,11 @@ export default function Ficha() {
     try { const r = await compartirPDF(ed.id, empresa!); if (r === "descargado") aviso("PDF descargado"); }
     catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
   }
+  /** Mensaje ya escrito para avisar al cliente por WhatsApp */
+  function mensajeListo() {
+    const quien = (cliente?.contacto || cliente?.nombre || "").split(" ")[0];
+    return `Hola${quien ? " " + quien : ""}, tu pedido ${ed.numero} (${t?.unidades ?? 0} prendas) ya está listo para recoger. Total: ${euros(t?.total ?? 0)}. ¡Gracias! ${empresa!.nombre}`;
+  }
   async function borrar() {
     if (!(await confirmar({ titulo: `¿Eliminar ${ed.numero}?`, texto: "Se borran sus prendas y personalizaciones. No se puede deshacer.", ok: "Eliminar", peligro: true }))) return;
     const { error } = await sb.from("pedidos").delete().eq("id", ed.id);
@@ -75,7 +81,7 @@ export default function Ficha() {
 
       {/* Estado: un toque */}
       <div className={cx("tarjeta mb-6 flex flex-wrap items-center gap-4 p-4", ed.entregado && "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30")}>
-        <div className="flex-1">
+        <div className="w-full sm:w-auto sm:flex-1">
           {ed.entregado ? (
             <><p className="font-semibold text-emerald-800 dark:text-emerald-300">Entregado {pedido.entregado_en ? "el " + fecha(pedido.entregado_en, true) : ""}</p><p className="text-[13px] text-texto2">Trabajo terminado.</p></>
           ) : (
@@ -83,9 +89,15 @@ export default function Ficha() {
               <p className="text-[13px] text-texto2">Pedido el {fecha(ed.fecha, true)}</p></>
           )}
         </div>
+        {cliente?.telefono && (
+          <a href={enlaceWa(cliente.telefono, mensajeListo())} target="_blank" rel="noopener noreferrer"
+            className="inline-flex h-11 items-center gap-2 rounded-full border border-borde bg-superficie px-5 text-[14px] font-medium hover:bg-acento-suave">
+            <IconoWhatsApp className="size-4" />{ed.entregado ? "Escribir por WhatsApp" : "Avisar: pedido listo"}
+          </a>
+        )}
         {ed.entregado
           ? <Boton cargando={ocupado === "entrega"} onClick={() => entregar(false)}><Undo2 className="size-4" />Volver a pendiente</Boton>
-          : <Boton variante="primario" cargando={ocupado === "entrega"} onClick={() => entregar(true)} className="bg-emerald-600 hover:bg-emerald-700"><Check className="size-4" />Marcar entregado</Boton>}
+          : <Boton variante="primario" cargando={ocupado === "entrega"} onClick={() => entregar(true)} className="bg-emerald-700 hover:bg-emerald-800"><Check className="size-4" />Marcar entregado</Boton>}
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">

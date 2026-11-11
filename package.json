@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "test": "node --test lib/*.test.ts",
-    "prueba:pantallas": "node pruebas/flujos.mjs"
+    "prueba:pantallas": "node pruebas/flujos.mjs",
+    "lint": "oxlint app components lib --deny-warnings",
+    "prueba:sql": "node pruebas/sql.mjs"
   },
   "repository": {
     "type": "git",
@@ -32,11 +34,13 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@fontsource/plus-jakarta-sans": "^5.3.0",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "oxlint": "^1.93.0",
     "playwright-core": "^1.65.0",
     "postcss": "^8.5.32",
     "tailwindcss": "^4.3.5",

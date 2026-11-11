@@ -21,7 +21,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - name: Revisión del código
+        run: npm run lint
       - run: npm test
+      - name: Pruebas de la base de datos (permisos, conflictos, borrar cuenta)
+        run: npm run prueba:sql
       - run: npm run build
       - name: Pruebas de pantallas (datos simulados)
         run: npm run prueba:pantallas

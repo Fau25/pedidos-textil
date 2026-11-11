@@ -5,12 +5,14 @@ import { Plus, Loader2, ChevronDown, Ticket as IconoTicket, Tag, Phone, Mail } f
 import { Ticket } from "./ticket";
 import { ticketDe } from "@/lib/presupuestos";
 import { useSesion } from "./sesion";
-import { Boton, Campo, CampoImporte, Tarjeta, cx, useAvisos } from "./ui";
+import { Boton, CampoImporte, Tarjeta, cx, useAvisos } from "./ui";
 import { sb, textoError } from "@/lib/supabase";
 import { calcular, euros, tarifaPara, sumaUnidades } from "@/lib/calculo";
-import { aCalc, claveBorrador, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, cargarPedido, pedidoGuardado, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
+import { IconoWhatsApp, enlaceWa } from "./whatsapp";
+import { aCalc, claveBorrador, claveCambios, esConflicto, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, cargarPedido, pedidoGuardado, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
 import { SelectorCliente } from "./selector-cliente";
-import { SelectorTecnica, TarjetaLinea, TarjetaPers } from "./bloques-pedido";
+import { TarjetaLinea } from "./bloques-pedido";
+import { SelectorTecnica, TarjetaPers } from "./bloque-personalizacion";
 export { SelectorCliente };
 import type { Cliente, Prenda } from "@/lib/tipos";
 
@@ -18,6 +20,7 @@ import type { Cliente, Prenda } from "@/lib/tipos";
 export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null; duplicarDe: string | null }) {
   const { empresa, tecnicas, tarifas, proveedores, sesion } = useSesion();
   const BORRADOR = claveBorrador(sesion!.user.id);
+  const CAMBIOS = pedidoId ? claveCambios(sesion!.user.id, pedidoId) : null;
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { aviso, confirmar } = useAvisos();
   const router = useRouter();
@@ -40,6 +43,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [errorCliente, setErrorCliente] = useState(false);
   const cambiado = useRef(false);
+  const cerrado = useRef(false); // ya guardado o descartado: no volver a apuntar borradores
 
   // Carga inicial: clientes, catálogo y pedido a la vez. Clientes y catálogo salen al momento de la copia local
   useEffect(() => {
@@ -59,6 +63,17 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
         if (copia) setP(copia); // al instante; se sustituye por el del servidor si aún no se ha tocado nada
         const r = await cargarPedido(pedidoId);
         if (!r) { aviso("No se encuentra el pedido", "error"); return router.replace("/pedidos/"); }
+        // ¿Quedaron cambios sin guardar de la última vez (app cerrada, gesto de atrás…)? Se recuperan
+        let previos: PedidoEd | null = null;
+        try { previos = JSON.parse(localStorage.getItem(CAMBIOS!) || "null"); } catch { /* nada */ }
+        if (previos && !cambiado.current) {
+          cambiado.current = true; setP(previos);
+          aviso("Hemos recuperado los cambios que no guardaste", "ok", { texto: "Descartar", fn: () => {
+            try { localStorage.removeItem(CAMBIOS!); } catch { /* nada */ }
+            cambiado.current = false; setGuardando(""); setP(r.ed);
+          } });
+          return;
+        }
         if (!cambiado.current) setP(r.ed);
         return;
       }
@@ -84,10 +99,12 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   // Borrador local si es nuevo (agrupado: no en cada letra); un pedido existente se guarda al pulsar Guardar
   useEffect(() => {
     if (!p || !cambiado.current) return;
-    if (!p.nuevo) { setGuardando("pendiente"); return; }
-    const t = setTimeout(() => { try { localStorage.setItem(BORRADOR, JSON.stringify(p)); } catch {} }, 400);
+    if (!p.nuevo) setGuardando("pendiente");
+    const k = p.nuevo ? BORRADOR : CAMBIOS;
+    if (!k) return;
+    const t = setTimeout(() => { if (cerrado.current) return; try { localStorage.setItem(k, JSON.stringify(p)); } catch {} }, 400);
     return () => clearTimeout(t);
-  }, [p, BORRADOR]);
+  }, [p, BORRADOR, CAMBIOS]);
 
   // Al abrir: pedido nuevo con los bloques plegados; uno existente con cliente y prendas plegados
   useEffect(() => {
@@ -123,8 +140,20 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     setEnviando(true);
     if (temporizador.current) { clearTimeout(temporizador.current); temporizador.current = null; } // sin guardados solapados
     try {
-      await guardarPedido(p, empresa!);
-      if (p.nuevo) try { localStorage.removeItem(BORRADOR); } catch {}
+      try { await guardarPedido(p, empresa!); }
+      catch (e) {
+        if (!esConflicto(e)) throw e;
+        const pisar = await confirmar({ titulo: "Otra persona ha cambiado este pedido", texto: "Lo guardaron mientras lo editabas. Si guardas, tus cambios sustituyen a los suyos. Si no, se abre su versión y pierdes lo que has cambiado aquí.", ok: "Guardar los míos", peligro: true });
+        if (!pisar) {
+          cerrado.current = true;
+          try { if (CAMBIOS) localStorage.removeItem(CAMBIOS); } catch { /* nada */ }
+          setGuardando(""); location.reload(); return;
+        }
+        await guardarPedido(p, empresa!, true);
+      }
+      cerrado.current = true;
+      try { localStorage.removeItem(p.nuevo ? BORRADOR : CAMBIOS!); } catch {}
+      setGuardando("");
       aviso(p.nuevo ? "Pedido creado" : "Cambios guardados");
       router.push(`/pedidos/ver/?id=${p.id}`);
     } catch (e) { aviso(textoError(e), "error"); setEnviando(false); }
@@ -135,10 +164,14 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     if (!p) return;
     if (p.nuevo) {
       if (cambiado.current && !(await confirmar({ titulo: "¿Salir sin guardar?", texto: "El pedido no se creará y se perderá lo que has escrito.", ok: "Salir sin guardar", peligro: true }))) return;
+      cerrado.current = true;
       try { localStorage.removeItem(BORRADOR); } catch {}
       return router.push("/pedidos/");
     }
     if (cambiado.current && !(await confirmar({ titulo: "¿Salir sin guardar?", texto: "Los cambios que has hecho no se guardarán.", ok: "Salir sin guardar", peligro: true }))) return;
+    cerrado.current = true;
+    try { if (CAMBIOS) localStorage.removeItem(CAMBIOS); } catch { /* nada */ }
+    setGuardando("");
     router.push(`/pedidos/ver/?id=${p.id}`);
   }
 
@@ -236,17 +269,16 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
               <Fila t="Personalización" v={euros(t.ventaPers)} />
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-texto2">Gastos adicionales</dt>
-                <CampoImporte className="w-28" valor={p.gastos_venta || null} cambiar={(v) => set((x) => ({ ...x, gastos_venta: v ?? 0 }))} aria-label="Gastos adicionales (venta)" />
+                <dd><CampoImporte className="w-28" valor={p.gastos_venta || null} cambiar={(v) => set((x) => ({ ...x, gastos_venta: v ?? 0 }))} aria-label="Gastos adicionales (venta)" /></dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-texto2">Descuento</dt>
-                <div className="relative w-28"><input inputMode="decimal" aria-label="Descuento en %" className="campo num pr-7 text-right" value={p.descuento_pct || ""} placeholder="0"
+                <dd className="relative w-28"><input inputMode="decimal" aria-label="Descuento en %" className="campo num pr-7 text-right" value={p.descuento_pct || ""} placeholder="0"
                   onChange={(e) => { const n = Number(e.target.value.replace(",", ".")); set((x) => ({ ...x, descuento_pct: Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0 })); }} />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-texto2">%</span></div>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-texto2">%</span></dd>
               </div>
-              {t.descuento > 0 && <Fila t="" v={"−" + euros(t.descuento)} />}
-              <div className="my-2 border-t border-borde" />
-              <Fila t="Base imponible" v={euros(t.base)} />
+              {t.descuento > 0 && <Fila t="Descuento aplicado" v={"−" + euros(t.descuento)} />}
+              <Fila t="Base imponible" v={euros(t.base)} linea />
               <div className="flex items-center justify-between">
                 <dt className="flex items-center gap-1 text-texto2">IVA
                   <select className="ml-1 h-9 rounded-lg bg-suave px-2 text-[13px]" value={p.iva} onChange={(e) => set((x) => ({ ...x, iva: Number(e.target.value) }))} aria-label="Tipo de IVA">
@@ -282,10 +314,9 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   );
 }
 
-const Fila = ({ t, v }: { t: string; v: string }) => <div className="flex justify-between gap-3"><dt className="text-texto2">{t}</dt><dd className="num">{v}</dd></div>;
+const Fila = ({ t, v, linea }: { t: string; v: string; linea?: boolean }) => <div className={cx("flex justify-between gap-3", linea && "mt-2 border-t border-borde pt-3")}><dt className="text-texto2">{t}</dt><dd className="num">{v}</dd></div>;
 
 
-const fechaCorta = (f: string) => { try { return new Date(f + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }); } catch { return f; } };
 
 /** Bloque que se pliega: título (y resumen cuando está plegado) */
 function Seccion({ titulo, resumen, abierta, alternar, tarjeta, id, children }: {
@@ -307,7 +338,6 @@ function Seccion({ titulo, resumen, abierta, alternar, tarjeta, id, children }: 
 }
 
 const iniciales = (n: string) => n.split(/\s+/).filter((w) => w.length > 2 || /^[A-ZÁÉÍÓÚÑ]/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || n.slice(0, 2).toUpperCase();
-const telWa = (t: string) => { const d = t.replace(/\D/g, ""); return d.length === 9 ? "34" + d : d; };
 
 /** Ficha oscura del cliente elegido: llamar, WhatsApp, email y cambiar */
 function FichaCliente({ c, cambiar }: { c: Cliente; cambiar: () => void }) {
@@ -325,19 +355,9 @@ function FichaCliente({ c, cambiar }: { c: Cliente; cambiar: () => void }) {
       </div>
       <div className="flex gap-2.5">
         {c.telefono ? <a href={`tel:${c.telefono.replace(/\s/g, "")}`} aria-label={`Llamar a ${c.nombre}`} title="Llamar" className={accion}><Phone className="size-[18px]" /></a> : <span className={apagada} title="Sin teléfono"><Phone className="size-[18px]" /></span>}
-        {c.telefono ? <a href={`https://wa.me/${telWa(c.telefono)}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp a ${c.nombre}`} title="WhatsApp" className={accion}><IconoWhatsApp /></a> : <span className={apagada} title="Sin teléfono"><IconoWhatsApp /></span>}
+        {c.telefono ? <a href={enlaceWa(c.telefono)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp a ${c.nombre}`} title="WhatsApp" className={accion}><IconoWhatsApp /></a> : <span className={apagada} title="Sin teléfono"><IconoWhatsApp /></span>}
         {c.email ? <a href={`mailto:${c.email}`} aria-label={`Email a ${c.nombre}`} title="Email" className={accion}><Mail className="size-[18px]" /></a> : <span className={apagada} title="Sin email"><Mail className="size-[18px]" /></span>}
       </div>
     </div>
-  );
-}
-
-/** Icono de WhatsApp (bocadillo con teléfono), en trazo como los demás */
-function IconoWhatsApp() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.4z" />
-      <path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-1.8-1.8l.8-1-1-2z" strokeWidth="1.5" />
-    </svg>
   );
 }

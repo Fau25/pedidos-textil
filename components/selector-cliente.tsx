@@ -37,7 +37,7 @@ export function SelectorCliente({ clientes, valor, cambiar, creado, error }: { c
       <span className="mb-1.5 block text-[12px] font-medium text-texto2">Cliente</span>
       <div className={cx("campo flex items-center gap-2 px-3", error && "border-red-500")}>
         <Search className="size-4 shrink-0 text-texto2" />
-        <input role="combobox" aria-expanded={abierto} aria-label="Buscar cliente" className="h-full flex-1 bg-transparent outline-none"
+        <input role="combobox" aria-expanded={abierto} aria-controls="lista-clientes" aria-autocomplete="list" aria-label="Buscar cliente" className="h-full flex-1 bg-transparent outline-none"
           placeholder={actual ? actual.nombre : "Buscar o crear cliente…"} value={abierto ? q : actual?.nombre ?? q}
           onFocus={() => { setAbierto(true); setQ(""); setSel(0); }}
           onChange={(e) => { setQ(e.target.value); setAbierto(true); setSel(0); }}
@@ -51,7 +51,7 @@ export function SelectorCliente({ clientes, valor, cambiar, creado, error }: { c
       </div>
       {error && <span className="mt-1 block text-[12px] text-red-600">Elige o crea un cliente</span>}
       {abierto && (
-        <div className="animar absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-borde bg-superficie p-1 shadow-xl" role="listbox">
+        <div className="animar absolute inset-x-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-borde bg-superficie p-1 shadow-xl" role="listbox" id="lista-clientes">
           {opciones.map((o, i) => (
             <button key={"c" in o ? o.c.id : "nuevo"} role="option" aria-selected={i === sel} onMouseEnter={() => setSel(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => elegir(o)}
               className={cx("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left", i === sel && "bg-suave")}>

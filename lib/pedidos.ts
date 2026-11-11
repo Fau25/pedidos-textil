@@ -22,6 +22,8 @@ export type PedidoEd = {
   cliente_id: string | null; fecha: string; entrega: string | null; entregado: boolean;
   referencia: string; notas: string; descuento_pct: number; gastos_coste: number; gastos_venta: number; iva: number;
   lineas: LineaEd[]; pers: PersEd[];
+  /** Cuándo se guardó por última vez en la base (para avisar si otra persona lo cambia mientras se edita) */
+  editado?: string | null;
 };
 
 /** Fecha local (no UTC) en formato AAAA-MM-DD, desplazada n días */
@@ -29,6 +31,8 @@ export function diaLocal(n = 0) { const d = new Date(); d.setDate(d.getDate() + 
 export const hoy = () => diaLocal(0);
 /** El borrador de «nuevo pedido» es de cada usuario (por si varios comparten dispositivo) */
 export const claveBorrador = (uid: string) => `pedido-borrador-${uid}`;
+/** Cambios sin guardar de un pedido ya existente (se recuperan si se cierra la app) */
+export const claveCambios = (uid: string, pid: string) => `cambios:${uid}:${pid}`;
 export const id = () => crypto.randomUUID();
 
 export function lineaVacia(margen: number, base?: Partial<LineaEd>): LineaEd {
@@ -68,6 +72,7 @@ export async function cargarPedido(pid: string): Promise<{ ed: PedidoEd; pedido:
     id: ped.id, numero: ped.numero, nuevo: false, cliente_id: ped.cliente_id, fecha: ped.fecha, entrega: ped.entrega,
     entregado: ped.entregado, referencia: ped.referencia ?? "", notas: ped.notas ?? "",
     descuento_pct: Number(ped.descuento_pct), gastos_coste: Number(ped.gastos_coste), gastos_venta: Number(ped.gastos_venta), iva: Number(ped.iva),
+    editado: ped.editado ?? null,
     lineas: ((l.data ?? []) as Linea[]).map((r) => {
       const tallas: Record<string, number> = {};
       const orden = [...(r.linea_tallas ?? [])].sort((a, b) => a.orden - b.orden);
@@ -91,16 +96,16 @@ export async function cargarPedido(pid: string): Promise<{ ed: PedidoEd; pedido:
 /** Guarda el pedido completo en una sola transacción (función guardar_pedido de la base de datos).
  *  Los guardados se ponen en cola para que nunca se solapen (autoguardado + botón). Devuelve el número. */
 let cola: Promise<unknown> = Promise.resolve();
-export function guardarPedido(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">): Promise<string> {
-  const r = cola.then(() => guardarAhora(p, empresa));
+export function guardarPedido(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">, forzar = false): Promise<string> {
+  const r = cola.then(() => guardarAhora(p, empresa, forzar));
   cola = r.catch(() => {});
   return r;
 }
-async function guardarAhora(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">): Promise<string> {
+async function guardarAhora(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">, forzar: boolean): Promise<string> {
   const t = calcular(aCalc(p, Number(empresa.margen)));
   const clavesL = new Set(p.lineas.map((l) => l.clave));
   const datos = {
-    id: p.id, empresa_id: empresa.id, cliente_id: p.cliente_id, fecha: p.fecha, entrega: p.entrega || null, entregado: p.entregado,
+    id: p.id, empresa_id: empresa.id, editado_base: p.nuevo ? null : p.editado ?? null, forzar, cliente_id: p.cliente_id, fecha: p.fecha, entrega: p.entrega || null, entregado: p.entregado,
     referencia: p.referencia, notas: p.notas, descuento_pct: p.descuento_pct || 0, gastos_coste: p.gastos_coste || 0,
     gastos_venta: p.gastos_venta || 0, iva: p.iva, coste: aEuros(t.coste), base: aEuros(t.base), total: aEuros(t.total), unidades: t.unidades,
     lineas: p.lineas.map((l, i) => ({
@@ -116,8 +121,11 @@ async function guardarAhora(p: PedidoEd, empresa: Pick<Empresa, "id" | "margen">
   };
   const { data, error } = await sb.rpc("guardar_pedido", { p: datos });
   if (error) throw error;
-  return data as string;
+  return typeof data === "string" ? data : (data as { numero: string }).numero;
 }
+
+/** El guardado se rechazó porque otra persona cambió el pedido después de abrirlo */
+export const esConflicto = (e: unknown) => /CONFLICTO/.test(String((e as { message?: string })?.message ?? e));
 
 const ORDEN_TALLAS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"];
 export function ordenTalla(t: string, i = 0) {

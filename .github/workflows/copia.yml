@@ -1,0 +1,35 @@
+name: Copia de seguridad
+# Cada domingo: base de datos + archivos de Supabase, cifrados con tu clave, guardados 90 días en GitHub.
+# Necesita 3 secretos (Settings → Secrets and variables → Actions): SUPABASE_DB_URL, SUPABASE_SERVICE_KEY y COPIA_CLAVE.
+on:
+  schedule: [{ cron: "17 3 * * 0" }]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  copia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar secretos
+        env: { A: "${{ secrets.SUPABASE_DB_URL }}", B: "${{ secrets.SUPABASE_SERVICE_KEY }}", C: "${{ secrets.COPIA_CLAVE }}" }
+        run: |
+          if [ -z "$A" ] || [ -z "$B" ] || [ -z "$C" ]; then echo "::error::Faltan secretos: SUPABASE_DB_URL, SUPABASE_SERVICE_KEY y COPIA_CLAVE"; exit 1; fi
+      - name: Base de datos (pg_dump)
+        env: { DB: "${{ secrets.SUPABASE_DB_URL }}" }
+        run: |
+          mkdir -p copia
+          docker run --rm -e DB postgres:17 sh -c 'pg_dump "$DB" --no-owner --no-privileges -n public -n auth -Fc' > copia/base.dump
+          ls -l copia/base.dump && test -s copia/base.dump
+      - name: Archivos (logos, diseños, fotos de Roly)
+        env: { SUPABASE_SERVICE_KEY: "${{ secrets.SUPABASE_SERVICE_KEY }}" }
+        run: node scripts/copia-archivos.mjs copia/archivos
+      - name: Empaquetar y cifrar con tu clave
+        env: { CLAVE: "${{ secrets.COPIA_CLAVE }}" }
+        run: |
+          F=copia-$(date +%F).tar.gz
+          tar czf "$F" copia
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$CLAVE" --symmetric --cipher-algo AES256 -o "$F.gpg" "$F"
+          rm -rf copia "$F"; echo "F=$F.gpg" >> $GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with: { name: "${{ env.F }}", path: "${{ env.F }}", retention-days: 90, compression-level: 0 }

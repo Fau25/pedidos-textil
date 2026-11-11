@@ -18,9 +18,9 @@ export type Prenda = {
 };
 export type Pedido = {
   id: string; empresa_id: string; numero: string; cliente_id: string | null; fecha: string; entrega: string | null;
-  estado_id: string | null; referencia: string | null; notas: string | null; descuento_pct: number; gastos_coste: number;
+  referencia: string | null; notas: string | null; descuento_pct: number; gastos_coste: number;
   gastos_venta: number; iva: number; coste: number; base: number; total: number; unidades: number; creado: string; actualizado: string;
-  entregado: boolean; entregado_en: string | null;
+  entregado: boolean; entregado_en: string | null; editado?: string | null;
   clientes?: { nombre: string } | null;
 };
 export type Linea = {

@@ -7,7 +7,7 @@ import { Cabecera } from "@/components/marco";
 import { Boton, Campo, CampoImporte, Cargando, Hoja, Pestanas, Tarjeta, Vacio, cx, useAvisos } from "@/components/ui";
 import { ImportarTarifa } from "@/components/importar-tarifa";
 import { Muestra } from "@/components/muestra";
-import { sb, subirArchivo, textoError } from "@/lib/supabase";
+import { borrarConDeshacer, sb, subirArchivo, textoError } from "@/lib/supabase";
 import { FotoPrenda } from "@/components/bloques-pedido";
 import { useCarga } from "@/lib/usar";
 import { TIPOS_PRENDA, type Prenda, type Proveedor, type TarifaFila } from "@/lib/tipos";
@@ -26,7 +26,7 @@ export default function Catalogo() {
 
 function Prendas() {
   const { empresa, proveedores } = useSesion();
-  const { aviso, confirmar } = useAvisos();
+  const { aviso } = useAvisos();
   const [ed, setEd] = useState<Partial<Prenda> | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -83,8 +83,8 @@ function Prendas() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 xl:gap-4">
             {lista.slice(0, 300).map((p) => (
               <article key={p.id} className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-[#e6e6e6] shadow-[0_8px_24px_rgba(20,30,60,.10)] dark:bg-superficie">
-                <button className="absolute inset-0 text-left" aria-label={`Ver ${p.modelo || p.tipo} en grande`} onClick={() => setVista(p)}>
-                  <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} cubrir className="absolute inset-0 size-full rounded-none" />
+                <button className="absolute inset-0 text-left" onClick={() => setVista(p)}>
+                  <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} cubrir mini className="absolute inset-0 size-full rounded-none" />
                   <span className="franja absolute inset-x-2 bottom-2 flex flex-col gap-1.5 rounded-2xl px-3 py-2.5">
                     <span className="flex min-w-0 items-baseline justify-between gap-2">
                       <span className="truncate text-[14px] font-bold">{p.modelo || p.tipo}</span>
@@ -96,6 +96,7 @@ function Prendas() {
                       {!p.colores.length && <span className="text-[11px] text-texto2">Sin colores</span>}
                     </span>
                   </span>
+                  <span className="sr-only">, ver en grande</span>
                 </button>
                 <button aria-label={p.favorito ? "Quitar de habituales" : "Marcar como habitual"} title={p.favorito ? "Habitual" : "Marcar como habitual"} onClick={() => estrella(p)}
                   className={cx("franja absolute right-2.5 top-2.5 grid size-10 place-items-center rounded-full text-[17px]", p.favorito ? "text-azul" : "text-texto2 hover:text-azul")}>{p.favorito ? "★" : "☆"}</button>
@@ -108,7 +109,7 @@ function Prendas() {
       {vista && <VerPrenda p={vista} cerrar={() => setVista(null)} editar={() => { const p = vista; setVista(null); setEd({ ...p, precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }); }} />}
       <Hoja abierta={!!ed} cerrar={() => setEd(null)} titulo={ed?.id ? "Editar prenda" : "Nueva prenda"}
         pie={<>
-          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar prenda" onClick={async () => { if (!(await confirmar({ titulo: "¿Quitar del catálogo?", ok: "Quitar", peligro: true }))) return; const { error: e } = await sb.from("catalogo").delete().eq("id", ed.id!); if (e) return aviso(textoError(e), "error"); setEd(null); recargar(); aviso("Prenda quitada del catálogo"); }}><Trash2 className="size-4" /></Boton>}
+          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar prenda" onClick={() => { const fila = datos?.find((x) => x.id === ed.id); if (!fila) return; setEd(null); borrarConDeshacer("catalogo", fila, "Prenda quitada del catálogo", aviso, recargar); }}><Trash2 className="size-4" /></Boton>}
           <Boton onClick={() => setEd(null)}>Cancelar</Boton><Boton variante="primario" type="submit" form="f-prenda" cargando={guardando}>Guardar</Boton>
         </>}>
         {ed && (
@@ -118,7 +119,7 @@ function Prendas() {
               <span className="absolute bottom-2 right-2 grid size-9 place-items-center rounded-full bg-superficie text-texto2 shadow group-hover:text-azul">{subiendoFoto ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}</span>
               <input type="file" accept="image/*" className="sr-only" aria-label="Subir foto del producto" onChange={async (e) => {
                 const f = e.target.files?.[0]; if (!f) return; setSubiendoFoto(true);
-                try { const path = await subirArchivo(empresa!.id, "catalogo", f); setEd((x) => (x ? { ...x, imagen_path: path } : x)); } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendoFoto(false); }
+                try { const path = await subirArchivo(empresa!.id, "catalogo", f, true); setEd((x) => (x ? { ...x, imagen_path: path } : x)); } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendoFoto(false); }
               }} />
             </label>
             <p className="-mt-2 text-center text-[12px] text-texto2">Foto del producto: sale al elegir esta prenda en un pedido.</p>
@@ -180,7 +181,7 @@ function Tarifas() {
                       <td className="py-1 text-right">
                         {tarifas.some((o) => o.id === t.id && o.precio !== t.precio) &&
                           <button className="mr-1 text-[12px] font-medium text-azul" onClick={() => { actualizar(t, { precio: t.precio }); aviso("Tarifa guardada"); }}>Guardar</button>}
-                        <button aria-label="Quitar tramo" className="p-1 text-texto2 hover:text-red-600" onClick={async () => { await sb.from("tarifas").delete().eq("id", t.id); recargar(); }}><Trash2 className="size-3.5" /></button>
+                        <button aria-label="Quitar tramo" className="p-1 text-texto2 hover:text-red-600" onClick={() => borrarConDeshacer("tarifas", t, "Tramo quitado", aviso, recargar)}><Trash2 className="size-3.5" /></button>
                       </td>
                     </tr>
                   ))}
@@ -210,7 +211,7 @@ function Tarifas() {
 
 function Proveedores() {
   const { empresa, proveedores, recargar } = useSesion();
-  const { aviso, confirmar } = useAvisos();
+  const { aviso } = useAvisos();
   const [ed, setEd] = useState<Partial<Proveedor> | null>(null);
   return (
     <>
@@ -226,7 +227,7 @@ function Proveedores() {
       )}
       <Hoja abierta={!!ed} cerrar={() => setEd(null)} titulo={ed?.id ? "Editar proveedor" : "Nuevo proveedor"}
         pie={<>
-          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar proveedor" onClick={async () => { if (!(await confirmar({ titulo: "¿Eliminar proveedor?", ok: "Eliminar", peligro: true }))) return; const { error: e } = await sb.from("proveedores").delete().eq("id", ed.id!); if (e) return aviso(textoError(e), "error"); setEd(null); recargar(); }}><Trash2 className="size-4" /></Boton>}
+          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar proveedor" onClick={() => { const fila = proveedores.find((x) => x.id === ed.id); if (!fila) return; setEd(null); borrarConDeshacer("proveedores", fila, "Proveedor eliminado", aviso, recargar); }}><Trash2 className="size-4" /></Boton>}
           <Boton onClick={() => setEd(null)}>Cancelar</Boton><Boton variante="primario" type="submit" form="f-prov">Guardar</Boton>
         </>}>
         {ed && (

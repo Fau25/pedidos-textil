@@ -26,6 +26,7 @@ const T = {
   tarifas: [{ id: "r1", tecnica_id: "t1", desde: 1, hasta: null, complejidad: "Normal", coste: 1, precio: 2.5 }],
   proveedores: [],
   invitados: [{ email: "prueba@ejemplo.es", creado: "2026-11-10" }],
+  admins: [{ user_id: "u1" }],
   catalogo: [{ id: "c1", tipo: "Camiseta", marca: "Roly", modelo: "Beagle", referencia: "CA6554", colores: ["Blanco", "Negro"], tallas: ["S", "M", "L", "XL"], favorito: true, precio_compra: 0, precio_venta: null, proveedor_id: null, imagen_path: null, notas: null }],
   clientes: [{ id: "k1", nombre: "Club Deportivo Arenal", contacto: "Marta", telefono: "612", email: "a@b.es" }],
   pedidos: [ped(1, 43, dia(-1), "Club Deportivo Arenal", { descuento_pct: 5 }), ped(2, 10, dia(0), "Bar La Esquina"), ped(3, 30, null, "Peña Ciclista")],
@@ -37,13 +38,14 @@ const exp = Math.floor(Date.now() / 1000) + 3600;
 const sesion = { access_token: `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ sub: "u1", exp, role: "authenticated" })}.x`, refresh_token: "r", token_type: "bearer", expires_in: 3600, expires_at: exp, user: { id: "u1", email: "prueba@ejemplo.es", aud: "authenticated", role: "authenticated" } };
 
 const navegador = await chromium.launch({ executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", args: ["--no-sandbox"] });
-async function abrir({ caido = false } = {}) {
+async function abrir({ caido = false, conflicto = false } = {}) {
   const ctx = await navegador.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true, locale: "es-ES", timezoneId: "Europe/Madrid" });
   await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-sqartxsdlynecelkufyq-auth-token", JSON.stringify(sesion)]);
   const escrituras = [];
   await ctx.route("**/*.supabase.co/**", async (r) => {
     if (caido) return r.abort("internetdisconnected");
     const req = r.request(); const u = new URL(req.url()); const tabla = u.pathname.match(/rest\/v1\/(?:rpc\/)?(\w+)/)?.[1];
+    if (req.method() !== "GET" && tabla === "guardar_pedido" && conflicto && !req.postDataJSON()?.p?.forzar) { escrituras.push({ tabla, metodo: "POST", cuerpo: req.postDataJSON(), rechazado: true }); return r.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ code: "P0409", message: "CONFLICTO: otra persona guardó este pedido mientras lo editabas" }) }); }
     if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : "[]" }); }
     if (!tabla) return r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
     let filas = T[tabla] ?? [];
@@ -198,10 +200,34 @@ await prueba("editar un pedido no guarda hasta pulsar Guardar; Cancelar sale sin
   assert.equal(escrituras.filter((x) => x.tabla === "guardar_pedido").length, 0, "cancelar no guarda");
   assert.deepEqual(errores, []); await ctx.close();
 });
+await prueba("los cambios sin guardar de un pedido se recuperan al volver a abrirlo", async () => {
+  const { ctx, p, errores } = await abrir();
+  await ir(p, "pedidos/nuevo/?id=p1");
+  await p.getByRole("button", { name: /^Cliente/ }).click();
+  await p.getByLabel("Referencia interna (opcional)").fill("No lo guardé"); await p.waitForTimeout(700);
+  await ir(p, "pedidos/nuevo/?id=p1"); // como si se hubiera cerrado la app
+  await p.getByText("Hemos recuperado los cambios que no guardaste").waitFor();
+  await p.getByRole("button", { name: /^Cliente/ }).click();
+  assert.equal(await p.getByLabel("Referencia interna (opcional)").inputValue(), "No lo guardé");
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("si otra persona guardó el pedido antes, avisa y deja elegir", async () => {
+  const { ctx, p, escrituras } = await abrir({ conflicto: true });
+  await ir(p, "pedidos/nuevo/?id=p1");
+  await p.getByRole("button", { name: /^Cliente/ }).click();
+  await p.getByLabel("Referencia interna (opcional)").fill("Mis cambios");
+  await p.getByRole("button", { name: "Guardar" }).last().click();
+  await p.getByText("Otra persona ha cambiado este pedido").waitFor();
+  await p.getByRole("alertdialog").getByRole("button", { name: "Guardar los míos" }).click();
+  await p.waitForURL(/pedidos\/ver/);
+  const g = escrituras.filter((x) => x.tabla === "guardar_pedido");
+  assert.equal(g.length, 2); assert.equal(g[1].cuerpo.p.forzar, true);
+  await ctx.close();
+});
 await prueba("en el catálogo la foto se ve en grande y el lápiz abre los datos", async () => {
   const { ctx, p, errores } = await abrir();
   await ir(p, "catalogo/");
-  await p.getByRole("button", { name: "Ver Beagle en grande" }).click();
+  await p.getByRole("button", { name: /Beagle.*ver en grande/ }).click();
   assert.equal(await p.getByText("Editar prenda").count(), 0, "los datos no salen de primeras");
   await p.getByRole("button", { name: "Editar los datos de la prenda" }).click();
   await p.getByText("Editar prenda").waitFor();
@@ -210,22 +236,24 @@ await prueba("en el catálogo la foto se ve en grande y el lápiz abre los datos
 await prueba("al escribir en una hoja el foco no salta a otro campo", async () => {
   const { ctx, p, errores } = await abrir();
   await ir(p, "catalogo/");
-  await p.getByRole("button", { name: "Ver Beagle en grande" }).click();
+  await p.getByRole("button", { name: /Beagle.*ver en grande/ }).click();
   await p.getByRole("button", { name: "Editar los datos de la prenda" }).click();
   const c = p.getByRole("dialog").locator("input[type=text], input:not([type])").nth(1);
   const antes = await c.inputValue(); await c.click(); await c.press("End"); await c.pressSequentially("xyz", { delay: 60 });
   assert.equal(await c.inputValue(), antes + "xyz");
   assert.deepEqual(errores, []); await ctx.close();
 });
-await prueba("quitar una prenda del catálogo pide confirmación y la borra", async () => {
+await prueba("quitar una prenda del catálogo la borra al momento y se puede deshacer", async () => {
   const { ctx, p, errores, escrituras } = await abrir();
   await ir(p, "catalogo/");
-  await p.getByRole("button", { name: "Ver Beagle en grande" }).click();
+  await p.getByRole("button", { name: /Beagle.*ver en grande/ }).click();
   await p.getByRole("button", { name: "Editar los datos de la prenda" }).click();
   await p.getByRole("button", { name: "Eliminar prenda" }).click();
-  await p.getByRole("alertdialog").getByRole("button", { name: "Quitar" }).click({ timeout: 3000 });
+  await p.getByRole("button", { name: "Deshacer" }).click({ timeout: 3000 });
   await p.waitForTimeout(400);
-  assert.ok(escrituras.some((x) => x.tabla === "catalogo" && x.metodo === "DELETE"), "envía el borrado");
+  assert.ok(escrituras.some((x) => x.tabla === "catalogo" && x.metodo === "DELETE"), "borra");
+  const vuelta = escrituras.find((x) => x.tabla === "catalogo" && x.metodo === "POST");
+  assert.equal(vuelta?.cuerpo?.id ?? vuelta?.cuerpo?.[0]?.id, "c1", "deshacer la vuelve a insertar");
   assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("en pantallas táctiles los campos tienen 16px (sin zoom al escribir)", async () => {
@@ -237,18 +265,39 @@ await prueba("en pantallas táctiles los campos tienen 16px (sin zoom al escribi
   assert.ok(tam.length && tam.every((x) => x >= 16), JSON.stringify(tam)); await ctx.close();
 });
 
+await prueba("si una foto no tiene miniatura, se ve la original", async () => {
+  const { ctx, p, errores } = await abrir();
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
+  await ctx.route("**/storage/v1/object/sign/roly", async (r) => { const { paths } = r.request().postDataJSON();
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paths.map((x) => x.startsWith("mini/") ? { path: x, signedURL: null, error: "Object not found" } : { path: x, signedURL: "/object/sign/roly/" + x + "?token=t", error: null })) }); });
+  await ctx.route("**/storage/v1/object/sign/roly/*.jpg*", (r) => r.fulfill({ status: 200, contentType: "image/png", body: png }));
+  T.catalogo[0] = { ...T.catalogo[0], imagen_path: "roly:CA6554" };
+  await ir(p, "catalogo/"); await p.waitForTimeout(800);
+  assert.equal(await p.locator('main img[src*="roly/CA6554.jpg"]').count(), 1);
+  T.catalogo[0] = { ...T.catalogo[0], imagen_path: null };
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("un fallo inesperado queda apuntado en el registro de errores", async () => {
+  const { ctx, p, escrituras } = await abrir();
+  await ir(p, "");
+  await p.evaluate(() => setTimeout(() => { throw new Error("fallo de prueba"); }));
+  await p.waitForTimeout(800);
+  const e = escrituras.find((x) => x.tabla === "errores");
+  assert.ok(e, "se apunta"); assert.match(JSON.stringify(e.cuerpo), /fallo de prueba/); assert.match(JSON.stringify(e.cuerpo), /2\.\d+\.\d+/);
+  await ctx.close();
+});
 await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
   const { ctx, p, errores } = await abrir();
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
   let firmas = 0;
   await ctx.route("**/storage/v1/object/sign/roly", async (r) => { firmas++; const { paths } = r.request().postDataJSON();
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paths.map((x) => ({ path: x, signedURL: "/object/sign/roly/" + x + "?token=t", error: null }))) }); });
-  await ctx.route("**/storage/v1/object/sign/roly/*.jpg*", (r) => r.fulfill({ status: 200, contentType: "image/png", body: png }));
+  await ctx.route("**/storage/v1/object/sign/roly/mini/*.webp*", (r) => r.fulfill({ status: 200, contentType: "image/png", body: png }));
   T.catalogo.push({ ...T.catalogo[0], id: "c2", modelo: "Samoyedo", referencia: "CA6503", imagen_path: "roly:CA6503" });
   T.catalogo[0] = { ...T.catalogo[0], imagen_path: "roly:CA6554" };
   await ir(p, "catalogo/"); await p.waitForTimeout(800);
   assert.equal(firmas, 1, "un solo lote de firmas");
-  assert.equal(await p.locator('main img[src*="roly/CA6554"]').count(), 1);
+  assert.equal(await p.locator('main img[src*="roly/mini/CA6554.webp"]').count(), 1, "en las fichas, la miniatura");
   T.catalogo = T.catalogo.slice(0, 1); T.catalogo[0] = { ...T.catalogo[0], imagen_path: null };
   assert.deepEqual(errores, []); await ctx.close();
 });

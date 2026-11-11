@@ -3,8 +3,10 @@ import { Suspense, useEffect, type ReactNode } from "react";
 import { ProveedorSesion } from "./sesion";
 import { ProveedorAvisos } from "./ui";
 import { Marco } from "./marco";
+import { escucharErrores } from "@/lib/errores";
 
 export function Raiz({ children }: { children: ReactNode }) {
+  useEffect(() => escucharErrores(), []);
   useEffect(() => {
     if (!("serviceWorker" in navigator) || location.hostname === "localhost") return;
     // Versión nueva publicada: el nuevo service worker toma el control y la app se recarga sola

@@ -7,7 +7,9 @@ import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Campo, Tarjeta, cx, useAvisos } from "@/components/ui";
-import { borrarCuenta, sb, subirArchivo, subirFotosRoly, textoError, urlArchivo } from "@/lib/supabase";
+import { borrarCuenta, crearMiniaturas, sb, subirArchivo, subirFotosRoly, textoError, urlArchivo } from "@/lib/supabase";
+import { useAdmin } from "@/lib/usar";
+import { VERSION } from "@/lib/version";
 import { borrarEjemplo, cargarEjemplo } from "@/lib/ejemplo";
 import { descargarCopia } from "@/lib/copia";
 import { Invitados } from "@/components/invitados";
@@ -21,7 +23,6 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "2.13.3";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();
@@ -86,6 +87,8 @@ export default function Ajustes() {
 
         <FotosRoly />
 
+        <ErroresApp />
+
         <Tarjeta titulo="Copia de seguridad">
           <p className="mb-4 text-[13px] text-texto2">Descarga todos tus pedidos, prendas, clientes y catálogo en un Excel. Hazlo de vez en cuando y guárdalo en tu ordenador.{ultima ? ` Última copia en este dispositivo: ${ultima}.` : ""}</p>
           <Boton variante="primario" cargando={copiando} onClick={async () => {
@@ -130,10 +133,14 @@ export default function Ajustes() {
 /** Subida en bloque de las fotos de Roly a la carpeta privada compartida por la familia */
 function FotosRoly() {
   const { aviso } = useAvisos();
+  const { empresa } = useSesion();
+  const admin = useAdmin();
   const [subiendo, setSubiendo] = useState<{ hechas: number; total: number } | null>(null);
+  const [mini, setMini] = useState<{ hechas: number; total: number } | null>(null);
   return (
     <Tarjeta titulo="Fotos de Roly">
-      <p className="mb-4 text-[13px] text-texto2">Elige todas las fotos a la vez (puedes seleccionar varias carpetas, una tras otra). Cada foto se coloca sola en su prenda por la referencia del nombre, por ejemplo «Camiseta CA6554.jpg». Son privadas: solo las ve tu familia dentro de la app.</p>
+      {admin && <p className="mb-4 text-[13px] text-texto2">Elige todas las fotos a la vez (puedes seleccionar varias carpetas, una tras otra). Cada foto se coloca sola en su prenda por la referencia del nombre, por ejemplo «Camiseta CA6554.jpg». Son privadas: solo las ve tu familia dentro de la app.</p>}
+      {!admin ? <p className="text-[13px] text-texto2">Las fotos de Roly las gestiona el administrador de la app.</p> : (
       <label className={cx("inline-flex h-11 cursor-pointer items-center gap-2 rounded-full bg-acento px-5 text-[14px] font-medium text-sobre-acento", subiendo && "pointer-events-none opacity-60")}>
         {subiendo ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
         {subiendo ? `Subiendo ${subiendo.hechas} de ${subiendo.total}…` : "Subir fotos"}
@@ -145,7 +152,42 @@ function FotosRoly() {
             aviso(`${r.ok} fotos subidas` + (r.sinRef.length ? ` · ${r.sinRef.length} sin referencia en el nombre` : ""));
           } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendo(null); }
         }} />
-      </label>
+      </label>)}
+      <div className="mt-5 border-t border-borde pt-4">
+        <p className="mb-3 text-[13px] text-texto2">Miniaturas: copias pequeñas de las fotos para que el catálogo cargue rápido y gaste menos datos. Las fotos nuevas ya se suben con su miniatura; esto crea las que falten.</p>
+        <Boton cargando={!!mini} onClick={async () => {
+          setMini({ hechas: 0, total: 0 });
+          try { const n = await crearMiniaturas(empresa!.id, admin, (hechas, total) => setMini({ hechas, total })); aviso(n ? `${n} miniaturas creadas` : "Ya estaban todas creadas"); }
+          catch (err) { aviso(textoError(err), "error"); } finally { setMini(null); }
+        }}>{mini ? `Creando ${mini.hechas} de ${mini.total}…` : "Crear miniaturas"}</Boton>
+      </div>
+    </Tarjeta>
+  );
+}
+
+/** Registro de errores de la app (solo el administrador): qué ha fallado, dónde y en qué versión */
+function ErroresApp() {
+  const admin = useAdmin();
+  const { aviso } = useAvisos();
+  const [filas, setFilas] = useState<{ id: number; creado: string; ruta: string | null; mensaje: string; version: string | null }[] | null>(null);
+  const cargar = () => { sb.from("errores").select("id, creado, ruta, mensaje, version").order("creado", { ascending: false }).limit(20).then(({ data, error }) => setFilas(error ? [] : data ?? [])); };
+  useEffect(() => { if (admin) cargar(); }, [admin]);
+  if (!admin || filas === null) return null;
+  return (
+    <Tarjeta titulo="Errores de la app" accion={filas.length ? <Boton tam="s" variante="fantasma" onClick={async () => {
+      const { error } = await sb.from("errores").delete().gte("id", 0);
+      if (error) aviso(textoError(error), "error"); else { aviso("Registro vaciado"); cargar(); }
+    }}>Vaciar</Boton> : undefined}>
+      {!filas.length ? <p className="text-[13px] text-texto2">Sin errores registrados. Si algo falla en el móvil de alguien, aparecerá aquí.</p> : (
+        <ul className="divide-y divide-borde text-[13px]">
+          {filas.map((f) => (
+            <li key={f.id} className="py-2.5">
+              <p className="font-medium [overflow-wrap:anywhere]">{f.mensaje}</p>
+              <p className="text-texto2">{new Date(f.creado).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })} · {f.ruta ?? "—"} · v{f.version ?? "?"}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </Tarjeta>
   );
 }

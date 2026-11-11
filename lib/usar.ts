@@ -45,3 +45,19 @@ export function useCarga<T>(fn: () => Promise<T>, deps: unknown[] = []) {
 export function useParam(nombre: string) {
   return useSearchParams().get(nombre);
 }
+
+/** ¿Es el administrador de la app? (el que gestiona las fotos compartidas de Roly y ve todos los errores).
+ *  Si la base aún no tiene la tabla «admins» (migración 08 sin aplicar), se comporta como antes: sí. */
+let adminCache: boolean | null = null;
+export function useAdmin(): boolean {
+  const { sesion } = useSesion();
+  const [admin, setAdmin] = useState(adminCache ?? false);
+  useEffect(() => {
+    if (adminCache !== null || !sesion) return;
+    import("./supabase").then(({ sb }) => sb.from("admins").select("user_id").eq("user_id", sesion.user.id).maybeSingle()).then(({ data, error }) => {
+      adminCache = error ? /admins|PGRST205|42P01/.test(error.message + error.code) : !!data;
+      setAdmin(adminCache);
+    }).catch(() => {});
+  }, [sesion]);
+  return admin;
+}

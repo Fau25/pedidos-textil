@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { sb, SUPABASE_URL } from "@/lib/supabase";
 import { salir } from "@/lib/supabase";
 import type { Empresa, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
+import { fijarEmpresaErrores } from "@/lib/errores";
 import { MODELOS_ROLY, REFERENCIAS_ROLY, TALLAS_ADULTO, TALLAS_NINO, cargarCatalogoRoly } from "@/lib/roly";
 
 type Datos = {
@@ -68,7 +69,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       sb.from("proveedores").select("*").eq("empresa_id", e).order("nombre"),
     ]);
     setRol(m.rol);
-    setEmpresa(emp.data as Empresa);
+    setEmpresa(emp.data as Empresa); fijarEmpresaErrores((emp.data as Empresa)?.id ?? null);
     setTecnicas((tec.data ?? []) as Tecnica[]);
     setTarifas(((tar.data ?? []) as TarifaFila[]).map((t) => ({ ...t, coste: Number(t.coste), precio: Number(t.precio) })));
     if (emp.error) throw emp.error;
@@ -149,7 +150,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!empresa) return;
     const canal = sb.channel("cambios-" + empresa.id);
-    for (const t of ["pedidos", "pedido_lineas", "clientes", "presupuestos"])
+    for (const t of ["pedidos", "pedido_lineas", "clientes"])
       canal.on("postgres_changes", { event: "*", schema: "public", table: t, filter: `empresa_id=eq.${empresa.id}` }, tocar);
     canal.subscribe();
     const vis = () => { if (document.visibilityState === "visible") { tocar(); sb.auth.startAutoRefresh(); } else sb.auth.stopAutoRefresh(); };
