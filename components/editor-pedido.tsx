@@ -25,6 +25,13 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   const [p, setP] = useState<PedidoEd | null>(null);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [guardando, setGuardando] = useState<"" | "pendiente">("");
+  // Aviso del navegador si se cierra o recarga con cambios sin guardar
+  useEffect(() => {
+    if (guardando !== "pendiente") return;
+    const f = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", f);
+    return () => window.removeEventListener("beforeunload", f);
+  }, [guardando]);
   const [enviando, setEnviando] = useState(false);
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>({ cliente: true, prendas: true, pers: true, notas: true });
   const [lineasAbiertas, setLineasAbiertas] = useState<Set<string> | null>(null);

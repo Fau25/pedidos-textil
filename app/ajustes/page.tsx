@@ -21,7 +21,7 @@ const esquema = z.object({
 type F = z.input<typeof esquema>;
 type FS = z.output<typeof esquema>;
 
-const VERSION = "2.13.2";
+const VERSION = "2.13.3";
 
 export default function Ajustes() {
   const { empresa, recargar, tocar, sesion } = useSesion();

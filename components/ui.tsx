@@ -96,8 +96,11 @@ export function Cargando({ texto = "Cargando…", error, reintentar }: { texto?:
 /** Hoja lateral (escritorio) / inferior (móvil). Cierra con Escape y devuelve el foco. */
 export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg" }: { abierta: boolean; cerrar: () => void; titulo: string; children: ReactNode; pie?: ReactNode; ancho?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const cerrarRef = useRef(cerrar);
+  useEffect(() => { cerrarRef.current = cerrar; });
   useEffect(() => {
     if (!abierta) return;
+    const cerrar = () => cerrarRef.current();
     const previo = document.activeElement as HTMLElement | null;
     const k = (e: KeyboardEvent) => e.key === "Escape" && cerrar();
     document.addEventListener("keydown", k);
@@ -115,7 +118,7 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
     };
     document.addEventListener("keydown", tab);
     return () => { document.removeEventListener("keydown", k); document.removeEventListener("keydown", tab); for (const el of fondo) el.inert = false; document.body.style.overflow = ""; previo?.focus?.(); };
-  }, [abierta, cerrar]);
+  }, [abierta]); // cerrar va en una ref: si cambiara en cada tecla, el foco saltaría al primer campo
   if (!abierta) return null;
   return createPortal(
     <div data-hoja className="fixed inset-0 z-50 flex items-end justify-center sm:items-stretch sm:justify-end" role="dialog" aria-modal="true" aria-label={titulo}>

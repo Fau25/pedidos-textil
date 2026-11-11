@@ -207,6 +207,16 @@ await prueba("en el catálogo la foto se ve en grande y el lápiz abre los datos
   await p.getByText("Editar prenda").waitFor();
   assert.deepEqual(errores, []); await ctx.close();
 });
+await prueba("al escribir en una hoja el foco no salta a otro campo", async () => {
+  const { ctx, p, errores } = await abrir();
+  await ir(p, "catalogo/");
+  await p.getByRole("button", { name: "Ver Beagle en grande" }).click();
+  await p.getByRole("button", { name: "Editar los datos de la prenda" }).click();
+  const c = p.getByRole("dialog").locator("input[type=text], input:not([type])").nth(1);
+  const antes = await c.inputValue(); await c.click(); await c.press("End"); await c.pressSequentially("xyz", { delay: 60 });
+  assert.equal(await c.inputValue(), antes + "xyz");
+  assert.deepEqual(errores, []); await ctx.close();
+});
 await prueba("quitar una prenda del catálogo pide confirmación y la borra", async () => {
   const { ctx, p, errores, escrituras } = await abrir();
   await ir(p, "catalogo/");
