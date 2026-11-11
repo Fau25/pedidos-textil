@@ -108,7 +108,7 @@ function Prendas() {
       {vista && <VerPrenda p={vista} cerrar={() => setVista(null)} editar={() => { const p = vista; setVista(null); setEd({ ...p, precio_compra: Number(p.precio_compra), precio_venta: p.precio_venta === null ? null : Number(p.precio_venta) }); }} />}
       <Hoja abierta={!!ed} cerrar={() => setEd(null)} titulo={ed?.id ? "Editar prenda" : "Nueva prenda"}
         pie={<>
-          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar prenda" onClick={async () => { if (!(await confirmar({ titulo: "¿Quitar del catálogo?", ok: "Quitar", peligro: true }))) return; await sb.from("catalogo").delete().eq("id", ed.id!); setEd(null); recargar(); }}><Trash2 className="size-4" /></Boton>}
+          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar prenda" onClick={async () => { if (!(await confirmar({ titulo: "¿Quitar del catálogo?", ok: "Quitar", peligro: true }))) return; const { error: e } = await sb.from("catalogo").delete().eq("id", ed.id!); if (e) return aviso(textoError(e), "error"); setEd(null); recargar(); aviso("Prenda quitada del catálogo"); }}><Trash2 className="size-4" /></Boton>}
           <Boton onClick={() => setEd(null)}>Cancelar</Boton><Boton variante="primario" type="submit" form="f-prenda" cargando={guardando}>Guardar</Boton>
         </>}>
         {ed && (
@@ -226,7 +226,7 @@ function Proveedores() {
       )}
       <Hoja abierta={!!ed} cerrar={() => setEd(null)} titulo={ed?.id ? "Editar proveedor" : "Nuevo proveedor"}
         pie={<>
-          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar proveedor" onClick={async () => { if (!(await confirmar({ titulo: "¿Eliminar proveedor?", ok: "Eliminar", peligro: true }))) return; await sb.from("proveedores").delete().eq("id", ed.id!); setEd(null); recargar(); }}><Trash2 className="size-4" /></Boton>}
+          {ed?.id && <Boton variante="peligro" className="mr-auto" aria-label="Eliminar proveedor" onClick={async () => { if (!(await confirmar({ titulo: "¿Eliminar proveedor?", ok: "Eliminar", peligro: true }))) return; const { error: e } = await sb.from("proveedores").delete().eq("id", ed.id!); if (e) return aviso(textoError(e), "error"); setEd(null); recargar(); }}><Trash2 className="size-4" /></Boton>}
           <Boton onClick={() => setEd(null)}>Cancelar</Boton><Boton variante="primario" type="submit" form="f-prov">Guardar</Boton>
         </>}>
         {ed && (

@@ -104,7 +104,7 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
     document.body.style.overflow = "hidden";
     setTimeout(() => ref.current?.querySelector<HTMLElement>("input,select,textarea,button:not([data-cerrar])")?.focus(), 30);
     // El resto de la página queda inerte mientras la hoja está abierta y el tabulador no sale de ella
-    const fondo = [...document.body.children].filter((el) => !el.contains(ref.current) && !el.hasAttribute("aria-live")) as HTMLElement[];
+    const fondo = [...document.body.children].filter((el) => !el.contains(ref.current) && !el.hasAttribute("aria-live") && !el.hasAttribute("data-encima")) as HTMLElement[];
     for (const el of fondo) el.inert = true;
     const tab = (e: KeyboardEvent) => {
       if (e.key !== "Tab" || !ref.current) return;
@@ -149,9 +149,12 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
   }, []);
   const confirmar = useCallback((o: Omit<Confirm, "resolver">) => new Promise<boolean>((resolver) => setConf({ ...o, resolver })), []);
   const cerrar = (v: boolean) => { conf?.resolver(v); setConf(null); };
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
   return (
     <Ctx.Provider value={{ aviso, confirmar }}>
       {children}
+      {montado && createPortal(<>
       <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex flex-col items-center gap-2 px-4 sm:bottom-6" aria-live="polite">
         {toasts.map((t) => (
           <div key={t.id} className="animar pointer-events-auto flex max-w-md items-center gap-2 rounded-xl bg-[#1e2024] px-4 py-3 text-[13px] text-white shadow-lg dark:bg-[#ecedef] dark:text-[#1e2024]">
@@ -162,7 +165,7 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
         ))}
       </div>
       {conf && (
-        <div className="fixed inset-0 z-[70] grid place-items-center p-4" role="alertdialog" aria-modal="true" onKeyDown={(e) => e.key === "Escape" && cerrar(false)}>
+        <div data-encima="" className="fixed inset-0 z-[70] grid place-items-center p-4" role="alertdialog" aria-modal="true" onKeyDown={(e) => e.key === "Escape" && cerrar(false)}>
           <div className="absolute inset-0 bg-black/30" onClick={() => cerrar(false)} />
           <div className="cristal animar relative w-full max-w-sm rounded-[22px] p-5 shadow-2xl">
             <p className="text-[16px] font-semibold">{conf.titulo}</p>
@@ -174,6 +177,7 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
+      </>, document.body)}
     </Ctx.Provider>
   );
 }

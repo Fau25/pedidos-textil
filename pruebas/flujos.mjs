@@ -207,6 +207,17 @@ await prueba("en el catálogo la foto se ve en grande y el lápiz abre los datos
   await p.getByText("Editar prenda").waitFor();
   assert.deepEqual(errores, []); await ctx.close();
 });
+await prueba("quitar una prenda del catálogo pide confirmación y la borra", async () => {
+  const { ctx, p, errores, escrituras } = await abrir();
+  await ir(p, "catalogo/");
+  await p.getByRole("button", { name: "Ver Beagle en grande" }).click();
+  await p.getByRole("button", { name: "Editar los datos de la prenda" }).click();
+  await p.getByRole("button", { name: "Eliminar prenda" }).click();
+  await p.getByRole("alertdialog").getByRole("button", { name: "Quitar" }).click({ timeout: 3000 });
+  await p.waitForTimeout(400);
+  assert.ok(escrituras.some((x) => x.tabla === "catalogo" && x.metodo === "DELETE"), "envía el borrado");
+  assert.deepEqual(errores, []); await ctx.close();
+});
 await prueba("en pantallas táctiles los campos tienen 16px (sin zoom al escribir)", async () => {
   const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   await ctx.addInitScript(([k, v]) => localStorage.setItem(k, v), ["sb-sqartxsdlynecelkufyq-auth-token", JSON.stringify(sesion)]);
