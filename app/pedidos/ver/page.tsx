@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Ticket as IconoTicket } from "lucide-react";
+import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Ticket as IconoTicket, FileText } from "lucide-react";
+import { emitirFactura, facturaComoDoc, facturaDe, type Factura } from "@/lib/facturas";
 import { useSesion } from "@/components/sesion";
 import { Boton, Cargando, Tarjeta, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError, urlArchivo } from "@/lib/supabase";
@@ -21,6 +22,9 @@ export default function Ficha() {
   const router = useRouter();
   const [ocupado, setOcupado] = useState("");
   const [verTicket, setVerTicket] = useState(false);
+  const [factura, setFactura] = useState<Factura | null>(null);
+  const [verFactura, setVerFactura] = useState(false);
+  useEffect(() => { if (pid) facturaDe(pid).then(setFactura).catch(() => {}); }, [pid]);
 
   const { datos, recargar, error } = useCarga(async () => {
     if (!pid) return null;
@@ -41,6 +45,16 @@ export default function Ficha() {
     try { await marcarEntregado([ed.id], v); aviso(v ? "Marcado como entregado" : "Vuelve a pendientes"); recargar(); }
     catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
   }
+  async function facturar() {
+    if (factura) return setVerFactura(true);
+    if (!empresa!.nif) return aviso("Para facturar, añade el NIF de tu taller en Ajustes", "error");
+    if (!ed.cliente_id) return aviso("El pedido no tiene cliente: edítalo y elige uno", "error");
+    if (!t || t.unidades === 0) return aviso("El pedido no tiene prendas con unidades", "error");
+    if (!(await confirmar({ titulo: "¿Emitir la factura?", texto: "Recibirá el número siguiente de tus facturas y quedará registrada tal cual: después no se puede cambiar ni borrar.", ok: "Emitir factura" }))) return;
+    setOcupado("factura");
+    try { const f = await emitirFactura(ed.id, ticketDe(ed, empresa!, cliente ?? null).datos); setFactura(f); setVerFactura(true); aviso(`Factura ${f.numero} emitida`); }
+    catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
+  }
   async function pdf() {
     setOcupado("pdf");
     try { const r = await compartirPDF(ed.id, empresa!); if (r === "descargado") aviso("PDF descargado"); }
@@ -52,7 +66,7 @@ export default function Ficha() {
     return `Hola${quien ? " " + quien : ""}, tu pedido ${ed.numero} (${t?.unidades ?? 0} prendas) ya está listo para recoger. Total: ${euros(t?.total ?? 0)}. ¡Gracias! ${empresa!.nombre}`;
   }
   async function borrar() {
-    if (!(await confirmar({ titulo: `¿Eliminar ${ed.numero}?`, texto: "Se borran sus prendas y personalizaciones. No se puede deshacer.", ok: "Eliminar", peligro: true }))) return;
+    if (!(await confirmar({ titulo: `¿Eliminar ${ed.numero}?`, texto: `Se borran sus prendas y personalizaciones. No se puede deshacer.${factura ? ` La factura ${factura.numero} se conserva.` : ""}`, ok: "Eliminar", peligro: true }))) return;
     const { error } = await sb.from("pedidos").delete().eq("id", ed.id);
     if (error) return aviso(textoError(error), "error");
     aviso("Pedido eliminado"); router.push("/pedidos/");
@@ -73,6 +87,7 @@ export default function Ficha() {
         <div className="flex flex-wrap gap-2">
           <Link href={`/pedidos/nuevo/?id=${ed.id}`}><Boton><Pencil className="size-4" />Editar</Boton></Link>
           <Boton onClick={() => setVerTicket(true)}><IconoTicket className="size-4" />Ticket</Boton>
+          <Boton cargando={ocupado === "factura"} onClick={facturar}><FileText className="size-4" />{factura ? factura.numero : "Factura"}</Boton>
           <Boton cargando={ocupado === "pdf"} onClick={pdf}><Download className="size-4" />Presupuesto</Boton>
           <Link href={`/pedidos/nuevo/?duplicar=${ed.id}`}><Boton variante="fantasma" aria-label="Duplicar"><Copy className="size-4" /></Boton></Link>
           <Boton variante="fantasma" aria-label="Eliminar" className="hover:text-red-600" onClick={borrar}><Trash2 className="size-4" /></Boton>
@@ -164,6 +179,7 @@ export default function Ficha() {
         </aside>
       </div>
       <Ticket abierto={verTicket} cerrar={() => setVerTicket(false)} p={verTicket ? ticketDe(ed, empresa!, cliente ?? null) : null} />
+      <Ticket tipo="factura" abierto={verFactura} cerrar={() => setVerFactura(false)} p={verFactura && factura ? facturaComoDoc(factura) : null} />
     </>
   );
 }

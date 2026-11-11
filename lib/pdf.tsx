@@ -23,8 +23,8 @@ const s = StyleSheet.create({
 
 const C = { d: { flex: 1 }, u: { width: 50 }, p: { width: 70 }, i: { width: 80 } };
 
-export type TipoDoc = "presupuesto" | "ticket";
-const TITULO: Record<TipoDoc, string> = { presupuesto: "Presupuesto", ticket: "Ticket" };
+export type TipoDoc = "presupuesto" | "ticket" | "factura";
+const TITULO: Record<TipoDoc, string> = { presupuesto: "Presupuesto", ticket: "Ticket", factura: "Factura" };
 
 function Doc({ p, logo, tipo }: { p: Presupuesto; logo: string | null; tipo: TipoDoc }) {
   const d = p.datos;
@@ -39,6 +39,7 @@ function Doc({ p, logo, tipo }: { p: Presupuesto; logo: string | null; tipo: Tip
           <View style={{ alignItems: "flex-end" }}>
             <Text style={s.titulo}>{TITULO[tipo]}</Text>
             <Text style={[s.gris, { marginTop: 2 }]}>{p.numero}</Text>
+            {tipo === "factura" && !d.cliente?.nif && <Text style={[s.gris, { fontSize: 8.5 }]}>Factura simplificada</Text>}
           </View>
         </View>
 
@@ -59,7 +60,8 @@ function Doc({ p, logo, tipo }: { p: Presupuesto; logo: string | null; tipo: Tip
             {d.cliente?.email && <Text>{d.cliente.email}</Text>}
           </View>
           <View style={[s.caja, { flex: 0.8 }]}>
-            <Text style={s.peq}>Fecha</Text><Text>{f(p.fecha)}</Text>
+            <Text style={s.peq}>{tipo === "factura" ? "Fecha de expedición" : "Fecha"}</Text><Text>{f(p.fecha)}</Text>
+            {tipo === "factura" && d.pedido?.numero && <><Text style={[s.peq, { marginTop: 6 }]}>Pedido</Text><Text>{d.pedido.numero}</Text></>}
             {tipo === "presupuesto" && p.validez && <><Text style={[s.peq, { marginTop: 6 }]}>Válido hasta</Text><Text>{f(p.validez)}</Text></>}
           </View>
         </View>
@@ -92,7 +94,7 @@ function Doc({ p, logo, tipo }: { p: Presupuesto; logo: string | null; tipo: Tip
           </View>
         </View>
 
-        {d.condiciones && (
+        {tipo !== "factura" && d.condiciones && (
           <View style={{ marginTop: 30 }} wrap={false}>
             <Text style={s.peq}>Condiciones</Text>
             <Text style={[s.gris, { fontSize: 8.5 }]}>{d.condiciones}</Text>

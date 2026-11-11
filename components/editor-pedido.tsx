@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, ChevronDown, Ticket as IconoTicket, Tag, Phone, Mail } from "lucide-react";
+import { Plus, Loader2, ChevronDown, Ticket as IconoTicket, Tag, Phone, Mail, FileText } from "lucide-react";
+import { emitirFactura, facturaComoDoc, facturaDe, type Factura } from "@/lib/facturas";
 import { Ticket } from "./ticket";
 import { ticketDe } from "@/lib/presupuestos";
 import { useSesion } from "./sesion";
@@ -39,6 +40,10 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>({ cliente: true, prendas: true, pers: true, notas: true });
   const [lineasAbiertas, setLineasAbiertas] = useState<Set<string> | null>(null);
   const [verTicket, setVerTicket] = useState(false);
+  const [factura, setFactura] = useState<Factura | null>(null);
+  const [verFactura, setVerFactura] = useState(false);
+  const [facturando, setFacturando] = useState(false);
+  useEffect(() => { if (pedidoId) facturaDe(pedidoId).then(setFactura).catch(() => {}); }, [pedidoId]);
   const [cambiandoCliente, setCambiandoCliente] = useState(false);
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [errorCliente, setErrorCliente] = useState(false);
@@ -133,6 +138,31 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     });
     if (cambia) setP((x) => (x ? { ...x, pers } : x));
   }, [p, t, tarifas]);
+
+  /** Emite la factura (número siguiente, queda fija). Si hay cambios sin guardar, primero guarda el pedido */
+  async function facturar() {
+    if (!p || !empresa) return;
+    if (factura) return setVerFactura(true);
+    if (!empresa.nif) return aviso("Para facturar, añade el NIF de tu taller en Ajustes", "error");
+    if (!p.cliente_id) { setErrorCliente(true); setAbiertos((a) => ({ ...a, cliente: true })); return aviso("Elige un cliente para emitir la factura", "error"); }
+    if (!t || t.unidades === 0) return aviso("Añade al menos una prenda con unidades", "error");
+    const pendiente = p.nuevo || guardando === "pendiente";
+    if (!(await confirmar({ titulo: "¿Emitir la factura?", texto: `Recibirá el número siguiente de tus facturas y quedará registrada tal cual: después no se puede cambiar ni borrar.${pendiente ? " Antes se guardan los cambios del pedido." : ""}`, ok: "Emitir factura" }))) return;
+    setFacturando(true);
+    try {
+      let actual = p;
+      if (pendiente) {
+        const numero = await guardarPedido(p, empresa);
+        try { localStorage.removeItem(p.nuevo ? BORRADOR : CAMBIOS!); } catch { /* nada */ }
+        cambiado.current = false; setGuardando("");
+        actual = { ...p, numero, nuevo: false };
+        setP(actual);
+        if (p.nuevo) history.replaceState(null, "", `${location.pathname}?id=${p.id}`);
+      }
+      const f = await emitirFactura(actual.id, ticketDe(actual, empresa, cliente ?? null).datos);
+      setFactura(f); setVerFactura(true); aviso(`Factura ${f.numero} emitida`);
+    } catch (e) { aviso(textoError(e), "error"); } finally { setFacturando(false); }
+  }
 
   async function guardar() {
     if (!p) return;
@@ -263,7 +293,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 
         {/* Resumen fijo */}
         <aside className="xl:sticky xl:top-8">
-          <Tarjeta titulo="Resumen">
+          <Tarjeta titulo="Resumen" className="resumen-oscuro">
             <dl className="space-y-2 text-[13px]">
               <Fila t="Prendas" v={euros(t.ventaPrendas)} />
               <Fila t="Personalización" v={euros(t.ventaPers)} />
@@ -288,13 +318,20 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
               </div>
               <div className="flex items-baseline justify-between pt-2"><dt className="font-semibold">Total</dt><dd className="num text-[24px] font-semibold tracking-[-0.02em]">{euros(t.total)}</dd></div>
             </dl>
-            <button type="button" onClick={() => setVerTicket(true)}
-              className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-azul-suave text-[14px] font-semibold text-azul hover:brightness-95">
-              <IconoTicket className="size-[18px]" />Generar ticket
-            </button>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setVerTicket(true)}
+                className="flex h-12 items-center justify-center gap-2 rounded-full bg-white/12 text-[14px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/20">
+                <IconoTicket className="size-[18px]" />Ticket
+              </button>
+              <button type="button" onClick={facturar} disabled={facturando}
+                className="flex h-12 items-center justify-center gap-2 rounded-full bg-white text-[14px] font-semibold text-[#17181c] hover:bg-white/90 disabled:opacity-60">
+                {facturando ? <Loader2 className="size-[18px] animate-spin" /> : <FileText className="size-[18px]" />}{factura ? "Ver factura" : "Generar factura"}
+              </button>
+            </div>
+            {factura && <p className="mt-2 text-center text-[12px] text-white/60">Factura {factura.numero} emitida</p>}
             <div className="mt-4 hidden flex-col gap-2 xl:flex">
-              <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
-              <Boton onClick={cancelar}>Cancelar</Boton>
+              <Boton variante="primario" className="!bg-azul !text-white" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
+              <Boton onClick={cancelar} className="!border-white/20 !bg-transparent !text-white hover:!bg-white/10">Cancelar</Boton>
             </div>
           </Tarjeta>
         </aside>
@@ -302,6 +339,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 
       {/* Barra de acciones (móvil) */}
       <Ticket abierto={verTicket} cerrar={() => setVerTicket(false)} p={verTicket ? ticketDe(p, empresa!, cliente ?? null) : null} />
+      <Ticket tipo="factura" abierto={verFactura} cerrar={() => setVerFactura(false)} p={verFactura && factura ? facturaComoDoc(factura) : null} />
       <div className="h-20 xl:hidden" />
       <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 mx-auto flex max-w-[640px] lg:bottom-4 lg:left-[260px] items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur xl:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>

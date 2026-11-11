@@ -12,7 +12,7 @@ grant select on auth.users to supabase_auth_admin;`);
 const u = "11111111-1111-1111-1111-111111111111", v = "22222222-2222-2222-2222-222222222222", w = "33333333-3333-3333-3333-333333333333";
 await db.exec(`insert into auth.users(id,email,created_at) values ('${u}','fau@x.es','2026-01-01'),('${v}','otra@x.es','2026-02-01'),('${w}','ayuda@x.es','2026-03-01')`);
 const P = new URL("../supabase/", import.meta.url);
-for (const f of ["esquema.sql", "02-simplificar.sql", "03-fiabilidad.sql", "05-invitados.sql", "06-fotos-roly.sql", "07-borrar-cuenta.sql", "08-auditoria.sql", "08-auditoria.sql"])
+for (const f of ["esquema.sql", "02-simplificar.sql", "03-fiabilidad.sql", "05-invitados.sql", "06-fotos-roly.sql", "07-borrar-cuenta.sql", "08-auditoria.sql", "08-auditoria.sql", "09-facturas.sql", "09-facturas.sql"])
   await db.exec(fs.readFileSync(new URL(f, P), "utf8"));
 async function como(user, q) { await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${user}',false);`); try { return await db.query(q); } finally { await db.exec("reset role"); } }
 const falla = async (user, q, re) => { await assert.rejects(como(user, q), re); };
@@ -60,9 +60,23 @@ await prueba("registro de errores: cada uno apunta los suyos y el administrador 
 await prueba("ya no existen las tablas antiguas", async () => {
   assert.equal((await db.query(`select count(*)::int c from information_schema.tables where table_name in ('estados','presupuestos','pedido_historial')`)).rows[0].c, 0);
 });
+await prueba("facturas: número correlativo, una por pedido, nadie de fuera puede emitir ni cambiar", async () => {
+  const id = "aaaaaaaa-0000-0000-0000-000000000001";
+  const f1 = (await como(u, `select (emitir_factura('${id}', '{"base":100,"iva":21,"total":121}'::jsonb)).*`)).rows[0];
+  assert.match(f1.numero, /^F-\d{4}-0001$/); assert.equal(Number(f1.total), 121);
+  const otra = (await como(u, `select (emitir_factura('${id}', '{"total":999}'::jsonb)).numero`)).rows[0].numero;
+  assert.equal(otra, f1.numero, "el mismo pedido no se factura dos veces");
+  const id2 = "aaaaaaaa-0000-0000-0000-000000000002";
+  await como(u, `select guardar_pedido('{"id":"${id2}","empresa_id":"${e}","fecha":"2026-11-11","lineas":[],"pers":[]}'::jsonb)`);
+  assert.match((await como(u, `select (emitir_factura('${id2}', '{}'::jsonb)).numero`)).rows[0].numero, /-0002$/);
+  await falla(v, `select emitir_factura('${id}', '{}'::jsonb)`, /permiso/);
+  assert.equal((await como(v, `select count(*)::int c from facturas`)).rows[0].c, 0, "otro taller no las ve");
+  await falla(u, `update facturas set total = 1`, /permission denied/); await falla(u, `delete from facturas`, /permission denied/);
+  assert.equal((await db.query(`select count(*)::int c from facturas where total = 121`)).rows[0].c, 1, "no se pueden cambiar ni borrar");
+});
 await prueba("borrar cuenta: el ayudante deja el taller intacto; la propietaria lo borra entero", async () => {
   await como(w, `select borrar_mi_cuenta()`);
-  assert.equal((await db.query(`select count(*)::int c from pedidos where empresa_id='${e}'`)).rows[0].c, 1);
+  assert.equal((await db.query(`select count(*)::int c from pedidos where empresa_id='${e}'`)).rows[0].c, 2);
   await como(u, `select borrar_mi_cuenta()`);
   assert.equal((await db.query(`select count(*)::int c from empresas where id='${e}'`)).rows[0].c, 0);
   assert.equal((await db.query(`select count(*)::int c from clientes where empresa_id='${e2}'`)).rows[0].c, 1);

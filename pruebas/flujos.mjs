@@ -46,7 +46,7 @@ async function abrir({ caido = false, conflicto = false } = {}) {
     if (caido) return r.abort("internetdisconnected");
     const req = r.request(); const u = new URL(req.url()); const tabla = u.pathname.match(/rest\/v1\/(?:rpc\/)?(\w+)/)?.[1];
     if (req.method() !== "GET" && tabla === "guardar_pedido" && conflicto && !req.postDataJSON()?.p?.forzar) { escrituras.push({ tabla, metodo: "POST", cuerpo: req.postDataJSON(), rechazado: true }); return r.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ code: "P0409", message: "CONFLICTO: otra persona guardó este pedido mientras lo editabas" }) }); }
-    if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : "[]" }); }
+    if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : tabla === "emitir_factura" ? JSON.stringify({ id: "f1", pedido_id: req.postDataJSON().p_pedido, numero: "F-2026-0001", fecha: "2026-11-11", datos: req.postDataJSON().p_datos, base: 100, iva: 21, total: 121 }) : "[]" }); }
     if (!tabla) return r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
     let filas = T[tabla] ?? [];
     for (const [k, v] of u.searchParams) if (v.startsWith("eq.") && ["id", "pedido_id", "favorito", "entregado"].includes(k)) filas = filas.filter((x) => String(x[k]) === v.slice(3));
@@ -294,6 +294,27 @@ await prueba("se quita una vez la técnica Serigrafía del taller del administra
   assert.ok(escrituras.some((x) => x.tabla === "tecnicas" && x.metodo === "DELETE" && /t9/.test(x.url ?? JSON.stringify(x))), "borra Serigrafía");
   await ctx.close();
 });
+await prueba("generar factura: pide el NIF del taller, confirma, emite y la enseña", async () => {
+  const { ctx, p, errores, escrituras } = await abrir();
+  await ir(p, "pedidos/nuevo/?id=p1");
+  await p.getByRole("button", { name: "Generar factura" }).click();
+  await p.getByText("añade el NIF de tu taller").waitFor();
+  assert.ok(!escrituras.some((x) => x.tabla === "emitir_factura"));
+  await ctx.close();
+  T.empresas[0].nif = "B12345678";
+  try {
+    const b = await abrir();
+    await ir(b.p, "pedidos/nuevo/?id=p1");
+    await b.p.getByRole("button", { name: "Generar factura" }).click();
+    await b.p.getByRole("alertdialog").getByRole("button", { name: "Emitir factura" }).click();
+    await b.p.getByRole("dialog", { name: "Factura" }).getByText("F-2026-0001").waitFor();
+    const e = b.escrituras.find((x) => x.tabla === "emitir_factura");
+    assert.equal(e.cuerpo.p_pedido, "p1"); assert.ok(e.cuerpo.p_datos.total > 0, "lleva los totales");
+    assert.ok(await b.p.getByRole("button", { name: "Ver factura" }).isVisible());
+    assert.deepEqual(b.errores, []); await b.ctx.close();
+  } finally { T.empresas[0].nif = null; }
+  assert.deepEqual(errores, []);
+});
 await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
   const { ctx, p, errores } = await abrir();
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
@@ -313,7 +334,7 @@ await prueba("las fotos del catálogo se firman en un solo lote y se ven", async
 await prueba("el ticket del pedido se genera y se puede enviar o descargar", async () => {
   const { ctx, p, errores } = await abrir();
   await ir(p, "pedidos/nuevo/?id=p1");
-  await p.getByRole("button", { name: /Generar ticket/ }).click();
+  await p.getByRole("button", { name: "Ticket", exact: true }).click();
   const tk = p.getByRole("article", { name: "Vista previa del ticket" });
   await tk.waitFor();
   const txt = await tk.innerText();

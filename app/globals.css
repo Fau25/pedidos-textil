@@ -131,3 +131,13 @@ input.campo[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto;
 /* Franja de datos sobre la foto (catálogo): sin desenfoque para que el scroll siga fluido */
 .franja{background:rgba(255,255,255,.82);border:1px solid rgba(255,255,255,.85)}
 .dark .franja{background:rgba(23,24,30,.78);border-color:rgba(255,255,255,.10)}
+
+/* Resumen del pedido en oscuro (en modo claro y en modo oscuro) */
+.resumen-oscuro{background:#17181c;border-color:#17181c;color:#fff;box-shadow:0 18px 40px -18px rgba(16,18,24,.55)}
+.dark .resumen-oscuro{background:#0e0f13;border-color:rgba(255,255,255,.10)}
+.resumen-oscuro .text-texto2{color:rgba(255,255,255,.64)}
+.resumen-oscuro .border-borde{border-color:rgba(255,255,255,.14)}
+.resumen-oscuro .campo{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#fff}
+.resumen-oscuro .campo::placeholder{color:rgba(255,255,255,.45)}
+.resumen-oscuro select{background:rgba(255,255,255,.10);color:#fff}
+.resumen-oscuro select option{color:#17181c}

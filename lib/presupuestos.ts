@@ -34,10 +34,10 @@ export function ticketDe(ed: PedidoEd, empresa: Empresa, cli: Partial<Cliente> |
 }
 
 /** Enviar (menú de compartir del móvil: WhatsApp, correo…) o descargar el PDF */
-export async function compartirDocumento(p: Presupuesto, tipo: "presupuesto" | "ticket", soloDescargar = false) {
+export async function compartirDocumento(p: Presupuesto, tipo: "presupuesto" | "ticket" | "factura", soloDescargar = false) {
   const { generarPDF } = await import("./pdf");
   const blob = await generarPDF(p, tipo);
-  const titulo = (tipo === "ticket" ? "Ticket" : "Presupuesto") + " " + p.numero;
+  const titulo = ({ ticket: "Ticket", factura: "Factura", presupuesto: "Presupuesto" })[tipo] + " " + p.numero;
   const nombre = `${titulo} ${p.datos.cliente?.nombre ?? ""}.pdf`.trim();
   const archivo = new File([blob], nombre, { type: "application/pdf" });
   // En móvil/tablet se abre el menú de compartir (WhatsApp, correo…); en el ordenador se descarga
