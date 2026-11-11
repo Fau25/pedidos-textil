@@ -90,14 +90,14 @@ export function Marco({ children }: { children: ReactNode }) {
           <Link key={href} href={href} aria-label={t} className={cx("grid size-12 place-items-center rounded-full transition-colors", activo(href) ? "bg-acento text-sobre-acento" : "text-texto2")}><I className="size-[22px]" strokeWidth={1.9} /></Link>
         ))}
         <Link href="/pedidos/nuevo/" aria-label="Nuevo pedido" className="grid size-12 place-items-center rounded-full bg-azul text-white shadow-[0_6px_16px_-6px_rgba(31,91,255,0.7)]"><Plus className="size-6" /></Link>
-        <Link href="/clientes/" aria-label="Clientes" className={cx("grid size-12 place-items-center rounded-full transition-colors", activo("/clientes/") ? "bg-acento text-sobre-acento" : "text-texto2")}><Users className="size-[22px]" strokeWidth={1.9} /></Link>
-        <button onClick={() => setMas(true)} aria-label="Más" className={cx("grid size-12 place-items-center rounded-full", ["/catalogo/", "/ajustes/"].some(activo) ? "bg-acento text-sobre-acento" : "text-texto2")}><MoreHorizontal className="size-[22px]" /></button>
+        <Link href="/catalogo/" aria-label="Catálogo" className={cx("grid size-12 place-items-center rounded-full transition-colors", activo("/catalogo/") ? "bg-acento text-sobre-acento" : "text-texto2")}><Shirt className="size-[22px]" strokeWidth={1.9} /></Link>
+        <button onClick={() => setMas(true)} aria-label="Más" className={cx("grid size-12 place-items-center rounded-full", ["/clientes/", "/ajustes/"].some(activo) ? "bg-acento text-sobre-acento" : "text-texto2")}><MoreHorizontal className="size-[22px]" /></button>
       </nav>
       {mas && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMas(false)}>
           <div className="absolute inset-0 bg-black/25" />
           <div className="cristal animar absolute inset-x-4 bottom-24 rounded-[24px] p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {NAV.slice(3).map(({ href, t, i: I }) => (
+            {NAV.filter((n) => n.href === "/clientes/" || n.href === "/ajustes/").map(({ href, t, i: I }) => (
               <Link key={href} href={href} className="flex h-12 items-center gap-3 rounded-xl px-3 hover:bg-suave"><I className="size-5 text-texto2" />{t}</Link>
             ))}
             <button onClick={cambiar} className="flex h-12 w-full items-center gap-3 rounded-xl px-3 hover:bg-suave">{oscuro ? <Sun className="size-5 text-texto2" /> : <Moon className="size-5 text-texto2" />}Modo {oscuro ? "claro" : "oscuro"}</button>
