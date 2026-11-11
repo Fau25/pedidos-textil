@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, ChevronDown, Receipt, Tag, Phone, Mail, MessageCircle } from "lucide-react";
+import { Plus, Loader2, ChevronDown, Receipt, Tag, Phone, Mail } from "lucide-react";
 import { Ticket } from "./ticket";
 import { ticketDe } from "@/lib/presupuestos";
 import { useSesion } from "./sesion";
@@ -219,12 +219,6 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
             <textarea className="campo" rows={3} placeholder="Notas para el pedido (plazos, indicaciones del cliente…)" value={p.notas} onChange={(e) => set((x) => ({ ...x, notas: e.target.value }))} />
           </Seccion>
 
-          {/* Ticket para el cliente */}
-          <button type="button" onClick={() => setVerTicket(true)}
-            className="tarjeta flex min-h-14 w-full items-center gap-3 px-5 py-3.5 text-left hover:bg-suave/60">
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-azul-suave text-azul"><Receipt className="size-5" /></span>
-            <span className="min-w-0 flex-1"><span className="block text-[16px] font-semibold">Generar ticket</span><span className="block text-[13px] text-texto2">Para enviar al cliente por WhatsApp o correo</span></span>
-          </button>
         </div>
 
         {/* Resumen fijo */}
@@ -255,6 +249,10 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
               </div>
               <div className="flex items-baseline justify-between pt-2"><dt className="font-semibold">Total</dt><dd className="num text-[24px] font-semibold tracking-[-0.02em]">{euros(t.total)}</dd></div>
             </dl>
+            <button type="button" onClick={() => setVerTicket(true)}
+              className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-azul-suave text-[14px] font-semibold text-azul hover:brightness-95">
+              <Receipt className="size-[18px]" />Generar ticket
+            </button>
             <div className="mt-4 hidden flex-col gap-2 xl:flex">
               <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>
               <Boton onClick={cancelar}>Cancelar</Boton>
@@ -306,8 +304,8 @@ const telWa = (t: string) => { const d = t.replace(/\D/g, ""); return d.length =
 
 /** Ficha oscura del cliente elegido: llamar, WhatsApp, email y cambiar */
 function FichaCliente({ c, cambiar }: { c: Cliente; cambiar: () => void }) {
-  const accion = "flex h-11 items-center justify-center gap-1.5 rounded-[14px] bg-white/10 text-[13px] font-medium text-white hover:bg-white/15";
-  const apagada = "flex h-11 items-center justify-center gap-1.5 rounded-[14px] bg-white/5 text-[13px] text-white/35";
+  const accion = "grid size-11 place-items-center rounded-full bg-white/12 text-white hover:bg-white/20";
+  const apagada = "grid size-11 place-items-center rounded-full bg-white/5 text-white/30";
   return (
     <div className="flex flex-col gap-3.5 rounded-[18px] bg-[#17181c] p-4 text-white">
       <div className="flex items-center gap-3">
@@ -318,11 +316,21 @@ function FichaCliente({ c, cambiar }: { c: Cliente; cambiar: () => void }) {
         </div>
         <button type="button" onClick={cambiar} className="h-9 shrink-0 rounded-full bg-white/15 px-3.5 text-[13px] font-semibold hover:bg-white/25">Cambiar</button>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        {c.telefono ? <a href={`tel:${c.telefono.replace(/\s/g, "")}`} className={accion}><Phone className="size-4" />Llamar</a> : <span className={apagada}><Phone className="size-4" />Llamar</span>}
-        {c.telefono ? <a href={`https://wa.me/${telWa(c.telefono)}`} target="_blank" rel="noopener noreferrer" className={accion}><MessageCircle className="size-4" />WhatsApp</a> : <span className={apagada}><MessageCircle className="size-4" />WhatsApp</span>}
-        {c.email ? <a href={`mailto:${c.email}`} className={accion}><Mail className="size-4" />Email</a> : <span className={apagada}><Mail className="size-4" />Email</span>}
+      <div className="flex gap-2.5">
+        {c.telefono ? <a href={`tel:${c.telefono.replace(/\s/g, "")}`} aria-label={`Llamar a ${c.nombre}`} title="Llamar" className={accion}><Phone className="size-[18px]" /></a> : <span className={apagada} title="Sin teléfono"><Phone className="size-[18px]" /></span>}
+        {c.telefono ? <a href={`https://wa.me/${telWa(c.telefono)}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp a ${c.nombre}`} title="WhatsApp" className={accion}><IconoWhatsApp /></a> : <span className={apagada} title="Sin teléfono"><IconoWhatsApp /></span>}
+        {c.email ? <a href={`mailto:${c.email}`} aria-label={`Email a ${c.nombre}`} title="Email" className={accion}><Mail className="size-[18px]" /></a> : <span className={apagada} title="Sin email"><Mail className="size-[18px]" /></span>}
       </div>
     </div>
+  );
+}
+
+/** Icono de WhatsApp (bocadillo con teléfono), en trazo como los demás */
+function IconoWhatsApp() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 20.5l1.3-4.2A8.5 8.5 0 1 1 8 19.4z" />
+      <path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-1.8-1.8l.8-1-1-2z" strokeWidth="1.5" />
+    </svg>
   );
 }
