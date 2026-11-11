@@ -86,7 +86,7 @@ await prueba("la ficha «Nuevo pedido» abre el editor y guarda todo en una sola
   assert.equal(await p.getByText(/Precio de compra|Coste \/ ud/).count(), 0, "sin precio de coste");
   // en un pedido nuevo los bloques empiezan plegados
   assert.equal(await p.getByLabel("Buscar cliente").count(), 0, "bloques plegados al empezar");
-  await p.getByRole("button", { name: /Cliente y fecha/ }).click();
+  await p.getByRole("button", { name: /^Cliente/ }).click();
   await p.getByLabel("Buscar cliente").click(); await p.getByRole("option", { name: /Club Deportivo/ }).click();
   await p.getByRole("button", { name: /^Prendas/ }).click();
   await p.getByLabel("Buscar prenda 1").fill("beagle");
@@ -121,7 +121,7 @@ await prueba("marcar entregado ofrece deshacer", async () => {
 await prueba("el PDF del presupuesto se descarga", async () => {
   const { ctx, p } = await abrir();
   await ir(p, "pedidos/ver/?id=p1");
-  const [d] = await Promise.all([p.waitForEvent("download", { timeout: 30000 }), p.getByRole("button", { name: "PDF" }).click()]);
+  const [d] = await Promise.all([p.waitForEvent("download", { timeout: 30000 }), p.getByRole("button", { name: "Presupuesto" }).click()]);
   const f = await d.path(); assert.ok(fs.statSync(f).size > 2000); await ctx.close();
 });
 await prueba("sin conexión avisa en vez de pedir crear el taller", async () => {
@@ -187,7 +187,7 @@ await prueba("editar un pedido no guarda hasta pulsar Guardar; Cancelar sale sin
   const { ctx, p, escrituras, errores } = await abrir();
   await ir(p, "pedidos/nuevo/?id=p1");
   assert.equal(await p.getByRole("button", { name: /Desde el catálogo/ }).count(), 0, "sin botón azul de catálogo");
-  await p.getByRole("button", { name: /Cliente y fecha/ }).click();
+  await p.getByRole("button", { name: /^Cliente/ }).click();
   await p.getByLabel("Referencia interna (opcional)").fill("Cambio de prueba"); await p.waitForTimeout(1500);
   assert.equal(escrituras.filter((x) => x.tabla === "guardar_pedido").length, 0, "no se guarda solo");
   await p.getByRole("button", { name: "Cancelar" }).first().click();
@@ -226,6 +226,24 @@ await prueba("las fotos del catálogo se firman en un solo lote y se ven", async
   assert.equal(firmas, 1, "un solo lote de firmas");
   assert.equal(await p.locator('main img[src*="roly/CA6554"]').count(), 1);
   T.catalogo = T.catalogo.slice(0, 1); T.catalogo[0] = { ...T.catalogo[0], imagen_path: null };
+  assert.deepEqual(errores, []); await ctx.close();
+});
+
+await prueba("el ticket del pedido se genera y se puede enviar o descargar", async () => {
+  const { ctx, p, errores } = await abrir();
+  await ir(p, "pedidos/nuevo/?id=p1");
+  await p.getByRole("button", { name: /Generar ticket/ }).click();
+  const tk = p.getByRole("article", { name: "Vista previa del ticket" });
+  await tk.waitFor();
+  const txt = await tk.innerText();
+  assert.match(txt, /P-2026-0001/); assert.match(txt, /Club Deportivo Arenal/); assert.match(txt, /Total/); assert.match(txt, /IVA 21/);
+  assert.ok(await p.getByRole("button", { name: /Enviar al cliente/ }).isEnabled());
+  const descarga = p.waitForEvent("download", { timeout: 30000 });
+  await p.getByRole("button", { name: /^PDF$/ }).click();
+  assert.match((await descarga).suggestedFilename(), /^Ticket P-2026-0001/);
+  await p.keyboard.press("Escape");
+  await ir(p, "pedidos/ver/?id=p1"); await p.getByRole("button", { name: "Ticket" }).click();
+  await p.getByRole("article", { name: "Vista previa del ticket" }).waitFor();
   assert.deepEqual(errores, []); await ctx.close();
 });
 

@@ -68,7 +68,7 @@ async function abrir({ caido = false } = {}) {
 }
 const ir = async (p, ruta) => { await p.goto(BASE + ruta, { waitUntil: "networkidle" }); await p.waitForTimeout(500); };
 
-const PAGS = [["inicio", "", "Nuevo pedido"], ["pedidos", "pedidos/", "P-2026-0002"], ["ficha", "pedidos/ver/?id=p1", "Prendas"], ["editor", "pedidos/nuevo/?id=p1", "Cliente y fecha"], ["clientes", "clientes/", "Marta"], ["catalogo", "catalogo/", "Beagle"], ["ajustes", "ajustes/", "Fotos de Roly"]];
+const PAGS = [["inicio", "", "Nuevo pedido"], ["pedidos", "pedidos/", "P-2026-0002"], ["ficha", "pedidos/ver/?id=p1", "Prendas"], ["editor", "pedidos/nuevo/?id=p1", "Generar ticket"], ["clientes", "clientes/", "Marta"], ["catalogo", "catalogo/", "Beagle"], ["ajustes", "ajustes/", "Fotos de Roly"]];
 const res = {};
 async function red(p) { const c = await p.context().newCDPSession(p); await c.send("Network.emulateNetworkConditions", { offline: false, latency: Number(process.env.RTT || 70), downloadThroughput: Number(process.env.BW || 9e6) / 8, uploadThroughput: 1e6 / 8 }); await c.send("Emulation.setCPUThrottlingRate", { rate: 4 }); }
 const ver = (p, t) => p.getByText(t, { exact: false }).first().waitFor({ timeout: 30000 });

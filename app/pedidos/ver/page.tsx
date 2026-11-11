@@ -2,14 +2,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2 } from "lucide-react";
+import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Receipt } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Boton, Cargando, Tarjeta, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError, urlArchivo } from "@/lib/supabase";
 import { useCarga, useParam } from "@/lib/usar";
 import { calcular, euros } from "@/lib/calculo";
 import { aCalc, cargarPedido, describirLinea, marcarEntregado, textoTallas } from "@/lib/pedidos";
-import { compartirPDF } from "@/lib/presupuestos";
+import { compartirPDF, ticketDe } from "@/lib/presupuestos";
+import { Ticket } from "@/components/ticket";
 import type { Cliente } from "@/lib/tipos";
 
 export default function Ficha() {
@@ -18,12 +19,13 @@ export default function Ficha() {
   const { aviso, confirmar } = useAvisos();
   const router = useRouter();
   const [ocupado, setOcupado] = useState("");
+  const [verTicket, setVerTicket] = useState(false);
 
   const { datos, recargar, error } = useCarga(async () => {
     if (!pid) return null;
     const r = await cargarPedido(pid);
     if (!r) return { falta: true as const };
-    const cli = r.ed.cliente_id ? await sb.from("clientes").select("*").eq("id", r.ed.cliente_id).single() : { data: null };
+    const cli = r.ed.cliente_id ? await sb.from("clientes").select("*").eq("id", r.ed.cliente_id).maybeSingle() : { data: null };
     return { ...r, cliente: cli.data as Cliente | null };
   }, [pid]);
 
@@ -64,7 +66,8 @@ export default function Ficha() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/pedidos/nuevo/?id=${ed.id}`}><Boton><Pencil className="size-4" />Editar</Boton></Link>
-          <Boton cargando={ocupado === "pdf"} onClick={pdf}><Download className="size-4" />PDF</Boton>
+          <Boton onClick={() => setVerTicket(true)}><Receipt className="size-4" />Ticket</Boton>
+          <Boton cargando={ocupado === "pdf"} onClick={pdf}><Download className="size-4" />Presupuesto</Boton>
           <Link href={`/pedidos/nuevo/?duplicar=${ed.id}`}><Boton variante="fantasma" aria-label="Duplicar"><Copy className="size-4" /></Boton></Link>
           <Boton variante="fantasma" aria-label="Eliminar" className="hover:text-red-600" onClick={borrar}><Trash2 className="size-4" /></Boton>
         </div>
@@ -148,6 +151,7 @@ export default function Ficha() {
           )}
         </aside>
       </div>
+      <Ticket abierto={verTicket} cerrar={() => setVerTicket(false)} p={verTicket ? ticketDe(ed, empresa!, cliente ?? null) : null} />
     </>
   );
 }

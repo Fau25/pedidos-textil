@@ -1,7 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, ChevronDown } from "lucide-react";
+import { Plus, Loader2, ChevronDown, Receipt, Tag, Phone, Mail, MessageCircle } from "lucide-react";
+import { Ticket } from "./ticket";
+import { ticketDe } from "@/lib/presupuestos";
 import { useSesion } from "./sesion";
 import { Boton, Campo, CampoImporte, Tarjeta, cx, useAvisos } from "./ui";
 import { sb, textoError } from "@/lib/supabase";
@@ -26,6 +28,8 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   const [enviando, setEnviando] = useState(false);
   const [abiertos, setAbiertos] = useState<Record<string, boolean>>({ cliente: true, prendas: true, pers: true, notas: true });
   const [lineasAbiertas, setLineasAbiertas] = useState<Set<string> | null>(null);
+  const [verTicket, setVerTicket] = useState(false);
+  const [cambiandoCliente, setCambiandoCliente] = useState(false);
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [errorCliente, setErrorCliente] = useState(false);
   const cambiado = useRef(false);
@@ -148,18 +152,25 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_330px]">
         <div className="min-w-0 space-y-6">
-          {/* 1 · Cliente y fechas */}
-          <Seccion tarjeta id="bloque-cliente" titulo="Cliente y fecha" abierta={abiertos.cliente} alternar={() => alternar("cliente")}
-            resumen={[cliente?.nombre ?? "Sin cliente", fechaCorta(p.fecha), p.referencia].filter(Boolean).join(" · ")}>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="sm:col-span-2">
-                <SelectorCliente clientes={clientes} valor={p.cliente_id} error={errorCliente}
-                  cambiar={(cid) => { setErrorCliente(false); set((x) => ({ ...x, cliente_id: cid })); }}
-                  creado={(c) => { setClientes((l) => [...l, c].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))); setErrorCliente(false); set((x) => ({ ...x, cliente_id: c.id })); }} />
-                {cliente && <p className="mt-1.5 truncate text-[12px] text-texto2">{[cliente.contacto, cliente.telefono, cliente.email].filter(Boolean).join(" · ") || "Sin datos de contacto"}</p>}
-              </div>
-              <Campo etiqueta="Fecha del pedido"><input type="date" className="campo" value={p.fecha} onChange={(e) => set((x) => ({ ...x, fecha: e.target.value }))} /></Campo>
-              <Campo etiqueta="Referencia interna (opcional)" className="sm:col-span-2"><input className="campo" placeholder="Ej.: Temporada 26/27" value={p.referencia} onChange={(e) => set((x) => ({ ...x, referencia: e.target.value }))} /></Campo>
+          {/* 1 · Cliente (propuesta A: ficha del cliente con llamar, WhatsApp y email; sin fecha) */}
+          <Seccion tarjeta id="bloque-cliente" titulo="Cliente" abierta={abiertos.cliente} alternar={() => alternar("cliente")}
+            resumen={[cliente?.nombre ?? "Sin cliente", p.referencia].filter(Boolean).join(" · ")}>
+            <div className="flex flex-col gap-3.5">
+              {cliente && !cambiandoCliente ? (
+                <FichaCliente c={cliente} cambiar={() => setCambiandoCliente(true)} />
+              ) : (
+                <div>
+                  <SelectorCliente clientes={clientes} valor={p.cliente_id} error={errorCliente}
+                    cambiar={(cid) => { setErrorCliente(false); setCambiandoCliente(false); set((x) => ({ ...x, cliente_id: cid })); }}
+                    creado={(c) => { setClientes((l) => [...l, c].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))); setErrorCliente(false); setCambiandoCliente(false); set((x) => ({ ...x, cliente_id: c.id })); }} />
+                  {cliente && <button type="button" onClick={() => setCambiandoCliente(false)} className="mt-1 h-9 px-1 text-[13px] text-texto2 hover:text-texto">Mantener {cliente.nombre}</button>}
+                </div>
+              )}
+              <label className="flex h-12 items-center gap-2.5 rounded-[14px] bg-suave px-3.5 text-texto2 focus-within:ring-2 focus-within:ring-azul/30">
+                <Tag className="size-[18px] shrink-0" />
+                <input className="min-w-0 flex-1 bg-transparent text-[15px] text-texto outline-none placeholder:text-texto2/80" aria-label="Referencia interna (opcional)"
+                  placeholder="Referencia (opcional)" value={p.referencia} onChange={(e) => set((x) => ({ ...x, referencia: e.target.value }))} />
+              </label>
             </div>
           </Seccion>
 
@@ -207,6 +218,13 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
           <Seccion tarjeta titulo="Observaciones" abierta={abiertos.notas} alternar={() => alternar("notas")} resumen={p.notas || "Sin observaciones"}>
             <textarea className="campo" rows={3} placeholder="Notas para el pedido (plazos, indicaciones del cliente…)" value={p.notas} onChange={(e) => set((x) => ({ ...x, notas: e.target.value }))} />
           </Seccion>
+
+          {/* Ticket para el cliente */}
+          <button type="button" onClick={() => setVerTicket(true)}
+            className="tarjeta flex min-h-14 w-full items-center gap-3 px-5 py-3.5 text-left hover:bg-suave/60">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-azul-suave text-azul"><Receipt className="size-5" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-[16px] font-semibold">Generar ticket</span><span className="block text-[13px] text-texto2">Para enviar al cliente por WhatsApp o correo</span></span>
+          </button>
         </div>
 
         {/* Resumen fijo */}
@@ -246,6 +264,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
       </div>
 
       {/* Barra de acciones (móvil) */}
+      <Ticket abierto={verTicket} cerrar={() => setVerTicket(false)} p={verTicket ? ticketDe(p, empresa!, cliente ?? null) : null} />
       <div className="h-20 xl:hidden" />
       <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 mx-auto flex max-w-[640px] lg:bottom-4 lg:left-[260px] items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur xl:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>
@@ -279,5 +298,31 @@ function Seccion({ titulo, resumen, abierta, alternar, tarjeta, id, children }: 
       </button>
       {abierta && <div className={cx("animar", tarjeta && "px-5 pb-5")}>{children}</div>}
     </section>
+  );
+}
+
+const iniciales = (n: string) => n.split(/\s+/).filter((w) => w.length > 2 || /^[A-ZÁÉÍÓÚÑ]/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || n.slice(0, 2).toUpperCase();
+const telWa = (t: string) => { const d = t.replace(/\D/g, ""); return d.length === 9 ? "34" + d : d; };
+
+/** Ficha oscura del cliente elegido: llamar, WhatsApp, email y cambiar */
+function FichaCliente({ c, cambiar }: { c: Cliente; cambiar: () => void }) {
+  const accion = "flex h-11 items-center justify-center gap-1.5 rounded-[14px] bg-white/10 text-[13px] font-medium text-white hover:bg-white/15";
+  const apagada = "flex h-11 items-center justify-center gap-1.5 rounded-[14px] bg-white/5 text-[13px] text-white/35";
+  return (
+    <div className="flex flex-col gap-3.5 rounded-[18px] bg-[#17181c] p-4 text-white">
+      <div className="flex items-center gap-3">
+        <span className="grid size-12 shrink-0 place-items-center rounded-full bg-azul text-[16px] font-bold" aria-hidden="true">{iniciales(c.nombre)}</span>
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-[17px] font-bold leading-tight">{c.nombre}</p>
+          <p className="truncate text-[13px] text-white/70">{[c.contacto, c.telefono].filter(Boolean).join(" · ") || "Sin datos de contacto"}</p>
+        </div>
+        <button type="button" onClick={cambiar} className="h-9 shrink-0 rounded-full bg-white/15 px-3.5 text-[13px] font-semibold hover:bg-white/25">Cambiar</button>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {c.telefono ? <a href={`tel:${c.telefono.replace(/\s/g, "")}`} className={accion}><Phone className="size-4" />Llamar</a> : <span className={apagada}><Phone className="size-4" />Llamar</span>}
+        {c.telefono ? <a href={`https://wa.me/${telWa(c.telefono)}`} target="_blank" rel="noopener noreferrer" className={accion}><MessageCircle className="size-4" />WhatsApp</a> : <span className={apagada}><MessageCircle className="size-4" />WhatsApp</span>}
+        {c.email ? <a href={`mailto:${c.email}`} className={accion}><Mail className="size-4" />Email</a> : <span className={apagada}><Mail className="size-4" />Email</span>}
+      </div>
+    </div>
   );
 }

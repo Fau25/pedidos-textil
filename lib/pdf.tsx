@@ -23,18 +23,21 @@ const s = StyleSheet.create({
 
 const C = { d: { flex: 1 }, u: { width: 50 }, p: { width: 70 }, i: { width: 80 } };
 
-function Doc({ p, logo }: { p: Presupuesto; logo: string | null }) {
+export type TipoDoc = "presupuesto" | "ticket";
+const TITULO: Record<TipoDoc, string> = { presupuesto: "Presupuesto", ticket: "Ticket" };
+
+function Doc({ p, logo, tipo }: { p: Presupuesto; logo: string | null; tipo: TipoDoc }) {
   const d = p.datos;
   const filas = [...d.lineas, ...d.personalizaciones];
   return (
-    <Document title={`Presupuesto ${p.numero}`} author={d.empresa.nombre ?? ""} language="es">
+    <Document title={`${TITULO[tipo]} ${p.numero}`} author={d.empresa.nombre ?? ""} language="es">
       <Page size="A4" style={s.pag}>
         <View style={[s.fila, { justifyContent: "space-between", marginBottom: 28 }]}>
           <View>
             {logo ? <Image src={logo} style={s.logo} /> : <Text style={[s.b, { fontSize: 14 }]}>{d.empresa.nombre}</Text>}
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={s.titulo}>Presupuesto</Text>
+            <Text style={s.titulo}>{TITULO[tipo]}</Text>
             <Text style={[s.gris, { marginTop: 2 }]}>{p.numero}</Text>
           </View>
         </View>
@@ -57,7 +60,7 @@ function Doc({ p, logo }: { p: Presupuesto; logo: string | null }) {
           </View>
           <View style={[s.caja, { flex: 0.8 }]}>
             <Text style={s.peq}>Fecha</Text><Text>{f(p.fecha)}</Text>
-            <Text style={[s.peq, { marginTop: 6 }]}>Válido hasta</Text><Text>{f(p.validez)}</Text>
+            {tipo === "presupuesto" && p.validez && <><Text style={[s.peq, { marginTop: 6 }]}>Válido hasta</Text><Text>{f(p.validez)}</Text></>}
           </View>
         </View>
         {d.pedido.referencia && <Text style={{ marginBottom: 10 }}><Text style={s.gris}>Referencia: </Text>{d.pedido.referencia}</Text>}
@@ -118,8 +121,8 @@ async function aDataUrl(url: string): Promise<string | null> {
   } catch { return null; }
 }
 
-export async function generarPDF(p: Presupuesto): Promise<Blob> {
+export async function generarPDF(p: Presupuesto, tipo: TipoDoc = "presupuesto"): Promise<Blob> {
   const u = await urlArchivo(p.datos.empresa.logo_path);
   const logo = u ? await aDataUrl(u) : null;
-  return pdf(<Doc p={p} logo={logo} />).toBlob();
+  return pdf(<Doc p={p} logo={logo} tipo={tipo} />).toBlob();
 }
