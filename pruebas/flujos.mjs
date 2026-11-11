@@ -67,7 +67,7 @@ async function prueba(nombre, fn) {
 
 await prueba("todas las pantallas cargan sin errores", async () => {
   const { ctx, p, errores } = await abrir();
-  for (const r of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/", "clientes/", "clientes/ver/?id=k1", "catalogo/", "ajustes/"]) await ir(p, r);
+  for (const r of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/", "clientes/", "clientes/ver/?id=k1", "catalogo/", "precios/", "precios/?tab=personalizacion", "ajustes/"]) await ir(p, r);
   assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("al saltar de un pedido a otro con el buscador se ve el nuevo", async () => {
@@ -179,7 +179,7 @@ await prueba("ninguna pantalla se sale de lado en móvil ni tablet", async () =>
   const { ctx, p, errores } = await abrir();
   for (const w of [360, 390, 768, 1024]) {
     await p.setViewportSize({ width: w, height: 900 });
-    for (const ruta of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/?id=p1", "clientes/", "clientes/ver/?id=k1", "catalogo/", "ajustes/"]) {
+    for (const ruta of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/?id=p1", "clientes/", "clientes/ver/?id=k1", "catalogo/", "precios/", "ajustes/"]) {
       await ir(p, ruta);
       const sobra = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       assert.ok(sobra <= 1, `${ruta || "inicio"} a ${w}px se sale ${sobra}px`);
@@ -314,6 +314,17 @@ await prueba("generar factura: pide el NIF del taller, confirma, emite y la ense
     assert.deepEqual(b.errores, []); await b.ctx.close();
   } finally { T.empresas[0].nif = null; }
   assert.deepEqual(errores, []);
+});
+await prueba("precios: poner el precio de una prenda lo guarda solo", async () => {
+  const { ctx, p, errores, escrituras } = await abrir();
+  await ir(p, "precios/");
+  const c = p.getByLabel("Precio de Beagle");
+  await c.fill("6,50"); await p.waitForTimeout(1000);
+  const e = escrituras.find((x) => x.tabla === "catalogo" && x.metodo === "PATCH");
+  assert.ok(e, "guarda"); assert.equal(e.cuerpo.precio_venta, 6.5);
+  await p.getByRole("tab", { name: /Personalización/ }).click();
+  await p.getByText("Bordado").first().waitFor();
+  assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
   const { ctx, p, errores } = await abrir();

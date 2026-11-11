@@ -4,22 +4,27 @@ import { createPortal } from "react-dom";
 import { Camera, Loader2, Pencil, Plus, Shirt, Trash2, Truck, X } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
-import { Boton, Campo, CampoImporte, Cargando, Hoja, Pestanas, Tarjeta, Vacio, cx, useAvisos } from "@/components/ui";
+import { Boton, Campo, Cargando, Hoja, Pestanas, Vacio, cx, useAvisos } from "@/components/ui";
 import { ImportarTarifa } from "@/components/importar-tarifa";
 import { Muestra } from "@/components/muestra";
 import { borrarConDeshacer, sb, subirArchivo, textoError } from "@/lib/supabase";
 import { FotoPrenda } from "@/components/bloques-pedido";
 import { useCarga } from "@/lib/usar";
-import { TIPOS_PRENDA, type Prenda, type Proveedor, type TarifaFila } from "@/lib/tipos";
+import { TIPOS_PRENDA, type Prenda, type Proveedor } from "@/lib/tipos";
+import { HABITUALES, categoria, categorias } from "@/lib/categorias";
 
 export default function Catalogo() {
-  const [tab, setTab] = useState<"prendas" | "tarifas" | "proveedores">("prendas");
-  useEffect(() => { const t = new URLSearchParams(location.search).get("tab"); if (t === "tarifas" || t === "proveedores") setTab(t); }, []);
+  const [tab, setTab] = useState<"prendas" | "proveedores">("prendas");
+  useEffect(() => {
+    const t = new URLSearchParams(location.search).get("tab");
+    if (t === "tarifas") location.replace(location.pathname.replace(/catalogo\/?$/, "precios/") + "?tab=personalizacion"); // ahora en Precios
+    else if (t === "proveedores") setTab(t);
+  }, []);
   return (
     <>
       <Cabecera titulo="Catálogo" sub="Tus prendas habituales (★) salen primero al crear pedidos." />
-      <Pestanas valor={tab} cambiar={setTab} opciones={[{ v: "prendas", t: "Prendas" }, { v: "tarifas", t: "Técnicas y tarifas" }, { v: "proveedores", t: "Proveedores" }]} />
-      <div className="mt-5">{tab === "prendas" ? <Prendas /> : tab === "tarifas" ? <Tarifas /> : <Proveedores />}</div>
+      <Pestanas valor={tab} cambiar={setTab} opciones={[{ v: "prendas", t: "Prendas" }, { v: "proveedores", t: "Proveedores" }]} />
+      <div className="mt-5">{tab === "prendas" ? <Prendas /> : <Proveedores />}</div>
     </>
   );
 }
@@ -145,70 +150,6 @@ function Prendas() {
   );
 }
 
-function Tarifas() {
-  const { tecnicas, tarifas, recargar, empresa } = useSesion();
-  const { aviso, confirmar } = useAvisos();
-  const [filas, setFilas] = useState<TarifaFila[]>(tarifas);
-  const [nueva, setNueva] = useState("");
-  useEffect(() => setFilas(tarifas), [tarifas]);
-
-  const actualizar = async (t: TarifaFila, c: Partial<TarifaFila>) => {
-    setFilas((f) => f.map((x) => (x.id === t.id ? { ...x, ...c } : x)));
-    const { error } = await sb.from("tarifas").update(c).eq("id", t.id);
-    if (error) aviso(textoError(error), "error"); else recargar();
-  };
-
-  return (
-    <div className="space-y-4">
-      <p className="text-[13px] text-texto2">El precio de cada personalización se elige solo según el número de prendas del pedido. Siempre puedes cambiarlo a mano en el pedido.</p>
-      {tecnicas.map((tc) => {
-        const tf = filas.filter((x) => x.tecnica_id === tc.id).sort((a, b) => a.desde - b.desde);
-        return (
-          <Tarjeta key={tc.id} titulo={tc.nombre} accion={<Boton tam="s" variante="fantasma" className="hover:text-red-600" aria-label={`Quitar ${tc.nombre}`} onClick={async () => {
-            if (!(await confirmar({ titulo: `¿Quitar la técnica ${tc.nombre}?`, texto: "Las personalizaciones ya hechas conservan su nombre y precio.", ok: "Quitar", peligro: true }))) return;
-            const { error } = await sb.from("tecnicas").delete().eq("id", tc.id); if (error) aviso(textoError(error), "error"); else recargar();
-          }}><Trash2 className="size-4" /></Boton>}>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[440px] text-[13px]">
-                <thead className="text-left text-[12px] text-texto2"><tr><th className="pb-2 font-medium">Desde (uds)</th><th className="pb-2 font-medium">Hasta</th><th className="pb-2 font-medium">Complejidad</th><th className="pb-2 font-medium">Precio / ud</th><th /></tr></thead>
-                <tbody>
-                  {tf.map((t) => (
-                    <tr key={t.id}>
-                      <td className="py-1 pr-2"><input type="number" min={1} className="campo num h-9 w-20" defaultValue={t.desde} onBlur={(e) => actualizar(t, { desde: Math.max(1, Number(e.target.value) || 1) })} aria-label="Desde unidades" /></td>
-                      <td className="py-1 pr-2"><input type="number" min={1} className="campo num h-9 w-20" placeholder="∞" defaultValue={t.hasta ?? ""} onBlur={(e) => actualizar(t, { hasta: e.target.value ? Number(e.target.value) : null })} aria-label="Hasta unidades" /></td>
-                      <td className="py-1 pr-2"><input className="campo h-9 w-28" defaultValue={t.complejidad} onBlur={(e) => actualizar(t, { complejidad: e.target.value || "Normal" })} aria-label="Complejidad" /></td>
-                      <td className="py-1 pr-2"><CampoImporte className="w-28" valor={t.precio} cambiar={(v) => setFilas((f) => f.map((x) => (x.id === t.id ? { ...x, precio: v ?? 0 } : x)))} aria-label="Precio" /></td>
-                      <td className="py-1 text-right">
-                        {tarifas.some((o) => o.id === t.id && o.precio !== t.precio) &&
-                          <button className="mr-1 text-[12px] font-medium text-azul" onClick={() => { actualizar(t, { precio: t.precio }); aviso("Tarifa guardada"); }}>Guardar</button>}
-                        <button aria-label="Quitar tramo" className="p-1 text-texto2 hover:text-red-600" onClick={() => borrarConDeshacer("tarifas", t, "Tramo quitado", aviso, recargar)}><Trash2 className="size-3.5" /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Boton tam="s" className="mt-3" onClick={async () => {
-              const ult = tf[tf.length - 1];
-              const { error } = await sb.from("tarifas").insert({ tecnica_id: tc.id, desde: ult ? (ult.hasta ?? ult.desde) + 1 : 1, hasta: null, coste: 0, precio: 0 });
-              if (error) aviso(textoError(error), "error"); else recargar();
-            }}><Plus className="size-3.5" />Añadir tramo</Boton>
-          </Tarjeta>
-        );
-      })}
-      <form className="tarjeta flex gap-2 p-4" onSubmit={async (e) => {
-        e.preventDefault(); if (!nueva.trim()) return;
-        const { error } = await sb.from("tecnicas").insert({ empresa_id: empresa!.id, nombre: nueva.trim(), orden: tecnicas.length + 1 });
-        if (error) return aviso(textoError(error), "error");
-        setNueva(""); recargar(); aviso("Técnica añadida");
-      }}>
-        <input className="campo" placeholder="Nueva técnica (p. ej. Sublimación, Transfer…)" value={nueva} onChange={(e) => setNueva(e.target.value)} />
-        <Boton type="submit"><Plus className="size-4" />Añadir</Boton>
-      </form>
-    </div>
-  );
-}
-
 function Proveedores() {
   const { empresa, proveedores, recargar } = useSesion();
   const { aviso } = useAvisos();
@@ -254,28 +195,6 @@ function Proveedores() {
 }
 
 
-
-const HABITUALES = "Habituales";
-/** Categoría del menú según el tipo de prenda */
-function categoria(tipo?: string | null): string {
-  const t = (tipo ?? "").toLowerCase();
-  if (/polo/.test(t)) return "Polos";
-  if (/chaleco/.test(t)) return "Chalecos";
-  if (/softshell/.test(t)) return "Softshell";
-  if (/polar/.test(t)) return "Polares";
-  if (/sudadera/.test(t)) return "Sudaderas";
-  if (/chaqueta|cazadora|abrigo|parka/.test(t)) return "Chaquetas";
-  if (/camiseta|tirantes/.test(t)) return "Camisetas";
-  return "Otras";
-}
-const ORDEN_CATS = ["Camisetas", "Polos", "Sudaderas", "Chaquetas", "Polares", "Softshell", "Chalecos", "Otras"];
-/** Chips del menú: Habituales (si hay) y las categorías con prendas, con su número */
-function categorias(ps: Prenda[]): { nombre: string; n: number }[] {
-  const cuenta = new Map<string, number>();
-  for (const p of ps) cuenta.set(categoria(p.tipo), (cuenta.get(categoria(p.tipo)) ?? 0) + 1);
-  const fav = ps.filter((p) => p.favorito).length;
-  return [...(fav ? [{ nombre: HABITUALES, n: fav }] : []), ...ORDEN_CATS.filter((c) => cuenta.has(c)).map((c) => ({ nombre: c, n: cuenta.get(c)! }))];
-}
 
 /** Foto de la prenda en grande; el lápiz abre sus datos para editarlos */
 function VerPrenda({ p, cerrar, editar }: { p: Prenda; cerrar: () => void; editar: () => void }) {
