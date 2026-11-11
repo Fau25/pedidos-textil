@@ -50,6 +50,10 @@ export function aCalc(p: PedidoEd, margen: number): PedidoCalc {
   };
 }
 
+/** Último pedido cargado guardado en el dispositivo (para abrir el editor al instante) */
+export function pedidoGuardado(pid: string): PedidoEd | null {
+  try { return JSON.parse(localStorage.getItem("pedido:" + pid) || "null"); } catch { return null; }
+}
 export async function cargarPedido(pid: string): Promise<{ ed: PedidoEd; pedido: Pedido } | null> {
   const [p, l, x] = await Promise.all([
     sb.from("pedidos").select("*, clientes(nombre)").eq("id", pid).maybeSingle(),
@@ -80,6 +84,7 @@ export async function cargarPedido(pid: string): Promise<{ ed: PedidoEd; pedido:
       notas: r.notas ?? "", estado: r.estado, lineas: (r.personalizacion_lineas ?? []).map((z) => z.linea_id),
     })),
   };
+  try { localStorage.setItem("pedido:" + pid, JSON.stringify(ed)); } catch { /* sin almacenamiento */ }
   return { ed, pedido: ped };
 }
 

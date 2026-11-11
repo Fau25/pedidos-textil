@@ -1,10 +1,10 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { sb } from "@/lib/supabase";
+import { sb, SUPABASE_URL } from "@/lib/supabase";
 import { salir } from "@/lib/supabase";
 import type { Empresa, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
-import { CATALOGO_ROLY, MODELOS_ROLY, REFERENCIAS_ROLY, TALLAS_ADULTO, TALLAS_NINO } from "@/lib/roly";
+import { MODELOS_ROLY, REFERENCIAS_ROLY, TALLAS_ADULTO, TALLAS_NINO, cargarCatalogoRoly } from "@/lib/roly";
 
 type Datos = {
   sesion: Session | null;
@@ -22,6 +22,8 @@ type Datos = {
 const Ctx = createContext<Datos | null>(null);
 export const useSesion = () => useContext(Ctx)!;
 
+const CLAVE_SESION = "sb-" + new URL(SUPABASE_URL).hostname.split(".")[0] + "-auth-token";
+
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [sesion, setSesion] = useState<Session | null>(null);
   const [listo, setListo] = useState(false);
@@ -37,6 +39,12 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const uid = sesion?.user.id;
 
   useEffect(() => {
+    // Arranque inmediato: si en el dispositivo hay sesión y copia del taller, se pinta ya;
+    // Supabase la comprueba (y renueva si hace falta) por detrás.
+    try {
+      const guardada = JSON.parse(localStorage.getItem(CLAVE_SESION) || "null") as Session | null;
+      if (guardada?.user?.id && localStorage.getItem("sesion-cache:" + guardada.user.id)) { setSesion(guardada); setListo(true); }
+    } catch { /* nada */ }
     sb.auth.getSession().then(({ data }) => { setSesion(data.session); setListo(true); });
     const { data } = sb.auth.onAuthStateChange((ev, s) => {
       if (ev === "PASSWORD_RECOVERY") setRecuperacion(true);
@@ -103,7 +111,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     if (!empresa || (rol !== "propietario" && rol !== "editor")) return;
     const clave = "roly-2026b:" + empresa.id; // b: + Mónaco y Montecarlo
     try { if (localStorage.getItem(clave)) return; } catch { return; }
-    (async () => {
+    let vivo = true;
+    const espera = setTimeout(() => vivo && (async () => { // en diferido: no compite con la carga de la pantalla
+      const CATALOGO_ROLY = await cargarCatalogoRoly();
       const norm = (x?: string | null) => (x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
       const { data, error } = await sb.from("catalogo").select("id, modelo, referencia, notas, imagen_path, colores").eq("empresa_id", empresa.id).ilike("marca", "roly");
       if (error) return;
@@ -129,7 +139,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       }
       if (nuevos.length) { const { error: e } = await sb.from("catalogo").insert(nuevos); if (e) return; }
       try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento */ }
-    })().catch(() => {});
+    })().catch(() => {}), 4000);
+    return () => { vivo = false; clearTimeout(espera); };
   }, [empresa, rol]);
 
   useEffect(() => {

@@ -60,7 +60,7 @@ const ir = async (p, ruta) => { await p.goto(BASE + ruta, { waitUntil: "networki
 let fallos = 0;
 async function prueba(nombre, fn) {
   try { await fn(); console.log("ok -", nombre); }
-  catch (e) { fallos++; console.log("FALLO -", nombre, "\n   ", e.message.split("\n")[0]); }
+  catch (e) { fallos++; console.log("FALLO -", nombre, "\n   ", e.message.split("\n").slice(0, 14).join("\n    ")); }
 }
 
 await prueba("todas las pantallas cargan sin errores", async () => {
@@ -152,7 +152,7 @@ await prueba("la copia de seguridad se descarga en Excel", async () => {
 await prueba("el catálogo de Roly se completa con colores y fotos, y las fotos se suben en bloque", async () => {
   const { ctx, p, errores, escrituras } = await abrir();
   await ir(p, "");
-  await p.waitForTimeout(1500);
+  await p.waitForTimeout(5500);
   const ins = escrituras.filter((x) => x.tabla === "catalogo" && x.metodo === "POST").flatMap((x) => x.cuerpo);
   const beagle = escrituras.find((x) => x.tabla === "catalogo" && x.metodo === "PATCH");
   assert.equal(ins.length, 96, "añade los modelos que faltan");

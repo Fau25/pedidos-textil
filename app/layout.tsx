@@ -24,7 +24,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: TEMA }} />
         <link rel="preconnect" href="https://sqartxsdlynecelkufyq.supabase.co" crossOrigin="" />
         <link rel="preload" href="/pedidos-textil/fuentes/pjs-400.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="preload" href="/pedidos-textil/fuentes/pjs-500.woff2" as="font" type="font/woff2" crossOrigin="" />
         <link rel="preload" href="/pedidos-textil/fuentes/pjs-600.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="preload" href="/pedidos-textil/fuentes/pjs-700.woff2" as="font" type="font/woff2" crossOrigin="" />
       </head>
       <body><Raiz>{children}</Raiz></body>
     </html>

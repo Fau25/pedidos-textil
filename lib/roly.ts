@@ -26,11 +26,11 @@ export const MODELOS_ROLY: ModeloRoly[] = [
 export const REFERENCIAS_ROLY: Record<string, string> = Object.fromEntries(
   MODELOS_ROLY.filter((m) => m.referencia).map((m) => [m.modelo, m.referencia!]));
 
-import datos from "./roly-catalogo.json";
+import colores from "./roly-colores.json";
 export type ModeloCatalogoRoly = { ref: string; modelo: string; tipo: string; colores: string[]; ninos: boolean };
-/** 95 modelos (camisetas, polos, sudaderas, abrigos) con colores del catálogo Roly 2026 */
-export const CATALOGO_ROLY = datos.modelos as ModeloCatalogoRoly[];
+/** 97 modelos con colores del catálogo Roly 2026. Se cargan solo cuando hacen falta (puesta al día del catálogo) */
+export const cargarCatalogoRoly = () => import("./roly-modelos.json").then((m) => m.default as ModeloCatalogoRoly[]);
 /** Color real de cada nombre de la carta de colores de Roly (en minúsculas) */
-export const HEX_ROLY = datos.hex as Record<string, string>;
+export const HEX_ROLY = colores as Record<string, string>;
 export const TALLAS_ADULTO = ["S", "M", "L", "XL", "XXL", "3XL"];
 export const TALLAS_NINO = ["1/2", "3/4", "5/6", "7/8", "9/10", "11/12"];

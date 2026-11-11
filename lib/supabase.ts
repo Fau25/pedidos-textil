@@ -106,7 +106,7 @@ export async function subirFotosRoly(files: File[], avance: (hechas: number) => 
 
 /** Cerrar sesión borrando lo guardado en el dispositivo (datos del taller y enlaces de fotos) */
 export async function salir() {
-  try { for (const k of Object.keys(localStorage)) if (k.startsWith("sesion-cache:") || k === CLAVE_CACHE) localStorage.removeItem(k); } catch { /* nada */ }
+  try { for (const k of Object.keys(localStorage)) if (k.startsWith("sesion-cache:") || k.startsWith("carga:") || k.startsWith("listas:") || k.startsWith("pedido:") || k === CLAVE_CACHE) localStorage.removeItem(k); } catch { /* nada */ }
   cacheUrl.clear();
   try { await caches.delete("pedidos-textil-fotos-1"); } catch { /* sin caché */ }
   await sb.auth.signOut();

@@ -19,10 +19,14 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   if (r.method !== "GET" || url.origin !== location.origin || !url.pathname.startsWith("/pedidos-textil/")) return; // Supabase y demás: siempre a la red
-  // Páginas: primero la red (sin caché HTTP) para ver siempre la última versión; sin conexión, la copia guardada
+  // Páginas: se abren al instante con la copia del dispositivo y se actualizan por detrás.
+  // Las versiones nuevas llegan con un service worker nuevo (cambia VERSION): al activarse, la app se recarga sola.
   if (r.mode === "navigate" || r.headers.get("accept")?.includes("text/html")) {
-    e.respondWith(fetch(r, { cache: "no-cache" }).then((res) => { const c = res.clone(); caches.open(CACHE).then((k) => k.put(r, c)); return res; })
-      .catch(() => caches.match(r).then((m) => m || caches.match("/pedidos-textil/"))));
+    const red = fetch(r, { cache: "no-cache" }).then((res) => { if (res.ok) { const c = res.clone(); caches.open(CACHE).then((k) => k.put(r, c)); } return res; });
+    e.respondWith(caches.match(r).then((m) => {
+      if (m) { e.waitUntil(red.catch(() => {})); return m; }
+      return red.catch(() => caches.match("/pedidos-textil/"));
+    }));
     return;
   }
   // Archivos con huella (_next/static, fuentes, iconos): caché primero

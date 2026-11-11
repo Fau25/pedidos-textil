@@ -21,8 +21,8 @@ export default function Clientes() {
       sb.from("pedidos").select("cliente_id, total").eq("empresa_id", empresa!.id),
     ]);
     if (c.error) throw c.error;
-    const r = new Map<string, { n: number; t: number }>();
-    for (const x of p.data ?? []) { const a = r.get(x.cliente_id) ?? { n: 0, t: 0 }; a.n++; a.t += aCent(x.total); r.set(x.cliente_id, a); }
+    const r: Record<string, { n: number; t: number }> = {};
+    for (const x of p.data ?? []) { const a = (r[x.cliente_id] ??= { n: 0, t: 0 }); a.n++; a.t += aCent(x.total); }
     return { clientes: c.data as Cliente[], resumen: r };
   });
   const lista = useMemo(() => {
@@ -40,7 +40,7 @@ export default function Clientes() {
         <div className="tarjeta divide-y divide-borde">
           {!lista.length && <p className="py-10 text-center text-texto2">Sin resultados.</p>}
           {lista.map((c) => {
-            const r = datos.resumen.get(c.id);
+            const r = datos.resumen[c.id];
             return (
               <Link key={c.id} href={`/clientes/ver/?id=${c.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-suave/60">
                 <span className="grid size-10 shrink-0 place-items-center rounded-full bg-acento-suave text-[13px] font-semibold text-azul">{c.nombre.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}</span>

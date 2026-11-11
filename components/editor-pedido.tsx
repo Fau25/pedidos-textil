@@ -6,7 +6,7 @@ import { useSesion } from "./sesion";
 import { Boton, Campo, CampoImporte, Tarjeta, cx, useAvisos } from "./ui";
 import { sb, textoError } from "@/lib/supabase";
 import { calcular, euros, tarifaPara, sumaUnidades } from "@/lib/calculo";
-import { aCalc, claveBorrador, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, cargarPedido, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
+import { aCalc, claveBorrador, describirLinea, duplicar, guardarPedido, hoy, id, lineaVacia, cargarPedido, pedidoGuardado, type LineaEd, type PedidoEd, type PersEd } from "@/lib/pedidos";
 import { SelectorCliente } from "./selector-cliente";
 import { SelectorTecnica, TarjetaLinea, TarjetaPers } from "./bloques-pedido";
 export { SelectorCliente };
@@ -30,19 +30,26 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
   const [errorCliente, setErrorCliente] = useState(false);
   const cambiado = useRef(false);
 
-  // Carga inicial
+  // Carga inicial: clientes, catálogo y pedido a la vez. Clientes y catálogo salen al momento de la copia local
   useEffect(() => {
+    const k = "listas:" + empresa!.id;
+    try { const c = JSON.parse(localStorage.getItem(k) || "null"); if (c) { setClientes(c.clientes); setPrendas(c.prendas); } } catch {}
+    Promise.all([
+      sb.from("clientes").select("*").eq("empresa_id", empresa!.id).order("nombre"),
+      sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000),
+    ]).then(([c, cat]) => {
+      if (c.error || cat.error) return;
+      setClientes((c.data ?? []) as Cliente[]); setPrendas((cat.data ?? []) as Prenda[]);
+      try { localStorage.setItem(k, JSON.stringify({ clientes: c.data, prendas: cat.data })); } catch {}
+    }).catch(() => {});
     (async () => {
-      const [c, cat] = await Promise.all([
-        sb.from("clientes").select("*").eq("empresa_id", empresa!.id).order("nombre"),
-        sb.from("catalogo").select("*").eq("empresa_id", empresa!.id).order("marca").order("modelo").limit(5000),
-      ]);
-      setClientes((c.data ?? []) as Cliente[]);
-      setPrendas((cat.data ?? []) as Prenda[]);
       if (pedidoId) {
+        const copia = pedidoGuardado(pedidoId);
+        if (copia) setP(copia); // al instante; se sustituye por el del servidor si aún no se ha tocado nada
         const r = await cargarPedido(pedidoId);
         if (!r) { aviso("No se encuentra el pedido", "error"); return router.replace("/pedidos/"); }
-        return setP(r.ed);
+        if (!cambiado.current) setP(r.ed);
+        return;
       }
       if (duplicarDe) {
         const r = await cargarPedido(duplicarDe);
@@ -63,11 +70,12 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 
   const t = useMemo(() => (p ? calcular(aCalc(p, margen)) : null), [p, margen]);
 
-  // Autoguardado: borrador local si es nuevo; en la base si ya existe
+  // Borrador local si es nuevo (agrupado: no en cada letra); un pedido existente se guarda al pulsar Guardar
   useEffect(() => {
     if (!p || !cambiado.current) return;
-    if (p.nuevo) { try { localStorage.setItem(BORRADOR, JSON.stringify(p)); } catch {} return; }
-    setGuardando("pendiente"); // los cambios de un pedido existente solo se guardan al pulsar Guardar
+    if (!p.nuevo) { setGuardando("pendiente"); return; }
+    const t = setTimeout(() => { try { localStorage.setItem(BORRADOR, JSON.stringify(p)); } catch {} }, 400);
+    return () => clearTimeout(t);
   }, [p, BORRADOR]);
 
   // Al abrir: pedido nuevo con todo desplegado; uno existente con las prendas plegadas
