@@ -97,7 +97,9 @@ await prueba("la ficha «Nuevo pedido» abre el editor y guarda todo en una sola
   await p.getByLabel("Precio / ud").fill("4,50");
   await p.getByRole("button", { name: /^Personalización/ }).click();
   await p.getByRole("radio", { name: "Bordado" }).click();
-  assert.match(await p.locator("main").innerText(), /Ubicación/, "al elegir la técnica salen sus características");
+  assert.match(await p.locator("main").innerText(), /Ubicación/i, "al elegir la técnica salen sus características");
+  await p.getByRole("button", { name: "Pecho centro" }).click();
+  assert.equal(await p.getByRole("button", { name: "Pecho centro" }).getAttribute("aria-pressed"), "true", "ubicación con icono");
   await p.getByRole("button", { name: "Guardar pedido" }).click(); await p.waitForTimeout(1000);
   const g = escrituras.filter((x) => x.tabla === "guardar_pedido");
   assert.equal(g.length, 1, "una sola llamada");

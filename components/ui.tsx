@@ -179,7 +179,7 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
 }
 
 /** Campo de importe en euros que acepta coma decimal */
-export function CampoImporte({ valor, cambiar, className, placeholder, ...p }: { valor: number | null; cambiar: (v: number | null) => void; className?: string; placeholder?: string; "aria-label"?: string }) {
+export function CampoImporte({ valor, cambiar, className, placeholder, oscuro, ...p }: { valor: number | null; cambiar: (v: number | null) => void; className?: string; placeholder?: string; "aria-label"?: string; oscuro?: boolean }) {
   const [txt, setTxt] = useState(valor === null || valor === undefined ? "" : String(valor).replace(".", ","));
   const foco = useRef(false);
   useEffect(() => { if (!foco.current) setTxt(valor === null || valor === undefined ? "" : Number(valor).toFixed(2).replace(".", ",")); }, [valor]);
@@ -188,7 +188,7 @@ export function CampoImporte({ valor, cambiar, className, placeholder, ...p }: {
       <input
         {...p}
         inputMode="decimal"
-        className="campo num pr-7 text-right"
+        className={oscuro ? "num h-8 w-full bg-transparent pr-4 text-center text-[19px] font-bold text-sobre-acento outline-none placeholder:text-sobre-acento/50" : "campo num pr-7 text-right"}
         value={txt}
         placeholder={placeholder ?? "0,00"}
         onFocus={(e) => { foco.current = true; e.target.select(); }}
@@ -201,7 +201,7 @@ export function CampoImporte({ valor, cambiar, className, placeholder, ...p }: {
           if (Number.isFinite(n)) cambiar(Math.round(n * 100) / 100);
         }}
       />
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-texto2">€</span>
+      <span className={cx("pointer-events-none absolute top-1/2 -translate-y-1/2", oscuro ? "right-1 text-[15px] font-semibold text-sobre-acento/80" : "right-3 text-texto2")}>€</span>
     </div>
   );
 }
