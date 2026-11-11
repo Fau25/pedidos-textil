@@ -1,2 +1,2 @@
 /** Versión de la app (se ve en Ajustes y va en el registro de errores) */
-export const VERSION = "2.14.0";
+export const VERSION = "2.14.1";

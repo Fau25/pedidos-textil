@@ -286,6 +286,14 @@ await prueba("un fallo inesperado queda apuntado en el registro de errores", asy
   assert.ok(e, "se apunta"); assert.match(JSON.stringify(e.cuerpo), /fallo de prueba/); assert.match(JSON.stringify(e.cuerpo), /2\.\d+\.\d+/);
   await ctx.close();
 });
+await prueba("se quita una vez la técnica Serigrafía del taller del administrador", async () => {
+  T.tecnicas.push({ id: "t9", nombre: "Serigrafía", orden: 2 });
+  const { ctx, p, escrituras } = await abrir();
+  await ir(p, ""); await p.waitForTimeout(800);
+  T.tecnicas.pop();
+  assert.ok(escrituras.some((x) => x.tabla === "tecnicas" && x.metodo === "DELETE" && /t9/.test(x.url ?? JSON.stringify(x))), "borra Serigrafía");
+  await ctx.close();
+});
 await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
   const { ctx, p, errores } = await abrir();
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");

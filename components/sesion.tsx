@@ -107,6 +107,20 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     if (temporizador.current) clearTimeout(temporizador.current);
     temporizador.current = setTimeout(() => setVersion((v) => v + 1), 250);
   }, []);
+  // Una vez: quitar la técnica «Serigrafía» del taller del administrador (no la usa). Los pedidos antiguos conservan el nombre
+  useEffect(() => {
+    if (!empresa || !sesion || rol !== "propietario") return;
+    const clave = "sin-serigrafia:" + empresa.id;
+    try { if (localStorage.getItem(clave)) return; } catch { return; }
+    const s = tecnicas.find((t) => /^serigraf/i.test(t.nombre));
+    (async () => {
+      const { data: adm, error } = await sb.from("admins").select("user_id").eq("user_id", sesion.user.id).maybeSingle();
+      if (error || !adm) return;
+      if (s) { const { error: e } = await sb.from("tecnicas").delete().eq("id", s.id); if (e) return; recargar(); }
+      try { localStorage.setItem(clave, "1"); } catch { /* nada */ }
+    })();
+  }, [empresa, sesion, rol, tecnicas, recargar]);
+
   // Una vez por empresa: referencias, colores y fotos de Roly (catálogo 2026) y alta de los modelos que falten
   useEffect(() => {
     if (!empresa || (rol !== "propietario" && rol !== "editor")) return;
