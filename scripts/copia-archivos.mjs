@@ -4,7 +4,8 @@ import fs from "node:fs"; import path from "node:path";
 const URL_ = process.env.SUPABASE_URL ?? "https://sqartxsdlynecelkufyq.supabase.co";
 const KEY = process.env.SUPABASE_SERVICE_KEY; const DEST = process.argv[2] ?? "archivos";
 if (!KEY) { console.error("Falta SUPABASE_SERVICE_KEY"); process.exit(1); }
-const h = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+// Claves nuevas (sb_secret_…) van solo en «apikey»; las antiguas (service_role, un JWT «eyJ…») también como Bearer
+const h = KEY.startsWith("eyJ") ? { apikey: KEY, Authorization: `Bearer ${KEY}` } : { apikey: KEY };
 async function listar(bucket, prefijo = "") {
   const fuera = [];
   for (let offset = 0; ; offset += 1000) {
