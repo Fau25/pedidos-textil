@@ -127,3 +127,7 @@ input.campo[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto;
 
 /* iPhone/iPad hacen zoom si un campo tiene letra < 16px: en pantallas táctiles, 16px */
 @media (pointer: coarse) { input, select, textarea { font-size: 16px !important; } }
+
+/* Franja de datos sobre la foto (catálogo): sin desenfoque para que el scroll siga fluido */
+.franja{background:rgba(255,255,255,.82);border:1px solid rgba(255,255,255,.85)}
+.dark .franja{background:rgba(23,24,30,.78);border-color:rgba(255,255,255,.10)}

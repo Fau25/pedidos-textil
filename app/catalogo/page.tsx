@@ -82,23 +82,23 @@ function Prendas() {
           {q && <p className="mb-3 text-[13px] text-texto2">{lista.length} resultado{lista.length === 1 ? "" : "s"}</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 xl:gap-4">
             {lista.slice(0, 300).map((p) => (
-              <article key={p.id} className="tarjeta relative flex flex-col gap-2.5 p-2.5">
-                <button className="flex flex-col gap-2.5 text-left" aria-label={`Ver ${p.modelo || p.tipo} en grande`} onClick={() => setVista(p)}>
-                  <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} cubrir className="aspect-square w-full rounded-2xl" />
-                  <span className="flex flex-col gap-1.5 px-1 pb-1">
-                    <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-bold">{p.modelo || p.tipo}</span>
-                      <span className="block truncate text-[12px] text-texto2">{[p.referencia, p.marca !== "Roly" ? p.marca : null].filter(Boolean).join(" · ") || p.tipo}</span>
+              <article key={p.id} className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-[#e6e6e6] shadow-[0_8px_24px_rgba(20,30,60,.10)] dark:bg-superficie">
+                <button className="absolute inset-0 text-left" aria-label={`Ver ${p.modelo || p.tipo} en grande`} onClick={() => setVista(p)}>
+                  <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} cubrir className="absolute inset-0 size-full rounded-none" />
+                  <span className="franja absolute inset-x-2 bottom-2 flex flex-col gap-1.5 rounded-2xl px-3 py-2.5">
+                    <span className="flex min-w-0 items-baseline justify-between gap-2">
+                      <span className="truncate text-[14px] font-bold">{p.modelo || p.tipo}</span>
+                      <span className="shrink-0 truncate text-[10px] tracking-[.04em] text-texto2">{[p.referencia, p.marca !== "Roly" ? p.marca : null].filter(Boolean).join(" · ")}</span>
                     </span>
-                    <span className="flex items-center gap-1">
-                      {p.colores.slice(0, 5).map((c) => <Muestra key={c} color={c} />)}
-                      {p.colores.length > 5 && <span className="ml-0.5 text-[11px] text-texto2">+{p.colores.length - 5}</span>}
+                    <span className="flex items-center">
+                      {p.colores.slice(0, 5).map((c, i) => <span key={c} className={cx("rounded-full ring-[1.5px] ring-white/90", i > 0 && "-ml-1")}><Muestra color={c} /></span>)}
+                      {p.colores.length > 5 && <span className="ml-1.5 text-[11px] text-texto2">+{p.colores.length - 5}</span>}
                       {!p.colores.length && <span className="text-[11px] text-texto2">Sin colores</span>}
                     </span>
                   </span>
                 </button>
                 <button aria-label={p.favorito ? "Quitar de habituales" : "Marcar como habitual"} title={p.favorito ? "Habitual" : "Marcar como habitual"} onClick={() => estrella(p)}
-                  className={cx("absolute right-3.5 top-3.5 grid size-10 place-items-center rounded-full bg-superficie text-[17px] shadow-sm", p.favorito ? "text-azul" : "text-texto2/50 hover:text-azul")}>{p.favorito ? "★" : "☆"}</button>
+                  className={cx("franja absolute right-2.5 top-2.5 grid size-10 place-items-center rounded-full text-[17px]", p.favorito ? "text-azul" : "text-texto2 hover:text-azul")}>{p.favorito ? "★" : "☆"}</button>
               </article>
             ))}
           </div>
@@ -258,7 +258,6 @@ const HABITUALES = "Habituales";
 /** Categoría del menú según el tipo de prenda */
 function categoria(tipo?: string | null): string {
   const t = (tipo ?? "").toLowerCase();
-  if (/body|beb/.test(t)) return "Bebé";
   if (/polo/.test(t)) return "Polos";
   if (/chaleco/.test(t)) return "Chalecos";
   if (/softshell/.test(t)) return "Softshell";
@@ -268,7 +267,7 @@ function categoria(tipo?: string | null): string {
   if (/camiseta|tirantes/.test(t)) return "Camisetas";
   return "Otras";
 }
-const ORDEN_CATS = ["Camisetas", "Polos", "Sudaderas", "Chaquetas", "Polares", "Softshell", "Chalecos", "Bebé", "Otras"];
+const ORDEN_CATS = ["Camisetas", "Polos", "Sudaderas", "Chaquetas", "Polares", "Softshell", "Chalecos", "Otras"];
 /** Chips del menú: Habituales (si hay) y las categorías con prendas, con su número */
 function categorias(ps: Prenda[]): { nombre: string; n: number }[] {
   const cuenta = new Map<string, number>();

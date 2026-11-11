@@ -109,7 +109,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   // Una vez por empresa: referencias, colores y fotos de Roly (catálogo 2026) y alta de los modelos que falten
   useEffect(() => {
     if (!empresa || (rol !== "propietario" && rol !== "editor")) return;
-    const clave = "roly-2026b:" + empresa.id; // b: + Mónaco y Montecarlo
+    const clave = "roly-2026c:" + empresa.id; // c: sin prendas de bebé
     try { if (localStorage.getItem(clave)) return; } catch { return; }
     let vivo = true;
     const espera = setTimeout(() => vivo && (async () => { // en diferido: no compite con la carga de la pantalla
@@ -117,7 +117,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
       const norm = (x?: string | null) => (x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
       const { data, error } = await sb.from("catalogo").select("id, modelo, referencia, notas, imagen_path, colores").eq("empresa_id", empresa.id).ilike("marca", "roly");
       if (error) return;
-      const filas = data ?? [];
+      const BEBE = ["BD7200", "BD7202", "CA7203", "CA6564"]; // quitadas del catálogo (bebé)
+      const fuera = (data ?? []).filter((f) => BEBE.includes(f.referencia ?? ""));
+      if (fuera.length) { const { error: e } = await sb.from("catalogo").delete().in("id", fuera.map((f) => f.id)); if (e) return; }
+      const filas = (data ?? []).filter((f) => !BEBE.includes(f.referencia ?? ""));
       // primero, referencias de los modelos antiguos que no la tenían
       for (const p of filas) { const r = REFERENCIAS_ROLY[p.modelo ?? ""]; if (r && !p.referencia) p.referencia = r; }
       const nuevos = []; const cambios: { id: string; c: Record<string, unknown> }[] = [];
