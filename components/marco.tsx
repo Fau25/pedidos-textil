@@ -48,7 +48,7 @@ export function Marco({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh lg:pl-[244px]">
       {/* Barra lateral (escritorio) */}
-      <aside className="no-imprimir fixed inset-y-3 left-3 z-30 hidden w-[220px] flex-col rounded-[26px] bg-superficie px-3 py-5 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.12)] lg:flex">
+      <aside className="cristal no-imprimir fixed inset-y-3 left-3 z-30 hidden w-[220px] flex-col rounded-[26px] px-3 py-5 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.12)] lg:flex">
         <Link href="/" className="mb-6 flex items-center gap-2.5 px-2">
           <Logo />
           <span className="leading-tight"><span className="block text-[14px] font-semibold">Mis pedidos</span><span className="block text-[12px] text-texto2">textiles</span></span>
@@ -77,7 +77,7 @@ export function Marco({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Cabecera (móvil) */}
-      <header className={cx("no-imprimir sticky top-0 z-20 flex h-14 items-center gap-3 bg-fondo/95 px-4 lg:hidden", ruta === "/" && "hidden")}>
+      <header className={cx("cristal no-imprimir sticky top-0 z-20 flex h-14 items-center gap-3 !border-x-0 !border-t-0 px-4 lg:hidden", ruta === "/" && "hidden")}>
         <Link href="/" className="flex items-center gap-2"><Logo /><span className="font-semibold">Mis pedidos</span></Link>
         <button onClick={() => setBuscar(true)} aria-label="Buscar" className="ml-auto grid size-10 place-items-center rounded-full bg-superficie shadow-sm"><Search className="size-[18px]" /></button>
       </header>
@@ -85,18 +85,18 @@ export function Marco({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-[1240px] px-4 pb-32 pt-3 sm:px-6 lg:px-10 lg:pb-12 lg:pt-8">{children}</main>
 
       {/* Barra inferior flotante (móvil) */}
-      <nav className="no-imprimir fixed inset-x-4 bottom-4 z-30 flex h-16 items-center justify-around rounded-full bg-[#17181c] px-2 text-white shadow-[0_12px_30px_-8px_rgba(16,18,24,0.5)] lg:hidden dark:bg-[#26282e]">
+      <nav className="cristal no-imprimir fixed inset-x-4 bottom-4 z-30 flex h-16 items-center justify-around rounded-full px-2 text-texto shadow-[0_12px_30px_-10px_rgba(16,18,24,0.25)] lg:hidden">
         {[NAV[0], NAV[1]].map(({ href, t, i: I }) => (
-          <Link key={href} href={href} aria-label={t} className={cx("grid size-12 place-items-center rounded-full transition-colors", activo(href) ? "bg-white/15 text-white" : "text-white/55")}><I className="size-[22px]" strokeWidth={1.9} /></Link>
+          <Link key={href} href={href} aria-label={t} className={cx("grid size-12 place-items-center rounded-full transition-colors", activo(href) ? "bg-acento text-sobre-acento" : "text-texto2")}><I className="size-[22px]" strokeWidth={1.9} /></Link>
         ))}
-        <Link href="/pedidos/nuevo/" aria-label="Nuevo pedido" className="grid size-12 place-items-center rounded-full bg-white text-[#17181c]"><Plus className="size-6" /></Link>
-        <Link href="/clientes/" aria-label="Clientes" className={cx("grid size-12 place-items-center rounded-full transition-colors", activo("/clientes/") ? "bg-white/15 text-white" : "text-white/55")}><Users className="size-[22px]" strokeWidth={1.9} /></Link>
-        <button onClick={() => setMas(true)} aria-label="Más" className={cx("grid size-12 place-items-center rounded-full", ["/catalogo/", "/ajustes/"].some(activo) ? "bg-white/15 text-white" : "text-white/55")}><MoreHorizontal className="size-[22px]" /></button>
+        <Link href="/pedidos/nuevo/" aria-label="Nuevo pedido" className="grid size-12 place-items-center rounded-full bg-azul text-white shadow-[0_6px_16px_-6px_rgba(31,91,255,0.7)]"><Plus className="size-6" /></Link>
+        <Link href="/clientes/" aria-label="Clientes" className={cx("grid size-12 place-items-center rounded-full transition-colors", activo("/clientes/") ? "bg-acento text-sobre-acento" : "text-texto2")}><Users className="size-[22px]" strokeWidth={1.9} /></Link>
+        <button onClick={() => setMas(true)} aria-label="Más" className={cx("grid size-12 place-items-center rounded-full", ["/catalogo/", "/ajustes/"].some(activo) ? "bg-acento text-sobre-acento" : "text-texto2")}><MoreHorizontal className="size-[22px]" /></button>
       </nav>
       {mas && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMas(false)}>
           <div className="absolute inset-0 bg-black/25" />
-          <div className="animar absolute inset-x-4 bottom-24 rounded-[24px] bg-superficie p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="cristal animar absolute inset-x-4 bottom-24 rounded-[24px] p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             {NAV.slice(3).map(({ href, t, i: I }) => (
               <Link key={href} href={href} className="flex h-12 items-center gap-3 rounded-xl px-3 hover:bg-suave"><I className="size-5 text-texto2" />{t}</Link>
             ))}

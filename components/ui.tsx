@@ -120,7 +120,7 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
   return createPortal(
     <div data-hoja className="fixed inset-0 z-50 flex items-end justify-center sm:items-stretch sm:justify-end" role="dialog" aria-modal="true" aria-label={titulo}>
       <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={cerrar} />
-      <div ref={ref} className={cx("animar relative flex max-h-[92dvh] w-full flex-col rounded-t-[28px] bg-superficie shadow-2xl sm:max-h-none sm:rounded-none sm:rounded-l-[28px]", ancho)}>
+      <div ref={ref} className={cx("cristal animar relative flex max-h-[92dvh] w-full flex-col rounded-t-[28px] shadow-2xl sm:max-h-none sm:rounded-none sm:rounded-l-[28px]", ancho)}>
         <div className="flex items-center justify-between border-b border-borde px-5 py-4">
           <h2 className="text-[16px] font-semibold">{titulo}</h2>
           <button data-cerrar onClick={cerrar} aria-label="Cerrar" className="-mr-1 grid size-10 place-items-center rounded-full text-texto2 hover:bg-suave"><X className="size-5" /></button>
@@ -164,7 +164,7 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
       {conf && (
         <div className="fixed inset-0 z-[70] grid place-items-center p-4" role="alertdialog" aria-modal="true" onKeyDown={(e) => e.key === "Escape" && cerrar(false)}>
           <div className="absolute inset-0 bg-black/30" onClick={() => cerrar(false)} />
-          <div className="animar tarjeta relative w-full max-w-sm p-5">
+          <div className="cristal animar relative w-full max-w-sm rounded-[22px] p-5 shadow-2xl">
             <p className="text-[16px] font-semibold">{conf.titulo}</p>
             {conf.texto && <p className="mt-1.5 text-[13px] text-texto2">{conf.texto}</p>}
             <div className="mt-5 flex justify-end gap-2">
