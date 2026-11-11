@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, ChevronDown, Receipt, Tag, Phone, Mail } from "lucide-react";
+import { Plus, Loader2, ChevronDown, Ticket as IconoTicket, Tag, Phone, Mail } from "lucide-react";
 import { Ticket } from "./ticket";
 import { ticketDe } from "@/lib/presupuestos";
 import { useSesion } from "./sesion";
@@ -251,7 +251,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
             </dl>
             <button type="button" onClick={() => setVerTicket(true)}
               className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-azul-suave text-[14px] font-semibold text-azul hover:brightness-95">
-              <Receipt className="size-[18px]" />Generar ticket
+              <IconoTicket className="size-[18px]" />Generar ticket
             </button>
             <div className="mt-4 hidden flex-col gap-2 xl:flex">
               <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>{p.nuevo ? "Guardar pedido" : "Guardar y salir"}</Boton>

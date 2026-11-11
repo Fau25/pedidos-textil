@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Receipt } from "lucide-react";
+import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Ticket as IconoTicket } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Boton, Cargando, Tarjeta, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError, urlArchivo } from "@/lib/supabase";
@@ -66,7 +66,7 @@ export default function Ficha() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/pedidos/nuevo/?id=${ed.id}`}><Boton><Pencil className="size-4" />Editar</Boton></Link>
-          <Boton onClick={() => setVerTicket(true)}><Receipt className="size-4" />Ticket</Boton>
+          <Boton onClick={() => setVerTicket(true)}><IconoTicket className="size-4" />Ticket</Boton>
           <Boton cargando={ocupado === "pdf"} onClick={pdf}><Download className="size-4" />Presupuesto</Boton>
           <Link href={`/pedidos/nuevo/?duplicar=${ed.id}`}><Boton variante="fantasma" aria-label="Duplicar"><Copy className="size-4" /></Boton></Link>
           <Boton variante="fantasma" aria-label="Eliminar" className="hover:text-red-600" onClick={borrar}><Trash2 className="size-4" /></Boton>
