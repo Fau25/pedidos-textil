@@ -15,7 +15,7 @@ export function Raiz({ children }: { children: ReactNode }) {
     let hecho = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (!habia || hecho) return; hecho = true;
-      if (!location.pathname.includes("/pedidos/nuevo")) location.reload();
+      if (!/\/(pedidos|trabajos)\/nuevo/.test(location.pathname)) location.reload();
       else window.addEventListener("popstate", () => location.reload(), { once: true });
     });
     navigator.serviceWorker.register("/pedidos-textil/sw.js", { updateViaCache: "none" }).then((r) => r.update()).catch(() => {});
