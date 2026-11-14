@@ -3,11 +3,14 @@
 const VERSION = "__VERSION__";
 const CACHE = "pedidos-textil-" + VERSION;
 const FOTOS = "pedidos-textil-fotos-1"; // no se borra al publicar una versión nueva
+const FIJOS = "pedidos-textil-fijos-1"; // código con huella y fuentes: tampoco (el motor de PDF pesa 1 MB y casi nunca cambia)
 
 self.addEventListener("install", (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.addAll(["/pedidos-textil/", "/pedidos-textil/manifest.webmanifest"]).catch(() => {}))); });
 self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k !== FOTOS).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k !== FOTOS && k !== FIJOS).map((k) => caches.delete(k)))).then(recortarFijos).then(() => self.clients.claim()));
 });
+// Que la caché de fijos no crezca sin fin: se quedan los 400 más recientes
+function recortarFijos() { return caches.open(FIJOS).then((c) => c.keys().then((ks) => Promise.all(ks.slice(0, Math.max(0, ks.length - 400)).map((k) => c.delete(k))))); }
 self.addEventListener("fetch", (e) => {
   const r = e.request;
   const url = new URL(r.url);
@@ -30,5 +33,6 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   // Archivos con huella (_next/static, fuentes, iconos): caché primero
-  e.respondWith(caches.match(r).then((m) => m || fetch(r).then((res) => { if (res.ok) { const c = res.clone(); caches.open(CACHE).then((k) => k.put(r, c)); } return res; })));
+  const destino = /\/_next\/static\/|\/fonts\//.test(url.pathname) ? FIJOS : CACHE;
+  e.respondWith(caches.match(r).then((m) => m || fetch(r).then((res) => { if (res.ok) { const c = res.clone(); caches.open(destino).then((k) => k.put(r, c)); } return res; })));
 });

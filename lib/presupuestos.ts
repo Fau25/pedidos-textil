@@ -1,3 +1,4 @@
+import { entregarPDF } from "./entregar-pdf";
 import { sb } from "./supabase";
 import { calcular } from "./calculo";
 import { aCalc, cargarPedido, datosPresupuesto, diaLocal, type PedidoEd } from "./pedidos";
@@ -33,21 +34,15 @@ export function ticketDe(ed: PedidoEd, empresa: Empresa, cli: Partial<Cliente> |
   };
 }
 
-/** Enviar (menú de compartir del móvil: WhatsApp, correo…) o descargar el PDF */
-export async function compartirDocumento(p: Presupuesto, tipo: "presupuesto" | "ticket" | "factura", soloDescargar = false) {
+type TipoDocumento = "presupuesto" | "ticket" | "factura";
+/** Genera el PDF (se puede llamar antes de que el usuario pulse, para que salga al momento) */
+export async function pdfDocumento(p: Presupuesto, tipo: TipoDocumento) {
   const { generarPDF } = await import("./pdf");
-  const blob = await generarPDF(p, tipo);
+  return generarPDF(p, tipo);
+}
+/** Enviar (menú de compartir del móvil: WhatsApp, correo…) o descargar el PDF */
+export async function compartirDocumento(p: Presupuesto, tipo: TipoDocumento, soloDescargar = false, hecho?: Promise<Blob>) {
+  const blob = await (hecho ?? pdfDocumento(p, tipo));
   const titulo = ({ ticket: "Ticket", factura: "Factura", presupuesto: "Presupuesto" })[tipo] + " " + p.numero;
-  const nombre = `${titulo} ${p.datos.cliente?.nombre ?? ""}.pdf`.trim();
-  const archivo = new File([blob], nombre, { type: "application/pdf" });
-  // En móvil/tablet se abre el menú de compartir (WhatsApp, correo…); en el ordenador se descarga
-  if (!soloDescargar && navigator.canShare?.({ files: [archivo] }) && matchMedia("(pointer: coarse)").matches) {
-    try { await navigator.share({ files: [archivo], title: titulo }); return "compartido"; }
-    catch (e) { if ((e as Error).name === "AbortError") return "cancelado"; }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-  return "descargado";
+  return entregarPDF(blob, `${titulo} ${p.datos.cliente?.nombre ?? ""}.pdf`.trim(), titulo, soloDescargar);
 }

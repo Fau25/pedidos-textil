@@ -172,6 +172,20 @@ export function datosPresupuesto(ed: PedidoEd, t: Totales, empresa: Empresa, cli
   };
 }
 
+/** Marca uno o varios pedidos como pagados (o los vuelve a «sin cobrar») */
+export async function marcarPagado(ids: string[], pagado: boolean) {
+  const { error } = await sb.from("pedidos").update({ pagado_en: pagado ? new Date().toISOString() : null }).in("id", ids);
+  if (error) throw /pagado_en/.test(error.message) ? new Error(AVISO_SIN_COBROS) : error;
+}
+export const AVISO_SIN_COBROS = "Para marcar pedidos como pagados falta activar los cobros en la base (SQL 12)";
+/** Consulta con la columna pagado_en; si aún no existe (sin el SQL 12) repite la consulta sin ella */
+export async function conPago<T>(consulta: (extra: string) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
+  let r = await consulta(", pagado_en");
+  if (r.error && /pagado_en/.test(r.error.message)) r = await consulta("");
+  if (r.error) throw r.error;
+  return r.data as T;
+}
+
 /** Marca uno o varios pedidos como entregados (o los devuelve a pendientes) */
 export async function marcarEntregado(ids: string[], entregado: boolean) {
   const { error } = await sb.from("pedidos").update({ entregado, entregado_en: entregado ? hoy() : null }).in("id", ids);

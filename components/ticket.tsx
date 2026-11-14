@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Send } from "lucide-react";
 import type { Presupuesto } from "@/lib/tipos";
-import { compartirDocumento } from "@/lib/presupuestos";
+import { compartirDocumento, pdfDocumento } from "@/lib/presupuestos";
 import { textoError, urlArchivo } from "@/lib/supabase";
 import { Boton, Hoja, useAvisos } from "./ui";
 
@@ -17,6 +17,13 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto
   const [ocupado, setOcupado] = useState<"" | "enviar" | "pdf">("");
   const [logo, setLogo] = useState<string | null>(null);
   useEffect(() => { if (abierto && p?.datos.empresa.logo_path) urlArchivo(p.datos.empresa.logo_path).then(setLogo); }, [abierto, p]);
+  // El PDF se prepara nada más abrir: al pulsar sale al momento (y el móvil deja compartirlo sin esperar)
+  const listo = useRef<Promise<Blob> | null>(null);
+  useEffect(() => {
+    listo.current = null;
+    if (!abierto || !p || !(p.datos.lineas.length + p.datos.personalizaciones.length)) return;
+    const pr = pdfDocumento(p, tipo); pr.catch(() => {}); listo.current = pr;
+  }, [abierto, p, tipo]);
   if (!p) return null;
   const d = p.datos;
   const filas = [...d.lineas, ...d.personalizaciones];
@@ -26,7 +33,7 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto
   async function hacer(que: "enviar" | "pdf") {
     setOcupado(que);
     try {
-      const r = await compartirDocumento(p!, doc, que === "pdf");
+      const r = await compartirDocumento(p!, doc, que === "pdf", listo.current ?? undefined);
       if (r === "descargado") aviso(tipo === "factura" ? "Factura descargada en PDF" : "Ticket descargado en PDF");
     } catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
   }

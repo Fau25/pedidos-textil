@@ -2,14 +2,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Ticket as IconoTicket, FileText } from "lucide-react";
+import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Ticket as IconoTicket, FileText, Euro } from "lucide-react";
 import { emitirFactura, facturaComoDoc, facturaDe, type Factura } from "@/lib/facturas";
 import { useSesion } from "@/components/sesion";
 import { Boton, Cargando, Tarjeta, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError, urlArchivo } from "@/lib/supabase";
 import { useCarga, useParam } from "@/lib/usar";
 import { calcular, euros } from "@/lib/calculo";
-import { aCalc, cargarPedido, describirLinea, marcarEntregado, textoTallas } from "@/lib/pedidos";
+import { aCalc, cargarPedido, describirLinea, marcarEntregado, marcarPagado, textoTallas } from "@/lib/pedidos";
 import { compartirPDF, ticketDe } from "@/lib/presupuestos";
 import { Ticket } from "@/components/ticket";
 import { IconoWhatsApp, enlaceWa } from "@/components/whatsapp";
@@ -44,6 +44,13 @@ export default function Ficha() {
     setOcupado("entrega");
     try { await marcarEntregado([ed.id], v); aviso(v ? "Marcado como entregado" : "Vuelve a pendientes"); recargar(); }
     catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
+  }
+  async function pagar(v: boolean) {
+    setOcupado("pago");
+    try {
+      await marcarPagado([ed.id], v); recargar();
+      aviso(v ? "Marcado como pagado" : "Vuelve a «sin cobrar»", "ok", { texto: "Deshacer", fn: async () => { await marcarPagado([ed.id], !v); recargar(); } });
+    } catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
   }
   async function facturar() {
     if (factura) return setVerFactura(true);
@@ -113,6 +120,18 @@ export default function Ficha() {
         {ed.entregado
           ? <Boton cargando={ocupado === "entrega"} onClick={() => entregar(false)}><Undo2 className="size-4" />Volver a pendiente</Boton>
           : <Boton variante="primario" cargando={ocupado === "entrega"} onClick={() => entregar(true)} className="bg-emerald-700 hover:bg-emerald-800"><Check className="size-4" />Marcar entregado</Boton>}
+      </div>
+
+      {/* Cobro: un toque */}
+      <div className={cx("tarjeta -mt-3 mb-6 flex flex-wrap items-center gap-4 p-4", pedido.pagado_en ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30" : "")}>
+        <div className="w-full sm:w-auto sm:flex-1">
+          {pedido.pagado_en
+            ? <><p className="font-semibold text-emerald-800 dark:text-emerald-300">Pagado el {fecha(pedido.pagado_en.slice(0, 10), true)}</p><p className="text-[13px] text-texto2">Cobrado {euros(t?.total ?? 0)}.</p></>
+            : <><p className="font-semibold">Sin cobrar</p><p className="num text-[13px] text-texto2">Pendiente {euros(t?.total ?? 0)}</p></>}
+        </div>
+        {pedido.pagado_en
+          ? <Boton cargando={ocupado === "pago"} onClick={() => pagar(false)}><Undo2 className="size-4" />Deshacer cobro</Boton>
+          : <Boton variante="primario" cargando={ocupado === "pago"} onClick={() => pagar(true)}><Euro className="size-4" />Marcar pagado</Boton>}
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">

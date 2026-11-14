@@ -8,12 +8,12 @@ import { Prenda } from "@/components/muestra";
 import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
-import { marcarEntregado } from "@/lib/pedidos";
+import { conPago, marcarEntregado } from "@/lib/pedidos";
 
 type Linea = { tipo: string; marca: string | null; modelo: string | null; color: string | null; orden: number };
 type Fila = {
   id: string; numero: string; fecha: string; total: number; unidades: number; referencia: string | null;
-  entregado: boolean; entregado_en: string | null; clientes: { nombre: string } | null;
+  entregado: boolean; entregado_en: string | null; pagado_en?: string | null; clientes: { nombre: string } | null;
   pedido_lineas: Linea[]; personalizaciones: { tecnica: string }[];
 };
 type Vista = "pendientes" | "entregados";
@@ -23,19 +23,16 @@ export default function Inicio() {
   const { aviso } = useAvisos();
   const [vista, setVista] = useState<Vista>("pendientes");
   const { datos, setDatos, error, recargar } = useCarga(async () => {
-    const { data, error } = await sb.from("pedidos")
-      .select("id, numero, fecha, total, unidades, referencia, entregado, entregado_en, clientes(nombre), pedido_lineas(tipo, marca, modelo, color, orden), personalizaciones(tecnica)")
-      .eq("empresa_id", empresa!.id).order("fecha", { ascending: false }).limit(300);
-    if (error) throw error;
-    return data as unknown as Fila[];
+    return conPago<Fila[]>((x) => sb.from("pedidos")
+      .select(`id, numero, fecha, total, unidades, referencia, entregado, entregado_en${x}, clientes(nombre), pedido_lineas(tipo, marca, modelo, color, orden), personalizaciones(tecnica)`)
+      .eq("empresa_id", empresa!.id).order("fecha", { ascending: false }).limit(300));
   });
 
   const pendientes = useMemo(() => (datos ?? []).filter((p) => !p.entregado).sort((a, b) => (a.fecha < b.fecha ? -1 : 1)), [datos]);
   const entregados = useMemo(() => (datos ?? []).filter((p) => p.entregado).sort((a, b) => ((a.entregado_en ?? "") < (b.entregado_en ?? "") ? 1 : -1)), [datos]);
-  const importePendiente = pendientes.reduce((a, p) => a + aCent(p.total), 0);
+  const sinCobrar = (datos ?? []).filter((p) => !p.pagado_en && aCent(p.total) > 0);
+  const importePendiente = sinCobrar.reduce((a, p) => a + aCent(p.total), 0);
   const udsPendientes = pendientes.reduce((a, p) => a + (p.unidades || 0), 0);
-  const mes = new Date().toISOString().slice(0, 7);
-  const entregadosMes = entregados.filter((p) => (p.entregado_en ?? "").startsWith(mes));
   const lista = vista === "pendientes" ? pendientes : entregados.slice(0, 24);
 
   async function cambiar(p: Fila, v: boolean) {
@@ -86,13 +83,13 @@ export default function Inicio() {
             <p className="mt-2 text-[13px] text-texto2">{udsPendientes} {udsPendientes === 1 ? "prenda" : "prendas"} por hacer</p>
           </div>
         </div>
-        <div className="tarjeta flex min-h-[132px] flex-col justify-between p-5 sm:p-6">
-          <p className="text-[13px] font-medium text-texto2">Por cobrar</p>
+        <Link href="/cuentas/" className="tarjeta flex min-h-[132px] flex-col justify-between p-5 transition-shadow hover:shadow-[0_16px_36px_-16px_rgba(16,18,24,0.22)] sm:p-6">
+          <p className="flex items-center justify-between text-[13px] font-medium text-texto2">Por cobrar <ArrowUpRight className="size-3.5" /></p>
           <div>
             <p className="num text-[22px] font-semibold leading-none tracking-[-0.03em] sm:text-[30px]">{euros(importePendiente)}</p>
-            <p className="mt-2 text-[13px] text-texto2">{entregadosMes.length === 1 ? "1 entregado" : `${entregadosMes.length} entregados`} este mes</p>
+            <p className="mt-2 text-[13px] text-texto2">{sinCobrar.length === 1 ? "1 pedido" : `${sinCobrar.length} pedidos`} sin cobrar</p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Chips */}

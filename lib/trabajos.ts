@@ -1,3 +1,4 @@
+import { entregarPDF } from "./entregar-pdf";
 import { sb } from "./supabase";
 import { aCent, euros } from "./calculo";
 import type { Empresa } from "./tipos";
@@ -78,19 +79,14 @@ export function mensajeListo(t: Trabajo, empresa: Pick<Empresa, "nombre">) {
   return `Hola${quien ? " " + quien : ""}, tu trabajo ${t.numero ?? ""} (${resumenItems(t) || "tus prendas"}) ya está listo para recoger.${p ? ` Pendiente: ${euros(p)}.` : ""} ¡Gracias! ${empresa.nombre}`;
 }
 
-/** Ticket de recogida en PDF: en móvil abre el menú de compartir (WhatsApp, correo…); en el ordenador se descarga */
-export async function compartirTicketTrabajo(t: Trabajo, empresa: Empresa, soloDescargar = false): Promise<"compartido" | "cancelado" | "descargado"> {
+/** PDF del ticket de recogida (se puede preparar antes de que el usuario pulse) */
+export async function pdfTicketTrabajo(t: Trabajo, empresa: Empresa) {
   const { pdfTrabajo } = await import("./pdf-trabajo");
-  const blob = await pdfTrabajo(t, empresa);
+  return pdfTrabajo(t, empresa);
+}
+/** Ticket de recogida en PDF: en móvil abre el menú de compartir (WhatsApp, correo…); en el ordenador se descarga */
+export async function compartirTicketTrabajo(t: Trabajo, empresa: Empresa, soloDescargar = false, hecho?: Promise<Blob>) {
+  const blob = await (hecho ?? pdfTicketTrabajo(t, empresa));
   const nombre = `Ticket ${t.numero ?? ""} ${t.cliente_nombre ?? ""}.pdf`.replace(/\s+/g, " ").trim();
-  const archivo = new File([blob], nombre, { type: "application/pdf" });
-  if (!soloDescargar && navigator.canShare?.({ files: [archivo] }) && matchMedia("(pointer: coarse)").matches) {
-    try { await navigator.share({ files: [archivo], title: `Ticket ${t.numero}` }); return "compartido"; }
-    catch (e) { if ((e as Error).name === "AbortError") return "cancelado"; }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-  return "descargado";
+  return entregarPDF(blob, nombre, `Ticket ${t.numero}`, soloDescargar);
 }

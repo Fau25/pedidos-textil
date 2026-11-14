@@ -141,3 +141,7 @@ input.campo[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto;
 .resumen-oscuro .campo::placeholder{color:rgba(255,255,255,.45)}
 .resumen-oscuro select{background:rgba(255,255,255,.10);color:#fff}
 .resumen-oscuro select option{color:#17181c}
+
+/* Cuentas: colores de las dos series del gráfico (comprobados para daltonismo, claro y oscuro) */
+:root{--serie-pedidos:#1d52eb;--serie-trabajos:#c98420}
+.dark{--serie-pedidos:#5b86ff;--serie-trabajos:#b97a20}

@@ -2,18 +2,20 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Inbox, ArrowUpDown, Check } from "lucide-react";
+import { Plus, Inbox, ArrowUpDown, Check, Euro } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Cargando, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError } from "@/lib/supabase";
 import { useCarga, useParam } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
-import { marcarEntregado } from "@/lib/pedidos";
+import { conPago, marcarEntregado, marcarPagado } from "@/lib/pedidos";
 import type { Pedido } from "@/lib/tipos";
 
 type Orden = "antiguos" | "fecha" | "total" | "cliente";
-type Filtro = "pendientes" | "entregados" | "todos";
+type Filtro = "pendientes" | "entregados" | "sincobrar" | "todos";
+const NOMBRE: Record<Filtro, string> = { pendientes: "Pendientes", entregados: "Entregados", sincobrar: "Sin cobrar", todos: "Todos" };
+const cumple = (p: Pedido, f: Filtro) => f === "todos" || (f === "entregados" ? p.entregado : f === "sincobrar" ? !p.pagado_en && Number(p.total) > 0 : !p.entregado);
 
 export default function Pedidos() {
   const { empresa } = useSesion();
@@ -25,17 +27,15 @@ export default function Pedidos() {
   const [sel, setSel] = useState<Set<string>>(new Set());
 
   const ver = useParam("ver");
-  useEffect(() => { if (ver === "entregados" || ver === "todos") { setFiltro(ver); setOrden("fecha"); } }, [ver]);
+  useEffect(() => { if (ver === "entregados" || ver === "todos" || ver === "sincobrar") { setFiltro(ver); setOrden("fecha"); } }, [ver]);
 
   const { datos, setDatos, error, recargar } = useCarga(async () => {
-    const { data, error } = await sb.from("pedidos").select("id, numero, fecha, total, unidades, referencia, entregado, entregado_en, actualizado, clientes(nombre)")
-      .eq("empresa_id", empresa!.id).order("fecha", { ascending: false }).limit(2000);
-    if (error) throw error;
-    return data as unknown as Pedido[];
+    return conPago<Pedido[]>((x) => sb.from("pedidos").select(`id, numero, fecha, total, unidades, referencia, entregado, entregado_en, actualizado${x}, clientes(nombre)`)
+      .eq("empresa_id", empresa!.id).order("fecha", { ascending: false }).limit(2000));
   });
 
   const lista = useMemo(() => {
-    let l = (datos ?? []).filter((p) => filtro === "todos" || (filtro === "entregados" ? p.entregado : !p.entregado));
+    let l = (datos ?? []).filter((p) => cumple(p, filtro));
     const q = texto.trim().toLowerCase();
     if (q) l = l.filter((p) => [p.numero, p.referencia, p.clientes?.nombre].some((v) => v?.toLowerCase().includes(q)));
     const f = {
@@ -47,7 +47,7 @@ export default function Pedidos() {
     return [...l].sort(f);
   }, [datos, filtro, texto, orden]);
 
-  const n = (f: Filtro) => (datos ?? []).filter((p) => f === "todos" || (f === "entregados" ? p.entregado : !p.entregado)).length;
+  const n = (f: Filtro) => (datos ?? []).filter((p) => cumple(p, f)).length;
 
   async function entregar(ids: string[], v: boolean) {
     const prev = datos;
@@ -61,16 +61,28 @@ export default function Pedidos() {
     catch (e) { setDatos(prev); aviso(textoError(e), "error"); }
   }
 
+  async function pagar(ids: string[], v: boolean) {
+    const prev = datos; const ahora = new Date().toISOString();
+    setDatos((d) => d?.map((p) => (ids.includes(p.id) ? { ...p, pagado_en: v ? ahora : null } : p)) ?? null);
+    try {
+      await marcarPagado(ids, v);
+      aviso(v ? (ids.length > 1 ? `${ids.length} pedidos cobrados` : "Marcado como pagado") : "Vuelve a «sin cobrar»", "ok",
+        { texto: "Deshacer", fn: async () => { await marcarPagado(ids, !v); recargar(); } });
+      setSel(new Set());
+    }
+    catch (e) { setDatos(prev); aviso(textoError(e), "error"); }
+  }
+
   return (
     <>
       <Cabecera titulo="Pedidos" acciones={<Link href="/pedidos/nuevo/"><Boton variante="primario"><Plus className="size-4" />Nuevo pedido</Boton></Link>} />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex rounded-full border border-borde bg-superficie p-0.5" role="tablist">
-          {(["pendientes", "entregados", "todos"] as Filtro[]).map((f) => (
+        <div className="grid w-full grid-cols-4 rounded-[20px] border border-borde bg-superficie p-0.5 sm:flex sm:w-auto sm:rounded-full" role="tablist">
+          {(["pendientes", "entregados", "sincobrar", "todos"] as Filtro[]).map((f) => (
             <button key={f} role="tab" aria-selected={filtro === f} onClick={() => { setFiltro(f); setSel(new Set()); setOrden(f === "pendientes" ? "antiguos" : "fecha"); }}
-              className={cx("h-9 flex-1 rounded-full px-3 text-[13px] font-medium capitalize sm:flex-none", filtro === f ? "bg-acento text-sobre-acento" : "text-texto2")}>
-              {f} <span className="num ml-0.5 text-[12px] opacity-70">{datos ? n(f) : ""}</span>
+              className={cx("min-h-9 rounded-[18px] px-1 py-1 text-[12.5px] font-medium leading-tight sm:flex-none sm:rounded-full sm:px-3 sm:text-[13px]", filtro === f ? "bg-acento text-sobre-acento" : "text-texto2")}>
+              <span className="block whitespace-nowrap sm:inline">{NOMBRE[f]}</span> <span className="num text-[12px] opacity-70 sm:ml-0.5">{datos ? n(f) : ""}</span>
             </button>
           ))}
         </div>
@@ -90,11 +102,12 @@ export default function Pedidos() {
             <div className="flex flex-wrap items-center gap-3 border-b border-borde bg-acento-suave px-4 py-2.5 text-[13px]">
               <b>{sel.size} seleccionado{sel.size > 1 ? "s" : ""}</b>
               {filtro !== "entregados" && <Boton tam="s" variante="primario" onClick={() => entregar([...sel], true)}><Check className="size-3.5" />Marcar entregados</Boton>}
-              {filtro !== "pendientes" && <Boton tam="s" onClick={() => entregar([...sel], false)}>Volver a pendientes</Boton>}
+              {filtro !== "pendientes" && filtro !== "sincobrar" && <Boton tam="s" onClick={() => entregar([...sel], false)}>Volver a pendientes</Boton>}
+              <Boton tam="s" onClick={() => pagar([...sel], true)}><Euro className="size-3.5" />Marcar pagados</Boton>
               <button className="text-azul" onClick={() => setSel(new Set())}>Cancelar</button>
             </div>
           )}
-          {!lista.length ? <p className="py-12 text-center text-texto2">{texto ? "Sin resultados." : filtro === "pendientes" ? "¡Nada pendiente! 🎉" : "No hay pedidos aquí."}</p> : (
+          {!lista.length ? <p className="py-12 text-center text-texto2">{texto ? "Sin resultados." : filtro === "pendientes" ? "¡Nada pendiente! 🎉" : filtro === "sincobrar" ? "Todo cobrado 🎉" : "No hay pedidos aquí."}</p> : (
             <ul className="divide-y divide-borde">
               {lista.map((p) => {
                 return (
@@ -111,8 +124,16 @@ export default function Pedidos() {
                         <span className={cx("block text-[12px]", p.entregado ? "text-emerald-700 dark:text-emerald-400" : "text-texto2")}>
                           {p.entregado ? `Entregado ${fecha(p.entregado_en)}` : `Pedido ${fecha(p.fecha)}`}
                         </span>
+                        {p.pagado_en ? <span className="block text-[11.5px] font-medium text-emerald-700 dark:text-emerald-400">Pagado</span>
+                          : Number(p.total) > 0 && <span className="block text-[11.5px] font-medium text-amber-700 dark:text-amber-400">Sin cobrar</span>}
                       </span>
                     </button>
+                    {!p.pagado_en && Number(p.total) > 0 && (
+                      <button title="Marcar como pagado" aria-label={`Cobrar ${p.numero}`} onClick={() => pagar([p.id], true)}
+                        className="grid size-9 shrink-0 place-items-center rounded-full border border-borde text-texto2 hover:border-amber-500 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950/40">
+                        <Euro className="size-4" />
+                      </button>
+                    )}
                     {!p.entregado && (
                       <button title="Marcar como entregado" aria-label={`Marcar ${p.numero} como entregado`} onClick={() => entregar([p.id], true)}
                         className="grid size-9 shrink-0 place-items-center rounded-full border border-borde text-texto2 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40">

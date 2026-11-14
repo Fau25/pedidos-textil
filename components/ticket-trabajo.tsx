@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText, Loader2 } from "lucide-react";
 import { Hoja, useAvisos } from "./ui";
 import { IconoWhatsApp, enlaceWa } from "./whatsapp";
 import { useSesion } from "./sesion";
 import { euros, aCent } from "@/lib/calculo";
-import { CORTO, compartirTicketTrabajo, pendienteCent, type Trabajo } from "@/lib/trabajos";
+import { CORTO, compartirTicketTrabajo, pdfTicketTrabajo, pendienteCent, type Trabajo } from "@/lib/trabajos";
 import { textoError } from "@/lib/supabase";
 
 const fecha = (d: string | null | undefined, larga = false) =>
@@ -18,6 +18,13 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
   const { empresa } = useSesion();
   const { aviso } = useAvisos();
   const [ocupado, setOcupado] = useState<"" | "enviar" | "pdf">("");
+  // El PDF se prepara nada más abrir, así al pulsar sale al momento
+  const listo = useRef<Promise<Blob> | null>(null);
+  useEffect(() => {
+    listo.current = null;
+    if (!abierto || !t || !empresa) return;
+    const pr = pdfTicketTrabajo(t, empresa); pr.catch(() => {}); listo.current = pr;
+  }, [abierto, t, empresa]);
   if (!t || !empresa) return null;
   const items = t.items.filter((i) => i.que || i.detalle);
 
@@ -30,7 +37,7 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
         window.open(enlaceWa(t!.cliente_telefono, txt), "_blank", "noopener");
         return;
       }
-      const r = await compartirTicketTrabajo(t!, empresa!, que === "pdf");
+      const r = await compartirTicketTrabajo(t!, empresa!, que === "pdf", listo.current ?? undefined);
       if (r === "descargado") aviso("Ticket descargado en PDF");
     } catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
   }

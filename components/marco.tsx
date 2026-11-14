@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 const Buscador = dynamic(() => import("./buscador").then((m) => m.Buscador), { ssr: false });
-import { Home, ShoppingBag, Users, Shirt, Settings, Plus, Search, Moon, Sun, LogOut, MoreHorizontal, ClipboardList } from "lucide-react";
+import { Home, ShoppingBag, Users, Shirt, Settings, Plus, Search, Moon, Sun, LogOut, MoreHorizontal, ClipboardList, Wallet } from "lucide-react";
 import { Logo } from "./logo";
 import { cx } from "./ui";
 import { useSesion } from "./sesion";
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/", t: "Inicio", i: Home },
   { href: "/pedidos/", t: "Pedidos", i: ShoppingBag },
   { href: "/trabajos/", t: "Trabajos", i: ClipboardList },
+  { href: "/cuentas/", t: "Cuentas", i: Wallet },
   { href: "/clientes/", t: "Clientes", i: Users },
   { href: "/catalogo/", t: "Catálogo", i: Shirt },
   { href: "/ajustes/", t: "Ajustes", i: Settings },
@@ -91,13 +92,13 @@ export function Marco({ children }: { children: ReactNode }) {
         ))}
         <Link href="/pedidos/nuevo/" aria-label="Nuevo pedido" className="grid size-12 place-items-center rounded-full bg-azul text-white shadow-[0_6px_16px_-6px_rgba(31,91,255,0.7)]"><Plus className="size-6" /></Link>
         <Link href="/catalogo/" aria-label="Catálogo" className={cx("grid size-12 place-items-center rounded-full transition-colors", activo("/catalogo/") ? "bg-acento text-sobre-acento" : "text-texto2")}><Shirt className="size-[22px]" strokeWidth={1.9} /></Link>
-        <button onClick={() => setMas(true)} aria-label="Más" className={cx("grid size-12 place-items-center rounded-full", ["/trabajos/", "/clientes/", "/ajustes/"].some(activo) ? "bg-acento text-sobre-acento" : "text-texto2")}><MoreHorizontal className="size-[22px]" /></button>
+        <button onClick={() => setMas(true)} aria-label="Más" className={cx("grid size-12 place-items-center rounded-full", ["/trabajos/", "/cuentas/", "/clientes/", "/ajustes/"].some(activo) ? "bg-acento text-sobre-acento" : "text-texto2")}><MoreHorizontal className="size-[22px]" /></button>
       </nav>
       {mas && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMas(false)}>
           <div className="absolute inset-0 bg-black/25" />
           <div className="cristal animar absolute inset-x-4 bottom-24 rounded-[24px] p-2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            {NAV.filter((n) => ["/trabajos/", "/clientes/", "/ajustes/"].includes(n.href)).map(({ href, t, i: I }) => (
+            {NAV.filter((n) => ["/trabajos/", "/cuentas/", "/clientes/", "/ajustes/"].includes(n.href)).map(({ href, t, i: I }) => (
               <Link key={href} href={href} className="flex h-12 items-center gap-3 rounded-xl px-3 hover:bg-suave"><I className="size-5 text-texto2" />{t}</Link>
             ))}
             <button onClick={cambiar} className="flex h-12 w-full items-center gap-3 rounded-xl px-3 hover:bg-suave">{oscuro ? <Sun className="size-5 text-texto2" /> : <Moon className="size-5 text-texto2" />}Modo {oscuro ? "claro" : "oscuro"}</button>

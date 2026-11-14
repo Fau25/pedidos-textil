@@ -18,7 +18,7 @@ const BASE = `http://localhost:${servidor.address().port}/pedidos-textil/`;
 
 const dia = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const E = "00000000-0000-0000-0000-0000000000e1";
-const ped = (i, uds, entrega, cliente, extra = {}) => ({ id: "p" + i, numero: "P-2026-000" + i, fecha: dia(-5), entrega, total: "123.40", unidades: uds, referencia: null, entregado: false, entregado_en: null, actualizado: new Date().toISOString(), clientes: { nombre: cliente }, cliente_id: "k1", empresa_id: E, descuento_pct: 0, gastos_coste: 0, gastos_venta: 0, iva: 21, coste: 0, base: 100, notas: null, ...extra });
+const ped = (i, uds, entrega, cliente, extra = {}) => ({ id: "p" + i, numero: "P-2026-000" + i, fecha: dia(-5), entrega, total: "123.40", unidades: uds, referencia: null, entregado: false, entregado_en: null, pagado_en: null, actualizado: new Date().toISOString(), clientes: { nombre: cliente }, cliente_id: "k1", empresa_id: E, descuento_pct: 0, gastos_coste: 0, gastos_venta: 0, iva: 21, coste: 0, base: 100, notas: null, ...extra });
 const T = {
   miembros: [{ empresa_id: E, rol: "propietario" }],
   empresas: [{ id: E, nombre: "Bordados Prueba", iva: 21, margen: 40, validez_dias: 30, condiciones: "Condiciones", nif: null, direccion: null, email: null, telefono: null, web: null, logo_path: null }],
@@ -33,7 +33,7 @@ const T = {
   ],
   catalogo: [{ id: "c1", tipo: "Camiseta", marca: "Roly", modelo: "Beagle", referencia: "CA6554", colores: ["Blanco", "Negro"], tallas: ["S", "M", "L", "XL"], favorito: true, precio_compra: 0, precio_venta: null, proveedor_id: null, imagen_path: null, notas: null }],
   clientes: [{ id: "k1", nombre: "Club Deportivo Arenal", contacto: "Marta", telefono: "612", email: "a@b.es" }],
-  pedidos: [ped(1, 43, dia(-1), "Club Deportivo Arenal", { descuento_pct: 5 }), ped(2, 10, dia(0), "Bar La Esquina"), ped(3, 30, null, "Peña Ciclista")],
+  pedidos: [ped(1, 43, dia(-1), "Club Deportivo Arenal", { descuento_pct: 5 }), ped(2, 10, dia(0), "Bar La Esquina"), ped(3, 30, null, "Peña Ciclista", { pagado_en: new Date().toISOString() })],
   pedido_lineas: [{ id: "l1", pedido_id: "p1", orden: 0, tipo: "Camiseta", marca: "Roly", modelo: "Beagle", color: "Marino", proveedor_id: null, precio_compra: 2, precio_venta: 4.5, imagen_path: null, notas: null, estado: "pendiente", linea_tallas: [{ talla: "M", cantidad: 20, orden: 3 }, { talla: "L", cantidad: 23, orden: 4 }] }],
   personalizaciones: [{ id: "x1", pedido_id: "p1", orden: 0, tecnica_id: "t1", tecnica: "Bordado", ubicacion: "Pecho izquierdo", aplicaciones: 1, diseno_path: null, coste_ud: 1, precio_ud: 2.5, precio_manual: false, notas: null, estado: "pendiente", personalizacion_lineas: [{ linea_id: "l1" }] }],
 };
@@ -71,7 +71,7 @@ async function prueba(nombre, fn) {
 
 await prueba("todas las pantallas cargan sin errores", async () => {
   const { ctx, p, errores } = await abrir();
-  for (const r of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/", "clientes/", "clientes/ver/?id=k1", "catalogo/", "trabajos/", "trabajos/nuevo/", "ajustes/"]) await ir(p, r);
+  for (const r of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/", "clientes/", "clientes/ver/?id=k1", "catalogo/", "trabajos/", "trabajos/nuevo/", "cuentas/", "ajustes/"]) await ir(p, r);
   assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("al saltar de un pedido a otro con el buscador se ve el nuevo", async () => {
@@ -183,7 +183,7 @@ await prueba("ninguna pantalla se sale de lado en móvil ni tablet", async () =>
   const { ctx, p, errores } = await abrir();
   for (const w of [360, 390, 768, 1024]) {
     await p.setViewportSize({ width: w, height: 900 });
-    for (const ruta of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/?id=p1", "clientes/", "clientes/ver/?id=k1", "catalogo/", "trabajos/", "trabajos/nuevo/?id=tr1", "ajustes/"]) {
+    for (const ruta of ["", "pedidos/", "pedidos/ver/?id=p1", "pedidos/nuevo/?id=p1", "clientes/", "clientes/ver/?id=k1", "catalogo/", "trabajos/", "trabajos/nuevo/?id=tr1", "ajustes/", "cuentas/"]) {
       await ir(p, ruta);
       const sobra = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       assert.ok(sobra <= 1, `${ruta || "inicio"} a ${w}px se sale ${sobra}px`);
@@ -394,6 +394,30 @@ await prueba("el ticket del pedido se genera y se puede enviar o descargar", asy
   await p.keyboard.press("Escape");
   await ir(p, "pedidos/ver/?id=p1"); await p.getByRole("button", { name: "Ticket" }).click();
   await p.getByRole("article", { name: "Vista previa del ticket" }).waitFor();
+  assert.deepEqual(errores, []); await ctx.close();
+});
+
+await prueba("cobros: marcar un pedido como pagado y ver las cuentas", async () => {
+  const { ctx, p, escrituras, errores } = await abrir();
+  await ir(p, "pedidos/");
+  await p.getByRole("tab", { name: /Sin cobrar/ }).click();
+  assert.match(await p.getByRole("tab", { name: /Sin cobrar/ }).innerText(), /2/);
+  await p.getByRole("button", { name: "Cobrar P-2026-0001" }).click();
+  await p.getByText("Marcado como pagado").waitFor();
+  const w = escrituras.find((e) => e.tabla === "pedidos" && e.metodo === "PATCH");
+  assert.ok(w && w.cuerpo.pagado_en, "guarda pagado_en");
+  await ir(p, "pedidos/ver/?id=p2");
+  await p.getByRole("button", { name: "Marcar pagado" }).waitFor();
+  await ir(p, "cuentas/");
+  await p.getByRole("heading", { name: "Ingresos cobrados por mes" }).waitFor();
+  const txt = await p.locator("main").innerText();
+  assert.match(txt, /Por cobrar/); assert.match(txt, /T-0007/); assert.match(txt, /P-2026-0002/);
+  assert.doesNotMatch(txt, /falta activar/);
+  await p.getByRole("button", { name: "Cobrar T-0007" }).click();
+  await p.getByText(/T-0007 cobrado/).waitFor();
+  assert.ok(escrituras.some((e) => e.tabla === "trabajos" && e.metodo === "PATCH" && Number(e.cuerpo.a_cuenta) === 36));
+  await p.getByRole("button", { name: /^Cobrado en/ }).click();
+  await p.getByText("Peña Ciclista").waitFor();
   assert.deepEqual(errores, []); await ctx.close();
 });
 
