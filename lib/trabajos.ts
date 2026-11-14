@@ -13,6 +13,8 @@ export type Trabajo = {
   cliente_id: string | null; cliente_nombre: string | null; cliente_telefono: string | null;
   items: ItemTrabajo[]; entrega: string | null; total: number; a_cuenta: number; notas: string | null;
   estado: EstadoTrabajo; listo_en: string | null; entregado_en: string | null; creado: string;
+  /** Cuándo quedó cobrado del todo (SQL 11) */
+  pagado_en?: string | null;
 };
 
 export const nuevoItem = (tecnica = "Bordado"): ItemTrabajo => ({ id: crypto.randomUUID(), que: "", cantidad: 1, tecnica, ubicaciones: [], detalle: "", diseno_path: null });
@@ -35,11 +37,32 @@ export async function guardarTrabajo(t: Trabajo): Promise<Trabajo> {
     id: t.id, empresa_id: t.empresa_id, cliente_id: t.cliente_id, cliente_nombre: t.cliente_nombre?.trim() || null, cliente_telefono: t.cliente_telefono?.trim() || null,
     items: t.items.filter((i) => i.que.trim() || i.detalle.trim()).map((i) => ({ ...i, que: i.que.trim(), detalle: i.detalle.trim(), cantidad: Math.max(1, Number(i.cantidad) || 1) })),
     entrega: t.entrega || null, total: Number(t.total) || 0, a_cuenta: Number(t.a_cuenta) || 0, notas: t.notas?.trim() || null,
+    pagado_en: estaPagado(t) ? (t.pagado_en ?? new Date().toISOString()) : null,
   };
-  const { data, error } = await sb.from("trabajos").upsert(fila).select("*").single();
+  let { data, error } = await sb.from("trabajos").upsert(fila).select("*").single();
+  if (error && /pagado_en/.test(error.message)) { // sin el SQL 11
+    const { pagado_en: _p, ...sinPago } = fila; void _p;
+    ({ data, error } = await sb.from("trabajos").upsert(sinPago).select("*").single());
+  }
   if (error) throw sinTablaTrabajos(error) ? new Error(AVISO_SIN_TRABAJOS) : error;
   return data as Trabajo;
 }
+
+/** Cobra lo pendiente: lo dejado a cuenta pasa a ser el total y se apunta la fecha de cobro */
+export async function cobrar(t: Trabajo) {
+  const r = await sb.from("trabajos").update({ a_cuenta: Number(t.total) || 0, pagado_en: new Date().toISOString() }).eq("id", t.id);
+  if (r.error && /pagado_en/.test(r.error.message)) { // sin el SQL 11: al menos queda sin pendiente
+    const r2 = await sb.from("trabajos").update({ a_cuenta: Number(t.total) || 0 }).eq("id", t.id);
+    if (r2.error) throw r2.error; return;
+  }
+  if (r.error) throw r.error;
+}
+export async function deshacerCobro(t: Trabajo) {
+  const r = await sb.from("trabajos").update({ a_cuenta: Number(t.a_cuenta) || 0, pagado_en: t.pagado_en ?? null }).eq("id", t.id);
+  if (r.error && /pagado_en/.test(r.error.message)) { await sb.from("trabajos").update({ a_cuenta: Number(t.a_cuenta) || 0 }).eq("id", t.id); return; }
+  if (r.error) throw r.error;
+}
+export const estaPagado = (t: Pick<Trabajo, "total" | "a_cuenta">) => Number(t.total) > 0 && pendienteCent(t) === 0;
 
 export async function cambiarEstado(id: string, estado: EstadoTrabajo) {
   const ahora = new Date().toISOString();

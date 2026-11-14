@@ -10,9 +10,10 @@ import { TicketTrabajo } from "@/components/ticket-trabajo";
 import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { euros } from "@/lib/calculo";
-import { AVISO_SIN_TRABAJOS, cambiarEstado, mensajeListo, pendienteCent, resumenItems, sinTablaTrabajos, unidades, type EstadoTrabajo, type Trabajo } from "@/lib/trabajos";
+import { AVISO_SIN_TRABAJOS, cambiarEstado, cobrar, deshacerCobro, estaPagado, mensajeListo, pendienteCent, resumenItems, sinTablaTrabajos, unidades, type EstadoTrabajo, type Trabajo } from "@/lib/trabajos";
 
-const FILTROS: { v: EstadoTrabajo; t: string }[] = [{ v: "pendiente", t: "Por hacer" }, { v: "listo", t: "Listos" }, { v: "entregado", t: "Entregados" }];
+type Filtro = EstadoTrabajo | "sincobrar";
+const FILTROS: { v: Filtro; t: string }[] = [{ v: "pendiente", t: "Por hacer" }, { v: "listo", t: "Listos" }, { v: "entregado", t: "Entregados" }, { v: "sincobrar", t: "Sin cobrar" }];
 const ESTILO: Record<EstadoTrabajo, string> = {
   pendiente: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
   listo: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
@@ -33,7 +34,7 @@ function cuando(d: string | null) {
 export default function Trabajos() {
   const { empresa, rol } = useSesion();
   const { aviso } = useAvisos();
-  const [filtro, setFiltro] = useState<EstadoTrabajo>("pendiente");
+  const [filtro, setFiltro] = useState<Filtro>("pendiente");
   const [q, setQ] = useState("");
   const [ticket, setTicket] = useState<Trabajo | null>(null);
   const editar = rol !== "lector";
@@ -44,17 +45,32 @@ export default function Trabajos() {
   });
 
   const cuenta = useMemo(() => {
-    const c = { pendiente: 0, listo: 0, entregado: 0, cobrar: 0 };
-    for (const t of datos ?? []) { c[t.estado]++; if (t.estado !== "entregado") c.cobrar += pendienteCent(t); }
+    const c = { pendiente: 0, listo: 0, entregado: 0, sincobrar: 0, cobrar: 0, cobradoMes: 0 };
+    const mes = new Date().toISOString().slice(0, 7);
+    for (const t of datos ?? []) {
+      c[t.estado]++;
+      const p = pendienteCent(t);
+      if (p > 0) { c.sincobrar++; c.cobrar += p; }
+      // Cobrado este mes: los pagados del todo con fecha de cobro de este mes (sin ella, la de entrega)
+      if (estaPagado(t) && (t.pagado_en ?? t.entregado_en ?? "").slice(0, 7) === mes) c.cobradoMes += Math.round(Number(t.total) * 100);
+    }
     return c;
   }, [datos]);
   const lista = useMemo(() => {
     const n = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-    let l = (datos ?? []).filter((t) => t.estado === filtro);
+    let l = (datos ?? []).filter((t) => (filtro === "sincobrar" ? pendienteCent(t) > 0 : t.estado === filtro));
     if (q.trim()) l = (datos ?? []).filter((t) => n([t.numero, t.cliente_nombre, t.cliente_telefono, resumenItems(t)].join(" ")).includes(n(q.trim())));
     // Por hacer: lo más urgente primero; el resto, lo último primero
     return filtro === "pendiente" && !q.trim() ? [...l].sort((a, b) => (a.entrega ?? "9999").localeCompare(b.entrega ?? "9999")) : l;
   }, [datos, filtro, q]);
+
+  async function pagar(t: Trabajo) {
+    setDatos((d) => d?.map((x) => (x.id === t.id ? { ...x, a_cuenta: Number(t.total), pagado_en: new Date().toISOString() } : x)) ?? d);
+    try {
+      await cobrar(t);
+      aviso(`${t.numero} cobrado: ${euros(pendienteCent(t))}`, "ok", { texto: "Deshacer", fn: () => { deshacerCobro(t).then(recargar).catch(() => {}); } });
+    } catch (e) { aviso(textoError(e), "error"); recargar(); }
+  }
 
   async function mover(t: Trabajo, estado: EstadoTrabajo) {
     const antes = t.estado;
@@ -75,8 +91,8 @@ export default function Trabajos() {
         <div className="grid gap-3">
           <div className="grid grid-cols-3 gap-2">
             <div className="tarjeta p-3"><p className="text-[11.5px] font-bold text-orange-700 dark:text-orange-300">Por hacer</p><b className="num text-[24px]">{cuenta.pendiente}</b></div>
-            <div className="tarjeta p-3"><p className="text-[11.5px] font-bold text-emerald-700 dark:text-emerald-300">Listos</p><b className="num text-[24px]">{cuenta.listo}</b></div>
-            <div className="tarjeta p-3"><p className="text-[11.5px] font-bold text-texto2">Por cobrar</p><b className="num text-[20px] leading-[36px]">{euros(cuenta.cobrar)}</b></div>
+            <button onClick={() => { setQ(""); setFiltro("sincobrar"); }} className="tarjeta p-3 text-left"><p className="text-[11.5px] font-bold text-red-700 dark:text-red-300">Por cobrar</p><b className="num text-[18px] leading-[36px] sm:text-[20px]">{euros(cuenta.cobrar)}</b></button>
+            <div className="tarjeta p-3"><p className="text-[11.5px] font-bold text-emerald-700 dark:text-emerald-300">Cobrado mes</p><b className="num text-[18px] leading-[36px] sm:text-[20px]">{euros(cuenta.cobradoMes)}</b></div>
           </div>
 
           <label className="relative">
@@ -97,7 +113,7 @@ export default function Trabajos() {
           )}
 
           {!lista.length ? (
-            <Vacio icono={<ClipboardList className="size-6" />} titulo={q.trim() ? "Nada coincide con la búsqueda" : filtro === "pendiente" ? "No hay trabajos por hacer" : filtro === "listo" ? "No hay trabajos listos" : "Aún no hay trabajos entregados"}
+            <Vacio icono={<ClipboardList className="size-6" />} titulo={q.trim() ? "Nada coincide con la búsqueda" : filtro === "pendiente" ? "No hay trabajos por hacer" : filtro === "listo" ? "No hay trabajos listos" : filtro === "sincobrar" ? "Todo cobrado" : "Aún no hay trabajos entregados"}
               texto={filtro === "pendiente" && !q.trim() ? "Cuando un cliente te deje prendas, pulsa «Recibí» y apúntalo en un minuto." : undefined} />
           ) : (
             <ul className="grid gap-2.5 md:grid-cols-2">
@@ -116,7 +132,11 @@ export default function Trabajos() {
                     </Link>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px] text-texto2">
                       <span className={cx("flex items-center gap-1", tarde && "font-semibold text-red-600")}><CalendarDays className="size-3.5" />{cuando(t.entrega)}</span>
-                      <span>Pendiente <b className="num text-texto">{euros(p)}</b></span>
+                      {estaPagado(t)
+                        ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11.5px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Pagado · {euros(Math.round(Number(t.total) * 100))}</span>
+                        : p > 0 ? <span className="flex items-center gap-1.5">Pendiente <b className="num text-texto">{euros(p)}</b>
+                            {editar && <button onClick={() => pagar(t)} className="rounded-full bg-emerald-600/10 px-2.5 py-1 text-[11.5px] font-bold text-emerald-800 hover:bg-emerald-600/20 dark:text-emerald-200">Cobrar</button>}</span>
+                          : <span>Sin precio</span>}
                       <span className="ml-auto flex gap-1.5">
                         <button aria-label={`Ver ticket ${t.numero}`} title="Ticket" onClick={() => setTicket(t)} className="grid size-9 place-items-center rounded-full border border-borde bg-superficie text-texto"><IconoTicket className="size-4" /></button>
                         {editar && t.estado === "pendiente" && <button onClick={() => mover(t, "listo")} className="flex h-9 items-center gap-1.5 rounded-full bg-acento px-3.5 text-[12.5px] font-bold text-sobre-acento"><Check className="size-4" />Marcar listo</button>}

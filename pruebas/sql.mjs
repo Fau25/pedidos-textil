@@ -12,7 +12,7 @@ grant select on auth.users to supabase_auth_admin;`);
 const u = "11111111-1111-1111-1111-111111111111", v = "22222222-2222-2222-2222-222222222222", w = "33333333-3333-3333-3333-333333333333";
 await db.exec(`insert into auth.users(id,email,created_at) values ('${u}','fau@x.es','2026-01-01'),('${v}','otra@x.es','2026-02-01'),('${w}','ayuda@x.es','2026-03-01')`);
 const P = new URL("../supabase/", import.meta.url);
-for (const f of ["esquema.sql", "02-simplificar.sql", "03-fiabilidad.sql", "05-invitados.sql", "06-fotos-roly.sql", "07-borrar-cuenta.sql", "08-auditoria.sql", "08-auditoria.sql", "09-facturas.sql", "09-facturas.sql", "10-trabajos.sql", "10-trabajos.sql"])
+for (const f of ["esquema.sql", "02-simplificar.sql", "03-fiabilidad.sql", "05-invitados.sql", "06-fotos-roly.sql", "07-borrar-cuenta.sql", "08-auditoria.sql", "08-auditoria.sql", "09-facturas.sql", "09-facturas.sql", "10-trabajos.sql", "10-trabajos.sql", "11-trabajos-cobro.sql", "11-trabajos-cobro.sql"])
   await db.exec(fs.readFileSync(new URL(f, P), "utf8"));
 async function como(user, q) { await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${user}',false);`); try { return await db.query(q); } finally { await db.exec("reset role"); } }
 const falla = async (user, q, re) => { await assert.rejects(como(user, q), re); };

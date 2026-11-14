@@ -358,6 +358,9 @@ await prueba("trabajos: lista por estado, marcar listo y avisar por WhatsApp", a
   await p.getByRole("tab", { name: /Listos/ }).click();
   const hrefs = await p.getByRole("link", { name: "Avisar" }).evaluateAll((as) => as.map((a) => a.href));
   assert.ok(hrefs.some((h) => /wa\.me\/34600111222\?text=.*listo/.test(h)), hrefs.join(" "));
+  await p.getByRole("button", { name: "Cobrar", exact: true }).first().click(); await p.waitForTimeout(300);
+  assert.ok(escrituras.some((x) => x.tabla === "trabajos" && x.metodo === "PATCH" && x.cuerpo?.pagado_en && x.cuerpo?.a_cuenta > 0), "cobrar apunta el pago");
+  await p.getByText(/Pagado · /).first().waitFor();
   assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
