@@ -9,6 +9,8 @@ import { Boton, Hoja, useAvisos } from "./ui";
 const eur = (n: number) => n.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 const fecha = (f: string) => { try { return new Date(f + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }); } catch { return f; } };
 
+const iniciales = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("") || "·";
+
 /** Ticket o factura del pedido: vista tipo recibo y botones para enviarlo al cliente o descargarlo en PDF */
 export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto | null; abierto: boolean; cerrar: () => void; tipo?: "ticket" | "factura" }) {
   const { aviso } = useAvisos();
@@ -38,53 +40,49 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto
       {vacio ? (
         <p className="rounded-2xl bg-suave p-4 text-[14px] text-texto2">Añade al menos una prenda con unidades.</p>
       ) : (
-        <article aria-label={`Vista previa ${tipo === "factura" ? "de la factura" : "del ticket"}`} className="mx-auto max-w-sm rounded-[18px] border border-borde bg-white px-5 py-6 text-[13px] text-[#17181c] shadow-sm">
-          <header className="flex flex-col items-center gap-1 text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {logo ? <img src={logo} alt={d.empresa.nombre ?? "Logotipo"} className="mb-1 h-12 max-w-[60%] object-contain" /> : <p className="text-[17px] font-bold">{d.empresa.nombre}</p>}
-            {logo && <p className="font-semibold">{d.empresa.nombre}</p>}
-            {d.empresa.nif && <p className="text-[12px] text-[#5f636b]">NIF {d.empresa.nif}</p>}
-            {d.empresa.direccion && <p className="text-[12px] text-[#5f636b]">{d.empresa.direccion}</p>}
-            {(d.empresa.telefono || d.empresa.email) && <p className="text-[12px] text-[#5f636b]">{[d.empresa.telefono, d.empresa.email].filter(Boolean).join(" · ")}</p>}
-          </header>
-
-          <div className="my-4 border-t border-dashed border-[#c9ccd3]" />
-          <div className="flex items-end justify-between gap-3">
-            <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[#5f636b]">{tipo === "factura" ? (d.cliente?.nif ? "Factura" : "Factura simplificada") : "Ticket"}</p><p className="text-[16px] font-bold">{p.numero}</p></div>
-            <p className="text-right text-[12px] text-[#5f636b]">{fecha(p.fecha)}</p>
-          </div>
-          {d.cliente && (
-            <div className="mt-3 rounded-xl bg-[#f1f2f5] px-3 py-2.5">
-              <p className="text-[11px] text-[#5f636b]">Cliente</p>
-              <p className="font-semibold">{d.cliente.nombre}</p>
-              {d.cliente.nif && <p className="text-[12px] text-[#5f636b]">NIF/CIF {d.cliente.nif}</p>}
+        <article aria-label={`Vista previa ${tipo === "factura" ? "de la factura" : "del ticket"}`} className="mx-auto max-w-sm overflow-hidden rounded-[14px] bg-white text-[13px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
+          {/* Diseño E: franja gris con los datos, título grande y fino, total grande abajo */}
+          <header className="bg-[#f5f6f8] px-5 pb-4 pt-5">
+            <div className="flex items-center gap-2.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {logo ? <img src={logo} alt="" className="h-9 max-w-[45%] object-contain" /> : <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17181c] text-[11px] font-semibold text-white">{iniciales(d.empresa.nombre)}</span>}
+              <div className="min-w-0"><p className="truncate font-semibold">{d.empresa.nombre}</p>
+                <p className="truncate text-[11.5px] text-[#6b7079]">{[d.empresa.nif && `NIF ${d.empresa.nif}`, d.empresa.telefono].filter(Boolean).join(" · ")}</p></div>
             </div>
-          )}
-          {d.pedido.referencia && <p className="mt-2 text-[12px] text-[#5f636b]">Ref.: {d.pedido.referencia}</p>}
-
-          <div className="my-4 border-t border-dashed border-[#c9ccd3]" />
-          <ul className="space-y-3">
-            {filas.map((x, i) => (
-              <li key={i}>
-                <div className="flex justify-between gap-3"><span className="min-w-0 font-semibold">{x.descripcion}</span><span className="num shrink-0 font-semibold">{eur(x.importe)}</span></div>
-                <div className="flex justify-between gap-3 text-[12px] text-[#5f636b]"><span className="min-w-0 truncate">{x.detalle}</span><span className="num shrink-0">{x.unidades} × {eur(x.precio)}</span></div>
-              </li>
-            ))}
-            {d.gastos > 0 && <li className="flex justify-between"><span>Otros gastos</span><span className="num">{eur(d.gastos)}</span></li>}
-          </ul>
-
-          <div className="my-4 border-t border-dashed border-[#c9ccd3]" />
-          <dl className="space-y-1">
-            {d.descuento > 0 && <>
-              <div className="flex justify-between text-[#5f636b]"><dt>Subtotal</dt><dd className="num">{eur(d.bruto)}</dd></div>
-              <div className="flex justify-between text-[#5f636b]"><dt>Descuento {d.descuento_pct} %</dt><dd className="num">-{eur(d.descuento)}</dd></div>
-            </>}
-            <div className="flex justify-between text-[#5f636b]"><dt>Base imponible</dt><dd className="num">{eur(d.base)}</dd></div>
-            <div className="flex justify-between text-[#5f636b]"><dt>IVA {d.iva_pct} %</dt><dd className="num">{eur(d.iva)}</dd></div>
-            <div className="mt-2 flex items-baseline justify-between border-t border-[#17181c] pt-2 text-[17px] font-bold"><dt>Total</dt><dd className="num">{eur(d.total)}</dd></div>
-          </dl>
-          {tipo !== "factura" && d.condiciones && <p className="mt-4 whitespace-pre-line text-[11px] text-[#5f636b]">{d.condiciones}</p>}
-          <p className="mt-4 text-center text-[12px] text-[#5f636b]">¡Gracias por tu pedido!</p>
+            {d.cliente && (
+              <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
+                <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Cliente</p>
+                  <p className="font-semibold [overflow-wrap:anywhere]">{d.cliente.nombre}</p>
+                  {d.cliente.nif && <p className="text-[11.5px] text-[#6b7079]">NIF/CIF {d.cliente.nif}</p>}</div>
+                {tipo === "factura" && d.pedido.numero && <div className="text-right"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Pedido</p><p>{d.pedido.numero}</p></div>}
+              </div>
+            )}
+          </header>
+          <div className="px-5 pb-5 pt-5">
+            <p className="text-[38px] font-light leading-none tracking-[-0.04em]">{tipo === "factura" ? "Factura" : "Ticket"}</p>
+            <p className="mt-2 text-[12px] text-[#6b7079]">Nº <b className="font-semibold text-[#17181c]">{p.numero}</b> · {fecha(p.fecha)}{tipo === "factura" && !d.cliente?.nif ? " · Factura simplificada" : ""}</p>
+            {d.pedido.referencia && <p className="text-[12px] text-[#6b7079]">Ref.: {d.pedido.referencia}</p>}
+            <ul className="mt-4">
+              {filas.map((x, i) => (
+                <li key={i} className="flex justify-between gap-3 border-b border-[#e4e6ea] py-2.5">
+                  <div className="min-w-0"><p>{x.descripcion}</p>
+                    {x.detalle && <p className="text-[11.5px] text-[#6b7079]">{x.detalle}</p>}
+                    <p className="num text-[11.5px] text-[#6b7079]">{x.unidades} × {eur(x.precio)}</p></div>
+                  <span className="num shrink-0">{eur(x.importe)}</span>
+                </li>
+              ))}
+              {d.gastos > 0 && <li className="flex justify-between border-b border-[#e4e6ea] py-2.5"><span>Otros gastos</span><span className="num">{eur(d.gastos)}</span></li>}
+            </ul>
+            <div className="mt-6 flex items-end justify-between gap-3 border-t border-[#17181c] pt-3">
+              <div className="num text-[11.5px] leading-relaxed text-[#6b7079]">
+                {d.descuento > 0 && <p>Descuento {d.descuento_pct} % −{eur(d.descuento)}</p>}
+                <p>Base {eur(d.base)}</p><p>IVA {d.iva_pct} % {eur(d.iva)}</p>
+              </div>
+              <div className="text-right"><p className="text-[11.5px] text-[#6b7079]">Total</p><p className="num text-[30px] font-light leading-tight tracking-[-0.03em]">{eur(d.total)}</p></div>
+            </div>
+            {tipo !== "factura" && d.condiciones && <p className="mt-4 whitespace-pre-line text-[11px] text-[#6b7079]">{d.condiciones}</p>}
+            <p className="mt-3 text-[11.5px] text-[#6b7079]">Gracias por tu confianza.</p>
+          </div>
         </article>
       )}
     </Hoja>

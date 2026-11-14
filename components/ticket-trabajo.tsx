@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
-import { FileText, Loader2, User } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { Hoja, useAvisos } from "./ui";
 import { IconoWhatsApp, enlaceWa } from "./whatsapp";
-import { iconoTecnica } from "./bloque-personalizacion";
 import { useSesion } from "./sesion";
 import { euros, aCent } from "@/lib/calculo";
 import { CORTO, compartirTicketTrabajo, pendienteCent, type Trabajo } from "@/lib/trabajos";
@@ -11,6 +10,8 @@ import { textoError } from "@/lib/supabase";
 
 const fecha = (d: string | null | undefined, larga = false) =>
   d ? new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("es-ES", larga ? { weekday: "short", day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" }) : "";
+
+const iniciales = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("") || "·";
 
 /** Ticket de recogida de un trabajo: vista moderna y botones para enviarlo o sacarlo en PDF */
 export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abierto: boolean; cerrar: () => void }) {
@@ -45,54 +46,37 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
         </button>
       </div>
     }>
-      <article aria-label="Vista previa del ticket" className="overflow-hidden rounded-[26px] bg-white text-[#17181c] shadow-[0_24px_50px_-24px_rgba(20,30,60,.45)] ring-1 ring-black/5">
-        <header className="bg-[#17181c] px-5 pb-5 pt-4 text-white">
-          <div className="flex items-center justify-between text-[13px]">
-            <b className="truncate">{empresa.nombre}</b>
-            <span className="shrink-0 text-white/65">{fecha(t.creado)}</span>
+      <article aria-label="Vista previa del ticket" className="overflow-hidden rounded-[14px] bg-white text-[13px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
+        {/* Diseño E: franja gris arriba, número grande y fino, pendiente grande al final */}
+        <header className="bg-[#f5f6f8] px-5 pb-4 pt-5">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17181c] text-[11px] font-semibold text-white">{iniciales(empresa.nombre)}</span>
+            <div className="min-w-0"><p className="truncate font-semibold">{empresa.nombre}</p>{empresa.telefono && <p className="text-[11.5px] text-[#6b7079]">{empresa.telefono}</p>}</div>
           </div>
-          <p className="mt-4 text-[11.5px] font-semibold tracking-[.08em] text-white/65">TICKET DE RECOGIDA</p>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <b className="text-[32px] tracking-tight">{t.numero}</b>
-            {t.entrega && <span className="rounded-full bg-[#1d52eb] px-3 py-1 text-[12px] font-bold">Para el {fecha(t.entrega, true)}</span>}
+          <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
+            <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Cliente</p>
+              <p className="font-semibold [overflow-wrap:anywhere]">{t.cliente_nombre || "—"}</p>{t.cliente_telefono && <p className="text-[11.5px] text-[#6b7079]">{t.cliente_telefono}</p>}</div>
+            {t.entrega && <div className="text-right"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Recoger el</p><p className="font-semibold">{fecha(t.entrega, true)}</p></div>}
           </div>
         </header>
-        <div className="grid gap-3 px-4 py-4">
-          <div className="flex items-start gap-2.5">
-            <span className="grid size-[34px] shrink-0 place-items-center rounded-[10px] bg-[#f2f3f6]"><User className="size-4" /></span>
-            <div className="min-w-0"><p className="text-[11px] font-bold uppercase tracking-[.06em] text-[#6b7079]">Cliente</p>
-              <p className="text-[14.5px] font-semibold [overflow-wrap:anywhere]">{[t.cliente_nombre, t.cliente_telefono].filter(Boolean).join(" · ") || "—"}</p></div>
-          </div>
-          <ul className="grid gap-1.5">
-            {items.map((i) => {
-              const I = iconoTecnica(i.tecnica);
-              return (
-                <li key={i.id} className="flex items-start gap-2.5 rounded-[14px] bg-[#f6f7f9] px-3 py-2.5">
-                  <b className="grid h-[30px] min-w-[30px] place-items-center rounded-[9px] bg-[#17181c] px-1 text-[13px] text-white">{i.cantidad}</b>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-bold">{i.que || "Prenda"}</p>
-                    {(i.tecnica || !!i.ubicaciones?.length) && (
-                      <span className="mt-1 flex flex-wrap gap-1">
-                        {i.tecnica && <span className="inline-flex items-center gap-1 rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11.5px] font-bold text-[#1d52eb]"><I className="size-3" />{i.tecnica}</span>}
-                        {i.ubicaciones?.map((u) => <span key={u} className="rounded-full bg-[#e9ebef] px-2 py-0.5 text-[11.5px] font-semibold">{CORTO[u] ?? u}</span>)}
-                      </span>
-                    )}
-                    {i.detalle && <p className="mt-1 text-[12.5px] leading-snug text-[#565b66] [overflow-wrap:anywhere]">{i.detalle}</p>}
-                  </div>
-                </li>
-              );
-            })}
+        <div className="px-5 pb-5 pt-5">
+          <p className="text-[40px] font-light leading-none tracking-[-0.04em]">{t.numero}</p>
+          <p className="mt-1.5 text-[12px] text-[#6b7079]">Ticket de recogida · {fecha(t.creado)}</p>
+          <ul className="mt-4">
+            {items.map((i) => (
+              <li key={i.id} className="border-b border-[#e4e6ea] py-2.5">
+                <p className="font-semibold">{i.cantidad} × {i.que || "Trabajo"}</p>
+                {(i.tecnica || !!i.ubicaciones?.length) && <p className="text-[11.5px] text-[#6b7079]">{[i.tecnica, ...(i.ubicaciones ?? []).map((u) => CORTO[u] ?? u)].filter(Boolean).join(" · ")}</p>}
+                {i.detalle && <p className="text-[11.5px] text-[#6b7079] [overflow-wrap:anywhere]">{i.detalle}</p>}
+              </li>
+            ))}
           </ul>
-          {t.notas && <p className="text-[12.5px] text-[#565b66]">{t.notas}</p>}
-        </div>
-        <div className="mx-4 border-t-2 border-dashed border-[#e3e5ea]" />
-        <div className="grid gap-1.5 px-4 pb-4 pt-4 text-[14px]">
-          <div className="flex justify-between text-[#6b7079]"><span>Total</span><span className="num">{euros(aCent(t.total))}</span></div>
-          {Number(t.a_cuenta) > 0 && <div className="flex justify-between text-[#6b7079]"><span>Dejó a cuenta</span><span className="num">−{euros(aCent(t.a_cuenta))}</span></div>}
-          <div className="mt-1.5 flex items-center justify-between rounded-2xl bg-[#17181c] px-3.5 py-3 text-white">
-            <span className="text-[13px] font-semibold">Pendiente al recoger</span><b className="num text-[24px]">{euros(pendienteCent(t))}</b>
+          {t.notas && <p className="mt-2 text-[12px] text-[#6b7079]">{t.notas}</p>}
+          <div className="mt-6 flex items-end justify-between gap-3 border-t border-[#17181c] pt-3">
+            <div className="num text-[11.5px] leading-relaxed text-[#6b7079]"><p>Total {euros(aCent(t.total))}</p>{Number(t.a_cuenta) > 0 && <p>A cuenta {euros(aCent(t.a_cuenta))}</p>}</div>
+            <div className="text-right"><p className="text-[11.5px] text-[#6b7079]">Pendiente</p><p className="num text-[30px] font-light leading-tight tracking-[-0.03em]">{euros(pendienteCent(t))}</p></div>
           </div>
-          <p className="mt-2 text-center text-[12px] text-[#6b7079]">Enseña este ticket para recoger tus prendas</p>
+          <p className="mt-3 text-center text-[11px] text-[#6b7079]">Presenta este ticket para recoger tus prendas</p>
         </div>
       </article>
     </Hoja>

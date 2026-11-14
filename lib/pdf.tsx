@@ -1,107 +1,110 @@
-import { Document, Page, Text, View, Image, StyleSheet, pdf } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image, StyleSheet, Font, pdf } from "@react-pdf/renderer";
 import { urlArchivo } from "./supabase";
 import type { Presupuesto } from "./tipos";
 
-const AZUL = "#2B59C3", TEXTO = "#1E2024", GRIS = "#5B616E", LINEA = "#E6E7EA";
+const OSC = "#17181C", GRIS = "#6B7079", LINEA = "#E4E6EA", LATERAL = "#F5F6F8";
 const e = (n: number) => new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + " €";
-const f = (d?: string | null) => (d ? new Date(d + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : "");
+const f = (d?: string | null) => (d ? new Date(d + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "");
 
+// Inter (incluida en la app: la política de seguridad no deja cargar fuentes de fuera)
+let fuentes = false;
+export function registrarFuentes() {
+  if (fuentes) return; fuentes = true;
+  const u = (x: string) => `${location.origin}/pedidos-textil/fonts/pdf/${x}`;
+  Font.register({ family: "Inter", fonts: [
+    { src: u("Inter_300Light.ttf"), fontWeight: 300 },
+    { src: u("Inter_400Regular.ttf"), fontWeight: 400 },
+    { src: u("Inter_600SemiBold.ttf"), fontWeight: 600 },
+  ] });
+  Font.registerHyphenationCallback((w) => [w]);
+}
+
+/* Diseño E (lienzo «Tickets y facturas»): columna gris con los datos a la izquierda y, a la derecha,
+   el título grande y fino, las líneas con «uds × precio» y el total grande abajo */
 const s = StyleSheet.create({
-  pag: { padding: 44, paddingBottom: 64, fontFamily: "Helvetica", fontSize: 9.5, color: TEXTO, lineHeight: 1.4 },
-  fila: { flexDirection: "row" },
-  logo: { width: 110, height: 44, objectFit: "contain", objectPositionX: 0 },
-  titulo: { fontSize: 22, fontFamily: "Helvetica-Bold", letterSpacing: -0.5 },
+  pag: { paddingTop: 46, paddingBottom: 56, paddingLeft: 150 + 36, paddingRight: 40, fontFamily: "Inter", fontSize: 9.5, color: OSC, lineHeight: 1.4 },
+  lateral: { position: "absolute", top: 0, bottom: 0, left: 0, width: 150, backgroundColor: LATERAL },
+  datos: { position: "absolute", top: 46, left: 18, width: 116 },
+  peq: { fontSize: 7, fontWeight: 600, color: GRIS, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 },
   gris: { color: GRIS },
-  peq: { fontSize: 8, color: GRIS, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3 },
-  caja: { flex: 1, padding: 12, backgroundColor: "#F7F7F8", borderRadius: 8 },
-  th: { fontSize: 8, color: GRIS, textTransform: "uppercase", letterSpacing: 0.5, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: LINEA },
-  td: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: LINEA },
-  num: { textAlign: "right" },
-  b: { fontFamily: "Helvetica-Bold" },
-  pie: { position: "absolute", bottom: 28, left: 44, right: 44, fontSize: 7.5, color: GRIS, flexDirection: "row", justifyContent: "space-between" },
+  b: { fontWeight: 600 },
+  logo: { width: 96, height: 40, objectFit: "contain", objectPositionX: 0, marginBottom: 8 },
+  inicial: { width: 26, height: 26, borderRadius: 6, backgroundColor: OSC, color: "#FFFFFF", fontSize: 9, fontWeight: 600, textAlign: "center", paddingTop: 7, marginBottom: 8 },
+  bloque: { marginBottom: 16, fontSize: 8.5 },
+  titulo: { fontSize: 40, fontWeight: 300, letterSpacing: -1.2, lineHeight: 1 },
+  linea: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: LINEA },
+  pie: { position: "absolute", bottom: 24, left: 186, right: 40, fontSize: 7.5, color: GRIS, flexDirection: "row", justifyContent: "space-between" },
 });
-
-const C = { d: { flex: 1 }, u: { width: 50 }, p: { width: 70 }, i: { width: 80 } };
 
 export type TipoDoc = "presupuesto" | "ticket" | "factura";
 const TITULO: Record<TipoDoc, string> = { presupuesto: "Presupuesto", ticket: "Ticket", factura: "Factura" };
+const iniciales = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("") || "·";
 
 function Doc({ p, logo, tipo }: { p: Presupuesto; logo: string | null; tipo: TipoDoc }) {
   const d = p.datos;
   const filas = [...d.lineas, ...d.personalizaciones];
+  const emp = d.empresa, cli = d.cliente;
   return (
-    <Document title={`${TITULO[tipo]} ${p.numero}`} author={d.empresa.nombre ?? ""} language="es">
+    <Document title={`${TITULO[tipo]} ${p.numero}`} author={emp.nombre ?? ""} language="es">
       <Page size="A4" style={s.pag}>
-        <View style={[s.fila, { justifyContent: "space-between", marginBottom: 28 }]}>
-          <View>
-            {logo ? <Image src={logo} style={s.logo} /> : <Text style={[s.b, { fontSize: 14 }]}>{d.empresa.nombre}</Text>}
+        <View style={s.lateral} fixed />
+        <View style={s.datos} fixed>
+          <View style={s.bloque}>
+            {logo ? <Image src={logo} style={s.logo} /> : <Text style={s.inicial}>{iniciales(emp.nombre)}</Text>}
+            <Text style={[s.b, { fontSize: 10 }]}>{emp.nombre}</Text>
+            {emp.nif ? <Text style={s.gris}>NIF {emp.nif}</Text> : null}
+            {emp.direccion ? <Text style={s.gris}>{emp.direccion}</Text> : null}
+            {emp.telefono ? <Text style={s.gris}>{emp.telefono}</Text> : null}
+            {emp.email ? <Text style={s.gris}>{emp.email}</Text> : null}
           </View>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text style={s.titulo}>{TITULO[tipo]}</Text>
-            <Text style={[s.gris, { marginTop: 2 }]}>{p.numero}</Text>
-            {tipo === "factura" && !d.cliente?.nif && <Text style={[s.gris, { fontSize: 8.5 }]}>Factura simplificada</Text>}
+          <View style={s.bloque}>
+            <Text style={s.peq}>Cliente</Text>
+            <Text style={s.b}>{cli?.nombre ?? "—"}</Text>
+            {cli?.contacto ? <Text style={s.gris}>Att. {cli.contacto}</Text> : null}
+            {cli?.nif ? <Text style={s.gris}>NIF/CIF {cli.nif}</Text> : null}
+            {cli?.facturacion || cli?.direccion ? <Text style={s.gris}>{cli?.facturacion || cli?.direccion}</Text> : null}
+            {cli?.email ? <Text style={s.gris}>{cli.email}</Text> : null}
           </View>
+          {tipo === "factura" && d.pedido?.numero ? <View style={s.bloque}><Text style={s.peq}>Pedido</Text><Text>{d.pedido.numero}</Text></View> : null}
+          {d.pedido?.referencia ? <View style={s.bloque}><Text style={s.peq}>Referencia</Text><Text>{d.pedido.referencia}</Text></View> : null}
+          {tipo === "presupuesto" && p.validez ? <View style={s.bloque}><Text style={s.peq}>Válido hasta</Text><Text>{f(p.validez)}</Text></View> : null}
+          {tipo !== "factura" && d.condiciones ? <View style={s.bloque}><Text style={s.peq}>Condiciones</Text><Text style={[s.gris, { fontSize: 7.5 }]}>{d.condiciones}</Text></View> : null}
         </View>
 
-        <View style={[s.fila, { gap: 12, marginBottom: 22 }]}>
-          <View style={s.caja}>
-            <Text style={s.peq}>De</Text>
-            <Text style={s.b}>{d.empresa.nombre}</Text>
-            {d.empresa.nif && <Text>NIF {d.empresa.nif}</Text>}
-            {d.empresa.direccion && <Text>{d.empresa.direccion}</Text>}
-            {[d.empresa.telefono, d.empresa.email].filter(Boolean).length > 0 && <Text>{[d.empresa.telefono, d.empresa.email].filter(Boolean).join(" · ")}</Text>}
-          </View>
-          <View style={s.caja}>
-            <Text style={s.peq}>Para</Text>
-            <Text style={s.b}>{d.cliente?.nombre ?? "—"}</Text>
-            {d.cliente?.contacto && <Text>Att. {d.cliente.contacto}</Text>}
-            {d.cliente?.nif && <Text>NIF/CIF {d.cliente.nif}</Text>}
-            {(d.cliente?.facturacion || d.cliente?.direccion) && <Text>{d.cliente?.facturacion || d.cliente?.direccion}</Text>}
-            {d.cliente?.email && <Text>{d.cliente.email}</Text>}
-          </View>
-          <View style={[s.caja, { flex: 0.8 }]}>
-            <Text style={s.peq}>{tipo === "factura" ? "Fecha de expedición" : "Fecha"}</Text><Text>{f(p.fecha)}</Text>
-            {tipo === "factura" && d.pedido?.numero && <><Text style={[s.peq, { marginTop: 6 }]}>Pedido</Text><Text>{d.pedido.numero}</Text></>}
-            {tipo === "presupuesto" && p.validez && <><Text style={[s.peq, { marginTop: 6 }]}>Válido hasta</Text><Text>{f(p.validez)}</Text></>}
-          </View>
+        <Text style={s.titulo}>{TITULO[tipo]}</Text>
+        <View style={{ flexDirection: "row", marginTop: 10, marginBottom: 26 }}>
+          <Text style={{ marginRight: 22 }}><Text style={s.gris}>Nº </Text><Text style={s.b}>{p.numero}</Text></Text>
+          <Text><Text style={s.gris}>{tipo === "factura" ? "Fecha de expedición " : "Fecha "}</Text>{f(p.fecha)}</Text>
+          {tipo === "factura" && !cli?.nif ? <Text style={[s.gris, { marginLeft: 22 }]}>Factura simplificada</Text> : null}
         </View>
-        {d.pedido.referencia && <Text style={{ marginBottom: 10 }}><Text style={s.gris}>Referencia: </Text>{d.pedido.referencia}</Text>}
 
-        <View style={s.fila}>
-          <Text style={[s.th, C.d]}>Concepto</Text><Text style={[s.th, C.u, s.num]}>Uds</Text><Text style={[s.th, C.p, s.num]}>Precio</Text><Text style={[s.th, C.i, s.num]}>Importe</Text>
-        </View>
         {filas.map((x, i) => (
-          <View key={i} style={s.fila} wrap={false}>
-            <View style={[s.td, C.d, { paddingRight: 8 }]}><Text style={s.b}>{x.descripcion}</Text>{x.detalle ? <Text style={[s.gris, { fontSize: 8.5 }]}>{x.detalle}</Text> : null}</View>
-            <Text style={[s.td, C.u, s.num]}>{x.unidades}</Text>
-            <Text style={[s.td, C.p, s.num]}>{e(x.precio)}</Text>
-            <Text style={[s.td, C.i, s.num]}>{e(x.importe)}</Text>
+          <View key={i} style={s.linea} wrap={false}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text>{x.descripcion}</Text>
+              {x.detalle ? <Text style={[s.gris, { fontSize: 8 }]}>{x.detalle}</Text> : null}
+              <Text style={[s.gris, { fontSize: 8 }]}>{x.unidades} × {e(x.precio)}</Text>
+            </View>
+            <Text style={{ fontSize: 10.5 }}>{e(x.importe)}</Text>
           </View>
         ))}
-        {d.gastos > 0 && (
-          <View style={s.fila}><Text style={[s.td, C.d]}>Otros gastos</Text><Text style={[s.td, C.u]} /><Text style={[s.td, C.p]} /><Text style={[s.td, C.i, s.num]}>{e(d.gastos)}</Text></View>
-        )}
+        {d.gastos > 0 && <View style={s.linea}><Text>Otros gastos</Text><Text style={{ fontSize: 10.5 }}>{e(d.gastos)}</Text></View>}
 
-        <View style={{ alignSelf: "flex-end", width: 230, marginTop: 14 }} wrap={false}>
-          {d.descuento > 0 && <>
-            <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>Suma</Text><Text>{e(d.bruto)}</Text></View>
-            <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>Descuento {d.descuento_pct} %</Text><Text>-{e(d.descuento)}</Text></View>
-          </>}
-          <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>Base imponible</Text><Text>{e(d.base)}</Text></View>
-          <View style={[s.fila, { justifyContent: "space-between", paddingVertical: 2 }]}><Text style={s.gris}>IVA {d.iva_pct} %</Text><Text>{e(d.iva)}</Text></View>
-          <View style={[s.fila, { justifyContent: "space-between", marginTop: 6, paddingTop: 8, borderTopWidth: 1.5, borderTopColor: AZUL }]}>
-            <Text style={[s.b, { fontSize: 12 }]}>Total</Text><Text style={[s.b, { fontSize: 14, color: AZUL }]}>{e(d.total)}</Text>
+        <View style={{ marginTop: 34, paddingTop: 12, borderTopWidth: 1, borderTopColor: OSC, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }} wrap={false}>
+          <View style={[s.gris, { fontSize: 8.5 }]}>
+            {d.descuento > 0 ? <Text>Suma {e(d.bruto)} · Descuento {d.descuento_pct} % −{e(d.descuento)}</Text> : null}
+            <Text>Base imponible {e(d.base)}</Text>
+            <Text>IVA {d.iva_pct} % {e(d.iva)}</Text>
+          </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={[s.gris, { fontSize: 8.5 }]}>Total</Text>
+            <Text style={{ fontSize: 28, fontWeight: 300, letterSpacing: -0.8 }}>{e(d.total)}</Text>
           </View>
         </View>
+        <Text style={[s.gris, { fontSize: 8.5, marginTop: 14 }]}>Gracias por tu confianza.</Text>
 
-        {tipo !== "factura" && d.condiciones && (
-          <View style={{ marginTop: 30 }} wrap={false}>
-            <Text style={s.peq}>Condiciones</Text>
-            <Text style={[s.gris, { fontSize: 8.5 }]}>{d.condiciones}</Text>
-          </View>
-        )}
         <View style={s.pie} fixed>
-          <Text>{[d.empresa.nombre, d.empresa.web].filter(Boolean).join(" · ")}</Text>
+          <Text>{[emp.nombre, emp.web].filter(Boolean).join(" · ")}</Text>
           <Text render={({ pageNumber, totalPages }) => `${p.numero} · ${pageNumber}/${totalPages}`} />
         </View>
       </Page>
@@ -126,5 +129,6 @@ async function aDataUrl(url: string): Promise<string | null> {
 export async function generarPDF(p: Presupuesto, tipo: TipoDoc = "presupuesto"): Promise<Blob> {
   const u = await urlArchivo(p.datos.empresa.logo_path);
   const logo = u ? await aDataUrl(u) : null;
+  registrarFuentes();
   return pdf(<Doc p={p} logo={logo} tipo={tipo} />).toBlob();
 }
