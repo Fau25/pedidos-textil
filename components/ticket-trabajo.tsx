@@ -6,7 +6,7 @@ import { IconoWhatsApp, enlaceWa } from "./whatsapp";
 import { iconoTecnica } from "./bloque-personalizacion";
 import { useSesion } from "./sesion";
 import { euros, aCent } from "@/lib/calculo";
-import { compartirTicketTrabajo, pendienteCent, type Trabajo } from "@/lib/trabajos";
+import { CORTO, compartirTicketTrabajo, pendienteCent, type Trabajo } from "@/lib/trabajos";
 import { textoError } from "@/lib/supabase";
 
 const fecha = (d: string | null | undefined, larga = false) =>
@@ -71,7 +71,12 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
                   <b className="grid h-[30px] min-w-[30px] place-items-center rounded-[9px] bg-[#17181c] px-1 text-[13px] text-white">{i.cantidad}</b>
                   <div className="min-w-0 flex-1">
                     <p className="text-[14px] font-bold">{i.que || "Prenda"}</p>
-                    {i.tecnica && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11.5px] font-bold text-[#1d52eb]"><I className="size-3" />{i.tecnica}</span>}
+                    {(i.tecnica || !!i.ubicaciones?.length) && (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {i.tecnica && <span className="inline-flex items-center gap-1 rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11.5px] font-bold text-[#1d52eb]"><I className="size-3" />{i.tecnica}</span>}
+                        {i.ubicaciones?.map((u) => <span key={u} className="rounded-full bg-[#e9ebef] px-2 py-0.5 text-[11.5px] font-semibold">{CORTO[u] ?? u}</span>)}
+                      </span>
+                    )}
                     {i.detalle && <p className="mt-1 text-[12.5px] leading-snug text-[#565b66] [overflow-wrap:anywhere]">{i.detalle}</p>}
                   </div>
                 </li>

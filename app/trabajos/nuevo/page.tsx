@@ -5,12 +5,12 @@ import { CalendarDays, Loader2, Paperclip, Phone, Plus, Trash2, User, X } from "
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Cargando, CampoImporte, cx, useAvisos } from "@/components/ui";
-import { iconoTecnica } from "@/components/bloque-personalizacion";
+import { IconoZona, ZONAS, iconoTecnica } from "@/components/bloque-personalizacion";
 import { TicketTrabajo } from "@/components/ticket-trabajo";
 import { sb, subirArchivo, textoError } from "@/lib/supabase";
 import { useParam } from "@/lib/usar";
 import { euros } from "@/lib/calculo";
-import { AVISO_SIN_TRABAJOS, guardarTrabajo, nuevoItem, nuevoTrabajo, pendienteCent, sinTablaTrabajos, type ItemTrabajo, type Trabajo } from "@/lib/trabajos";
+import { AVISO_SIN_TRABAJOS, CORTO, UBICACIONES_TRABAJO, guardarTrabajo, nuevoItem, nuevoTrabajo, pendienteCent, sinTablaTrabajos, type ItemTrabajo, type Trabajo } from "@/lib/trabajos";
 
 type ClienteMin = { id: string; nombre: string; telefono: string | null };
 
@@ -54,7 +54,7 @@ export default function NuevoTrabajo() {
 
   async function guardar() {
     if (!t!.cliente_nombre?.trim()) { setErrorNombre(true); return aviso("Escribe el nombre del cliente", "error"); }
-    if (!t!.items.some((i) => i.que.trim())) return aviso("Escribe qué deja el cliente", "error");
+    if (!t!.items.some((i) => i.que.trim())) return aviso("Escribe el trabajo", "error");
     setGuardando(true);
     try {
       const g = await guardarTrabajo(t!);
@@ -106,18 +106,18 @@ export default function NuevoTrabajo() {
 
         {t.items.map((i, n) => {
           return (
-            <section key={i.id} className="tarjeta p-4" aria-label={`Prenda ${n + 1}`}>
+            <section key={i.id} className="tarjeta p-4" aria-label={`Orden de trabajo ${n + 1}`}>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-[12px] font-bold uppercase tracking-[.06em] text-texto2">Prenda {n + 1}</h2>
+                <h2 className="text-[12px] font-bold uppercase tracking-[.06em] text-texto2">Orden de trabajo {n + 1}</h2>
                 {t.items.length > 1 && <button className="flex items-center gap-1 text-[12px] font-semibold text-texto2 hover:text-red-600" onClick={() => set({ items: t.items.filter((x) => x.id !== i.id) })}><X className="size-3.5" />Quitar</button>}
               </div>
               <div className="grid grid-cols-[1fr_80px] gap-2">
-                <label><span className={etiqueta}>Qué deja</span><input className="campo" placeholder="Juego de cuna, toalla, mochila…" value={i.que} onChange={(e) => setItem(i.id, { que: e.target.value })} /></label>
+                <label><span className={etiqueta}>Trabajo</span><input className="campo" placeholder="Juego de cuna, toalla, cinturón…" value={i.que} onChange={(e) => setItem(i.id, { que: e.target.value })} /></label>
                 <label><span className={etiqueta}>Cant.</span><input className="campo num text-center font-bold" type="number" inputMode="numeric" min={1} value={i.cantidad || ""} onChange={(e) => setItem(i.id, { cantidad: Math.max(0, Number(e.target.value) || 0) })} /></label>
               </div>
               <div className="mt-3 border-t border-borde pt-3">
                 <span className={etiqueta}>Personalización</span>
-                <div className="mb-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label={`Técnica de la prenda ${n + 1}`}>
+                <div className="mb-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label={`Técnica de la orden ${n + 1}`}>
                   {(tecnicas.length ? tecnicas.map((x) => x.nombre) : ["Bordado", "Vinilo", "DTF"]).map((nombre) => {
                     const I = iconoTecnica(nombre); const on = i.tecnica === nombre;
                     return (
@@ -128,8 +128,19 @@ export default function NuevoTrabajo() {
                     );
                   })}
                 </div>
+                <div className="mb-2 grid grid-cols-4 gap-1.5" role="group" aria-label={`Ubicación de la orden ${n + 1}`}>
+                  {UBICACIONES_TRABAJO.map((u) => {
+                    const z = ZONAS.find((x) => x.nombre === u)!; const on = (i.ubicaciones ?? []).includes(u);
+                    return (
+                      <button key={u} aria-pressed={on} onClick={() => setItem(i.id, { ubicaciones: on ? (i.ubicaciones ?? []).filter((x) => x !== u) : [...(i.ubicaciones ?? []), u] })}
+                        className={cx("flex flex-col items-center gap-0.5 rounded-[14px] px-1 py-1.5 text-[10.5px] font-semibold", on ? "bg-azul-suave ring-[1.5px] ring-azul" : "border border-borde bg-superficie")}>
+                        <IconoZona z={z} activa={on} />{CORTO[u]}
+                      </button>
+                    );
+                  })}
+                </div>
                 <label><span className="sr-only">Qué y dónde</span>
-                  <textarea className="campo min-h-[64px] py-2.5 leading-snug" rows={2} placeholder="Qué y dónde: nombre «Lucía» en la esquina, letra script, hilo rosa…" value={i.detalle} onChange={(e) => setItem(i.id, { detalle: e.target.value })} />
+                  <textarea className="campo min-h-[64px] py-2.5 leading-snug" rows={2} placeholder="Qué y dónde (si no es en el pecho o la espalda, p. ej. un cinturón): nombre «Lucía», letra script, hilo rosa…" value={i.detalle} onChange={(e) => setItem(i.id, { detalle: e.target.value })} />
                 </label>
                 <Diseno i={i} n={n} cambiar={(p) => setItem(i.id, { diseno_path: p })} />
               </div>
@@ -139,7 +150,7 @@ export default function NuevoTrabajo() {
 
         <button onClick={() => set({ items: [...t.items, nuevoItem(tecnicaInicial)] })}
           className="flex h-11 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-dashed border-borde text-[13.5px] font-semibold hover:bg-superficie">
-          <Plus className="size-4" />Añadir otra prenda
+          <Plus className="size-4" />Añadir otra orden de trabajo
         </button>
 
         <section className="resumen-oscuro tarjeta grid grid-cols-2 gap-3 p-4" aria-label="Entrega y precio">
@@ -183,7 +194,7 @@ function Diseno({ i, n, cambiar }: { i: ItemTrabajo; n: number; cambiar: (p: str
       <label className={cx("flex h-10 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-xl border-[1.5px] border-dashed border-borde px-3 text-[12.5px] text-texto2 hover:bg-superficie", subiendo && "pointer-events-none opacity-60")}>
         {subiendo ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4 shrink-0" />}
         <span className="truncate">{nombre ? `Diseño: ${nombre}` : "Añadir foto del diseño (opcional)"}</span>
-        <input type="file" accept="image/*,application/pdf" className="sr-only" aria-label={`Foto del diseño de la prenda ${n + 1}`} onChange={async (e) => {
+        <input type="file" accept="image/*,application/pdf" className="sr-only" aria-label={`Foto del diseño de la orden ${n + 1}`} onChange={async (e) => {
           const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
           setSubiendo(true);
           try { cambiar(await subirArchivo(empresa!.id, "trabajos", f)); } catch (err) { aviso(textoError(err), "error"); } finally { setSubiendo(false); }

@@ -3,7 +3,10 @@ import { aCent, euros } from "./calculo";
 import type { Empresa } from "./tipos";
 
 /** «Recibí»: trabajo rápido en el que el cliente deja sus prendas (cunas, toallas, camisetas…) para personalizar */
-export type ItemTrabajo = { id: string; que: string; cantidad: number; tecnica: string; detalle: string; diseno_path: string | null };
+export type ItemTrabajo = { id: string; que: string; cantidad: number; tecnica: string; ubicaciones?: string[]; detalle: string; diseno_path: string | null };
+/** Ubicaciones rápidas (iconos); para lo demás (un cinturón…) está el texto «qué y dónde» */
+export const UBICACIONES_TRABAJO = ["Pecho derecho", "Pecho izquierdo", "Pecho centro", "Espalda"];
+export const CORTO: Record<string, string> = { "Pecho derecho": "Pecho der.", "Pecho izquierdo": "Pecho izq.", "Pecho centro": "Centrado", "Espalda": "Espalda" };
 export type EstadoTrabajo = "pendiente" | "listo" | "entregado";
 export type Trabajo = {
   id: string; empresa_id: string; numero: string | null;
@@ -12,7 +15,7 @@ export type Trabajo = {
   estado: EstadoTrabajo; listo_en: string | null; entregado_en: string | null; creado: string;
 };
 
-export const nuevoItem = (tecnica = "Bordado"): ItemTrabajo => ({ id: crypto.randomUUID(), que: "", cantidad: 1, tecnica, detalle: "", diseno_path: null });
+export const nuevoItem = (tecnica = "Bordado"): ItemTrabajo => ({ id: crypto.randomUUID(), que: "", cantidad: 1, tecnica, ubicaciones: [], detalle: "", diseno_path: null });
 export const nuevoTrabajo = (empresaId: string, tecnica?: string): Trabajo => ({
   id: crypto.randomUUID(), empresa_id: empresaId, numero: null, cliente_id: null, cliente_nombre: "", cliente_telefono: "",
   items: [nuevoItem(tecnica)], entrega: null, total: 0, a_cuenta: 0, notas: null, estado: "pendiente", listo_en: null, entregado_en: null, creado: new Date().toISOString(),

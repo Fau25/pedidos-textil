@@ -150,7 +150,7 @@ export function TarjetaPers({ z, lineas, calc, tecnicas, cambiar, quitar, usarTa
 
 /** Zonas de marcaje con su icono: punto o zona azul sobre una camiseta (izq./der. = de quien la lleva puesta) */
 type Zona = { nombre: string; corto: string; vista: "delante" | "detras"; marca: [number, number, number] | [number, number, number, number] };
-const ZONAS: Zona[] = [
+export const ZONAS: Zona[] = [
   { nombre: "Pecho izquierdo", corto: "Pecho izq.", vista: "delante", marca: [30, 17, 3.2] },
   { nombre: "Pecho derecho", corto: "Pecho der.", vista: "delante", marca: [18, 17, 3.2] },
   { nombre: "Pecho centro", corto: "Pecho centro", vista: "delante", marca: [24, 19, 3.6] },
@@ -161,7 +161,7 @@ const ZONAS: Zona[] = [
   { nombre: "Nuca", corto: "Nuca", vista: "detras", marca: [24, 9, 2.6] },
 ];
 const CAMISETA = { delante: "M17 7l-9 4-4 10 6 3 3-5v22h22V19l3 5 6-3-4-10-9-4c-1 3-4 5-7 5s-6-2-7-5z", detras: "M17 7l-9 4-4 10 6 3 3-5v22h22V19l3 5 6-3-4-10-9-4c-2 1.5-4.5 2-7 2s-5-.5-7-2z" };
-function IconoZona({ z, activa }: { z: Zona; activa: boolean }) {
+export function IconoZona({ z, activa }: { z: Zona; activa: boolean }) {
   const m = z.marca;
   return (
     <svg viewBox="0 0 48 48" className="size-11" aria-hidden="true">

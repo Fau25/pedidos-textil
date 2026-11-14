@@ -326,12 +326,13 @@ await prueba("recibí: apuntar un trabajo con prendas libres genera su ticket", 
   await p.getByText("Escribe el nombre del cliente").waitFor();
   await p.getByPlaceholder("Nombre", { exact: true }).fill("Ana Pérez");
   await p.getByPlaceholder("Teléfono").fill("611222333");
-  await p.getByLabel("Prenda 1").getByPlaceholder("Juego de cuna, toalla, mochila…").fill("Juego de cuna");
-  await p.getByLabel("Prenda 1").locator('input[type="number"]').fill("2");
-  await p.getByLabel("Prenda 1").getByPlaceholder(/Qué y dónde/).fill("Nombre «Lucía» en la esquina");
-  await p.getByRole("button", { name: "Añadir otra prenda" }).click();
-  await p.getByLabel("Prenda 2").getByPlaceholder("Juego de cuna, toalla, mochila…").fill("Toalla");
-  await p.getByLabel("Prenda 2").getByRole("radio", { name: "Bordado" }).click(); // sin personalización
+  await p.getByLabel("Orden de trabajo 1").getByPlaceholder("Juego de cuna, toalla, cinturón…").fill("Juego de cuna");
+  await p.getByLabel("Orden de trabajo 1").locator('input[type="number"]').fill("2");
+  await p.getByLabel("Orden de trabajo 1").getByPlaceholder(/Qué y dónde/).fill("Nombre «Lucía» en la esquina");
+  await p.getByRole("button", { name: "Añadir otra orden de trabajo" }).click();
+  await p.getByLabel("Orden de trabajo 2").getByPlaceholder("Juego de cuna, toalla, cinturón…").fill("Toalla");
+  await p.getByLabel("Orden de trabajo 2").getByRole("radio", { name: "Bordado" }).click(); // sin técnica
+  await p.getByLabel("Orden de trabajo 1").getByRole("button", { name: "Pecho izq." }).click();
   await p.getByLabel("Precio total").fill("36"); await p.getByLabel("Deja a cuenta").fill("10");
   await p.getByText("26,00 €").first().waitFor();
   await p.getByRole("button", { name: /Guardar y generar ticket/ }).click();
@@ -340,7 +341,8 @@ await prueba("recibí: apuntar un trabajo con prendas libres genera su ticket", 
   assert.ok(await hoja.getByText("Juego de cuna").isVisible());
   const g = escrituras.find((x) => x.tabla === "trabajos" && x.metodo === "POST").cuerpo;
   assert.equal(g.cliente_nombre, "Ana Pérez"); assert.equal(g.items.length, 2); assert.equal(g.items[0].cantidad, 2);
-  assert.equal(g.items[0].tecnica, "Bordado"); assert.equal(g.items[1].tecnica, ""); assert.equal(g.total, 36); assert.equal(g.a_cuenta, 10);
+  assert.equal(g.items[0].tecnica, "Bordado"); assert.equal(g.items[1].tecnica, ""); assert.deepEqual(g.items[0].ubicaciones, ["Pecho izquierdo"]);
+  assert.ok(await hoja.getByText("Pecho izq.").isVisible(), "la ubicación sale en el ticket"); assert.equal(g.total, 36); assert.equal(g.a_cuenta, 10);
   await hoja.getByRole("button", { name: /PDF/ }).click();
   await p.getByText("Ticket descargado en PDF").waitFor({ timeout: 15000 });
   assert.deepEqual(errores, []); await ctx.close();

@@ -1,6 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, pdf } from "@react-pdf/renderer";
 import type { Empresa } from "./tipos";
-import { pendienteCent, type Trabajo } from "./trabajos";
+import { CORTO, pendienteCent, type Trabajo } from "./trabajos";
 
 /** Ticket de recogida de un trabajo («Recibí»): tamaño A6, cabecera oscura y lo pendiente bien visible */
 const OSC = "#17181C", AZUL = "#1D52EB", GRIS = "#6B7079", SUAVE = "#F4F5F7";
@@ -42,7 +42,7 @@ function Ticket({ t, emp }: { t: Trabajo; emp: Empresa }) {
               <Text style={s.cant}>{i.cantidad}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 9.5 }}>{i.que || "Prenda"}</Text>
-                {i.tecnica ? <Text style={s.tec}>{i.tecnica.toUpperCase()}</Text> : null}
+                {i.tecnica || i.ubicaciones?.length ? <Text style={s.tec}>{[i.tecnica?.toUpperCase(), ...(i.ubicaciones ?? []).map((u) => CORTO[u] ?? u)].filter(Boolean).join("  ·  ")}</Text> : null}
                 {i.detalle ? <Text style={{ color: GRIS, marginTop: 2, lineHeight: 1.35 }}>{i.detalle}</Text> : null}
               </View>
             </View>
