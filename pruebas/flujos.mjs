@@ -329,7 +329,7 @@ await prueba("recibí: apuntar un trabajo con prendas libres genera su ticket", 
   await p.getByLabel("Orden de trabajo 1").getByPlaceholder("Juego de cuna, toalla, cinturón…").fill("Juego de cuna");
   await p.getByLabel("Orden de trabajo 1").locator('input[type="number"]').fill("2");
   await p.getByLabel("Orden de trabajo 1").getByPlaceholder(/Qué y dónde/).fill("Nombre «Lucía» en la esquina");
-  await p.getByRole("button", { name: "Añadir otra orden de trabajo" }).click();
+  await p.getByRole("button", { name: /Añadir otro trabajo/ }).click();
   await p.getByLabel("Orden de trabajo 2").getByPlaceholder("Juego de cuna, toalla, cinturón…").fill("Toalla");
   await p.getByLabel("Orden de trabajo 2").getByRole("radio", { name: "Bordado" }).click(); // sin técnica
   await p.getByLabel("Orden de trabajo 1").getByRole("button", { name: "Pecho izq." }).click();

@@ -148,9 +148,11 @@ export default function NuevoTrabajo() {
           );
         })}
 
-        <button onClick={() => set({ items: [...t.items, nuevoItem(tecnicaInicial)] })}
-          className="flex h-11 items-center justify-center gap-1.5 rounded-full border-[1.5px] border-dashed border-borde text-[13.5px] font-semibold hover:bg-superficie">
-          <Plus className="size-4" />Añadir otra orden de trabajo
+        <button onClick={() => { set({ items: [...t.items, nuevoItem(tecnicaInicial)] }); setTimeout(() => document.querySelector<HTMLInputElement>(`section[aria-label="Orden de trabajo ${t.items.length + 1}"] input`)?.focus(), 50); }}
+          className="flex min-h-[56px] items-center justify-center gap-2.5 rounded-[18px] bg-azul px-4 text-left text-white shadow-[0_10px_24px_-12px_rgba(29,82,235,.7)] hover:brightness-110">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/20"><Plus className="size-[18px]" /></span>
+          <span><span className="block text-[14.5px] font-semibold leading-tight">Añadir otro trabajo</span>
+            <span className="block text-[12px] text-white/75">Ej.: bordar una sudadera y además marcar una toalla</span></span>
         </button>
 
         <section className="resumen-oscuro tarjeta grid grid-cols-2 gap-3 p-4" aria-label="Entrega y precio">
