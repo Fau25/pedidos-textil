@@ -359,8 +359,12 @@ await prueba("trabajos: lista por estado, marcar listo y avisar por WhatsApp", a
   const hrefs = await p.getByRole("link", { name: "Avisar" }).evaluateAll((as) => as.map((a) => a.href));
   assert.ok(hrefs.some((h) => /wa\.me\/34600111222\?text=.*listo/.test(h)), hrefs.join(" "));
   await p.getByRole("button", { name: "Cobrar", exact: true }).first().click(); await p.waitForTimeout(300);
-  assert.ok(escrituras.some((x) => x.tabla === "trabajos" && x.metodo === "PATCH" && x.cuerpo?.pagado_en && x.cuerpo?.a_cuenta > 0), "cobrar apunta el pago");
+  assert.ok(escrituras.some((x) => x.tabla === "trabajos" && x.metodo === "PATCH" && x.cuerpo?.pagado_en && !("a_cuenta" in x.cuerpo)), "cobrar apunta la fecha y no toca «a cuenta»");
   await p.getByText(/Pagado · /).first().waitFor();
+  // y se puede deshacer
+  await p.getByRole("button", { name: /^Deshacer cobro de / }).first().click(); await p.waitForTimeout(300);
+  assert.ok(escrituras.some((x) => x.tabla === "trabajos" && x.metodo === "PATCH" && x.cuerpo && "pagado_en" in x.cuerpo && x.cuerpo.pagado_en === null), "deshacer quita el pago");
+  await p.getByText(/vuelve a «sin cobrar»/).waitFor();
   assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
@@ -426,7 +430,7 @@ await prueba("cobros: marcar un pedido como pagado y ver las cuentas", async () 
   assert.doesNotMatch(txt, /falta activar/);
   await p.getByRole("button", { name: "Cobrar T-0007" }).click();
   await p.getByText(/T-0007 cobrado/).waitFor();
-  assert.ok(escrituras.some((e) => e.tabla === "trabajos" && e.metodo === "PATCH" && Number(e.cuerpo.a_cuenta) === 36));
+  assert.ok(escrituras.some((e) => e.tabla === "trabajos" && e.metodo === "PATCH" && e.cuerpo.pagado_en));
   await p.getByRole("button", { name: /^Cobrado en/ }).click();
   await p.getByText("Peña Ciclista").waitFor();
   assert.deepEqual(errores, []); await ctx.close();

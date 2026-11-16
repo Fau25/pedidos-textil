@@ -56,9 +56,12 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
       <article aria-label="Vista previa del ticket" className="overflow-hidden rounded-[14px] bg-white text-[13px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
         {/* Diseño E: franja gris arriba, número grande y fino, pendiente grande al final */}
         <header className="bg-[#f5f6f8] px-5 pb-4 pt-5">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-start gap-2.5">
             <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17181c] text-[11px] font-semibold text-white">{iniciales(empresa.nombre)}</span>
-            <div className="min-w-0"><p className="truncate font-semibold">{empresa.nombre}</p>{empresa.telefono && <p className="text-[11.5px] text-[#6b7079]">{empresa.telefono}</p>}</div>
+            <div className="min-w-0 flex-1"><p className="truncate font-semibold">{empresa.nombre}</p>{empresa.telefono && <p className="text-[11.5px] text-[#6b7079]">{empresa.telefono}</p>}</div>
+            {/* El número va en la franja gris: ahorra espacio */}
+            <div className="shrink-0 text-right"><p className="num text-[30px] font-light leading-none tracking-[-0.04em]">{t.numero}</p>
+              <p className="mt-1 text-[11px] text-[#6b7079]">Ticket · {fecha(t.creado)}</p></div>
           </div>
           <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
             <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Cliente</p>
@@ -66,10 +69,8 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
             {t.entrega && <div className="text-right"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Recoger el</p><p className="font-semibold">{fecha(t.entrega, true)}</p></div>}
           </div>
         </header>
-        <div className="px-5 pb-5 pt-5">
-          <p className="text-[40px] font-light leading-none tracking-[-0.04em]">{t.numero}</p>
-          <p className="mt-1.5 text-[12px] text-[#6b7079]">Ticket de recogida · {fecha(t.creado)}</p>
-          <ul className="mt-4">
+        <div className="px-5 pb-5 pt-2">
+          <ul>
             {items.map((i) => (
               <li key={i.id} className="border-b border-[#e4e6ea] py-2.5">
                 <p className="font-semibold">{i.cantidad} × {i.que || "Trabajo"}</p>

@@ -25,7 +25,8 @@ export const nuevoTrabajo = (empresaId: string, tecnica?: string): Trabajo => ({
 });
 
 /** Lo que falta por cobrar, en céntimos */
-export const pendienteCent = (t: Pick<Trabajo, "total" | "a_cuenta">) => Math.max(0, aCent(t.total) - aCent(t.a_cuenta));
+/** Lo que falta por cobrar: nada si ya está pagado; si no, total menos lo dejado a cuenta */
+export const pendienteCent = (t: Pick<Trabajo, "total" | "a_cuenta" | "pagado_en">) => (t.pagado_en ? 0 : Math.max(0, aCent(t.total) - aCent(t.a_cuenta)));
 export const unidades = (t: Pick<Trabajo, "items">) => t.items.reduce((a, i) => a + (Number(i.cantidad) || 0), 0);
 export const resumenItems = (t: Pick<Trabajo, "items">) => t.items.filter((i) => i.que.trim()).map((i) => `${i.que.trim()}${i.cantidad > 1 ? ` ×${i.cantidad}` : ""}`).join(", ");
 
@@ -50,20 +51,23 @@ export async function guardarTrabajo(t: Trabajo): Promise<Trabajo> {
 }
 
 /** Cobra lo pendiente: lo dejado a cuenta pasa a ser el total y se apunta la fecha de cobro */
-export async function cobrar(t: Trabajo) {
-  const r = await sb.from("trabajos").update({ a_cuenta: Number(t.total) || 0, pagado_en: new Date().toISOString() }).eq("id", t.id);
+/** Cobrar: marca la fecha de pago y deja «a cuenta» como estaba (así se puede deshacer sin perder nada) */
+export async function cobrar(t: Pick<Trabajo, "id" | "total">) {
+  const r = await sb.from("trabajos").update({ pagado_en: new Date().toISOString() }).eq("id", t.id);
   if (r.error && /pagado_en/.test(r.error.message)) { // sin el SQL 11: al menos queda sin pendiente
     const r2 = await sb.from("trabajos").update({ a_cuenta: Number(t.total) || 0 }).eq("id", t.id);
     if (r2.error) throw r2.error; return;
   }
   if (r.error) throw r.error;
 }
-export async function deshacerCobro(t: Trabajo) {
-  const r = await sb.from("trabajos").update({ a_cuenta: Number(t.a_cuenta) || 0, pagado_en: t.pagado_en ?? null }).eq("id", t.id);
-  if (r.error && /pagado_en/.test(r.error.message)) { await sb.from("trabajos").update({ a_cuenta: Number(t.a_cuenta) || 0 }).eq("id", t.id); return; }
+/** Deshacer el cobro: vuelve a «sin cobrar». Los cobrados con la versión anterior tenían a cuenta = total: se deja a 0. */
+export async function deshacerCobro(t: Pick<Trabajo, "id" | "total" | "a_cuenta">) {
+  const viejo = aCent(t.a_cuenta) >= aCent(t.total) && aCent(t.total) > 0;
+  const r = await sb.from("trabajos").update(viejo ? { pagado_en: null, a_cuenta: 0 } : { pagado_en: null }).eq("id", t.id);
+  if (r.error && /pagado_en/.test(r.error.message)) { const r2 = await sb.from("trabajos").update({ a_cuenta: 0 }).eq("id", t.id); if (r2.error) throw r2.error; return; }
   if (r.error) throw r.error;
 }
-export const estaPagado = (t: Pick<Trabajo, "total" | "a_cuenta">) => Number(t.total) > 0 && pendienteCent(t) === 0;
+export const estaPagado = (t: Pick<Trabajo, "total" | "a_cuenta" | "pagado_en">) => Number(t.total) > 0 && pendienteCent(t) === 0;
 
 export async function cambiarEstado(id: string, estado: EstadoTrabajo) {
   const ahora = new Date().toISOString();

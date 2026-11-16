@@ -65,10 +65,18 @@ export default function Trabajos() {
   }, [datos, filtro, q]);
 
   async function pagar(t: Trabajo) {
-    setDatos((d) => d?.map((x) => (x.id === t.id ? { ...x, a_cuenta: Number(t.total), pagado_en: new Date().toISOString() } : x)) ?? d);
+    setDatos((d) => d?.map((x) => (x.id === t.id ? { ...x, pagado_en: new Date().toISOString() } : x)) ?? d);
     try {
       await cobrar(t);
       aviso(`${t.numero} cobrado: ${euros(pendienteCent(t))}`, "ok", { texto: "Deshacer", fn: () => { deshacerCobro(t).then(recargar).catch(() => {}); } });
+    } catch (e) { aviso(textoError(e), "error"); recargar(); }
+  }
+
+  async function despagar(t: Trabajo) {
+    setDatos((d) => d?.map((x) => (x.id === t.id ? { ...x, pagado_en: null, a_cuenta: Number(x.a_cuenta) >= Number(x.total) ? 0 : x.a_cuenta } : x)) ?? d);
+    try {
+      await deshacerCobro(t);
+      aviso(`${t.numero} vuelve a «sin cobrar»`, "ok", { texto: "Deshacer", fn: () => { cobrar(t).then(recargar).catch(() => {}); } });
     } catch (e) { aviso(textoError(e), "error"); recargar(); }
   }
 
@@ -133,7 +141,8 @@ export default function Trabajos() {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12.5px] text-texto2">
                       <span className={cx("flex items-center gap-1", tarde && "font-semibold text-red-600")}><CalendarDays className="size-3.5" />{cuando(t.entrega)}</span>
                       {estaPagado(t)
-                        ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11.5px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Pagado · {euros(Math.round(Number(t.total) * 100))}</span>
+                        ? <span className="flex items-center gap-1.5"><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11.5px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Pagado · {euros(Math.round(Number(t.total) * 100))}</span>
+                            {editar && <button onClick={() => despagar(t)} aria-label={`Deshacer cobro de ${t.numero}`} className="flex items-center gap-1 rounded-full border border-borde px-2.5 py-1 text-[11.5px] font-bold text-texto2 hover:text-texto"><Undo2 className="size-3" />Deshacer</button>}</span>
                         : p > 0 ? <span className="flex items-center gap-1.5">Pendiente <b className="num text-texto">{euros(p)}</b>
                             {editar && <button onClick={() => pagar(t)} className="rounded-full bg-emerald-600/10 px-2.5 py-1 text-[11.5px] font-bold text-emerald-800 hover:bg-emerald-600/20 dark:text-emerald-200">Cobrar</button>}</span>
                           : <span>Sin precio</span>}

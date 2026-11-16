@@ -15,7 +15,7 @@ const s = StyleSheet.create({
   fila: { flexDirection: "row", justifyContent: "space-between" },
   peq: { fontSize: 6.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: GRIS },
   ini: { width: 22, height: 22, borderRadius: 5, backgroundColor: OSC, color: "#FFFFFF", fontSize: 7.5, fontWeight: 600, textAlign: "center", paddingTop: 6, marginRight: 8 },
-  cuerpo: { paddingHorizontal: 20, paddingTop: 14, flexGrow: 1 },
+  cuerpo: { paddingHorizontal: 20, paddingTop: 6, flexGrow: 1 },
   item: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: LINEA },
 });
 
@@ -25,9 +25,13 @@ function Ticket({ t, emp }: { t: Trabajo; emp: Empresa }) {
     <Document title={`Ticket ${t.numero ?? ""}`} author={emp.nombre}>
       <Page size="A6" style={s.pag}>
         <View style={s.cab}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
             <Text style={s.ini}>{iniciales(emp.nombre)}</Text>
-            <View><Text style={{ fontWeight: 600, fontSize: 9.5 }}>{emp.nombre}</Text>{emp.telefono ? <Text style={{ color: GRIS }}>{emp.telefono}</Text> : null}</View>
+            <View style={{ flexGrow: 1, flexShrink: 1 }}><Text style={{ fontWeight: 600, fontSize: 9.5 }}>{emp.nombre}</Text>{emp.telefono ? <Text style={{ color: GRIS }}>{emp.telefono}</Text> : null}</View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ fontSize: 22, fontWeight: 300, letterSpacing: -0.6, lineHeight: 1 }}>{t.numero ?? ""}</Text>
+              <Text style={{ color: GRIS, fontSize: 7, marginTop: 3 }}>Ticket · {f(t.creado)}</Text>
+            </View>
           </View>
           <View style={[s.fila, { marginTop: 12 }]}>
             <View style={{ maxWidth: 150 }}><Text style={s.peq}>Cliente</Text><Text style={{ fontWeight: 600 }}>{t.cliente_nombre || "—"}</Text>{t.cliente_telefono ? <Text style={{ color: GRIS }}>{t.cliente_telefono}</Text> : null}</View>
@@ -35,8 +39,6 @@ function Ticket({ t, emp }: { t: Trabajo; emp: Empresa }) {
           </View>
         </View>
         <View style={s.cuerpo}>
-          <Text style={{ fontSize: 28, fontWeight: 300, letterSpacing: -0.8, lineHeight: 1 }}>{t.numero ?? ""}</Text>
-          <Text style={{ color: GRIS, marginTop: 3, marginBottom: 10 }}>Ticket de recogida · {f(t.creado)}</Text>
           {items.map((i) => (
             <View key={i.id} style={s.item} wrap={false}>
               <Text style={{ fontWeight: 600 }}>{i.cantidad} × {i.que || "Trabajo"}</Text>

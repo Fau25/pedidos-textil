@@ -30,8 +30,6 @@ export default function Inicio() {
 
   const pendientes = useMemo(() => (datos ?? []).filter((p) => !p.entregado).sort((a, b) => (a.fecha < b.fecha ? -1 : 1)), [datos]);
   const entregados = useMemo(() => (datos ?? []).filter((p) => p.entregado).sort((a, b) => ((a.entregado_en ?? "") < (b.entregado_en ?? "") ? 1 : -1)), [datos]);
-  const sinCobrar = (datos ?? []).filter((p) => !p.pagado_en && aCent(p.total) > 0);
-  const importePendiente = sinCobrar.reduce((a, p) => a + aCent(p.total), 0);
   const udsPendientes = pendientes.reduce((a, p) => a + (p.unidades || 0), 0);
   const lista = vista === "pendientes" ? pendientes : entregados.slice(0, 24);
 
@@ -59,42 +57,25 @@ export default function Inicio() {
         <Link href="/ajustes/" aria-label="Ajustes del taller" className="grid size-12 shrink-0 place-items-center rounded-full bg-acento text-[17px] font-semibold text-sobre-acento shadow-sm">{inicial}</Link>
       </div>
 
+      {/* Crear: dos pastillas */}
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:flex">
+        <Link href="/pedidos/nuevo/" className="flex h-[52px] items-center justify-center gap-2 rounded-full bg-acento px-5 text-[14.5px] font-semibold text-sobre-acento shadow-[0_10px_24px_-12px_rgba(16,18,24,0.55)] transition-transform active:scale-[0.98]">
+          <Plus className="size-[18px]" />Nuevo pedido
+        </Link>
+        <Link href="/trabajos/nuevo/" className="flex h-[52px] items-center justify-center gap-2 rounded-full bg-azul px-5 text-[14.5px] font-semibold text-white shadow-[0_10px_24px_-12px_rgba(29,82,235,0.7)] transition-transform active:scale-[0.98]">
+          <Plus className="size-[18px]" />Nuevo trabajo
+        </Link>
+      </div>
+
       {/* Buscar */}
       <button onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
         className="mb-6 flex h-[52px] w-full items-center gap-3 rounded-full bg-superficie px-5 text-left text-[14px] text-texto2 shadow-[0_6px_20px_-12px_rgba(16,18,24,0.18)] lg:max-w-md">
         <Search className="size-[18px]" />Buscar pedido, cliente o prenda
       </button>
 
-      {/* Ficha «Nuevo pedido» + resumen */}
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-[1.25fr_1fr_1fr]">
-        <Link href="/pedidos/nuevo/" className="group relative col-span-2 flex min-h-[168px] flex-col justify-between overflow-hidden rounded-[26px] bg-[#17181c] p-6 text-white shadow-[0_18px_40px_-18px_rgba(16,18,24,0.55)] transition-transform active:scale-[0.99] lg:col-span-1 dark:bg-[#24262c]">
-          <div className="pointer-events-none absolute -right-10 -top-10 size-44 rounded-full bg-white/[0.06]" />
-          <div className="pointer-events-none absolute -bottom-16 right-10 size-40 rounded-full bg-[#1f5bff]/30 blur-2xl" />
-          <span className="grid size-12 place-items-center rounded-full bg-white text-[#17181c] transition-transform group-hover:rotate-90"><Plus className="size-6" /></span>
-          <div className="relative">
-            <p className="text-[22px] font-semibold tracking-[-0.02em]">Nuevo pedido</p>
-            <p className="mt-0.5 text-[13px] text-white/60">Cliente, prendas, tallas y personalización</p>
-          </div>
-        </Link>
-        <div className="tarjeta flex min-h-[132px] flex-col justify-between p-5 sm:p-6">
-          <p className="text-[13px] font-medium text-texto2">Pendientes</p>
-          <div>
-            <p className="num text-[36px] font-semibold leading-none tracking-[-0.04em] sm:text-[44px]">{datos ? pendientes.length : "–"}</p>
-            <p className="mt-2 text-[13px] text-texto2">{udsPendientes} {udsPendientes === 1 ? "prenda" : "prendas"} por hacer</p>
-          </div>
-        </div>
-        <Link href="/cuentas/" className="tarjeta flex min-h-[132px] flex-col justify-between p-5 transition-shadow hover:shadow-[0_16px_36px_-16px_rgba(16,18,24,0.22)] sm:p-6">
-          <p className="flex items-center justify-between text-[13px] font-medium text-texto2">Por cobrar <ArrowUpRight className="size-3.5" /></p>
-          <div>
-            <p className="num text-[22px] font-semibold leading-none tracking-[-0.03em] sm:text-[30px]">{euros(importePendiente)}</p>
-            <p className="mt-2 text-[13px] text-texto2">{sinCobrar.length === 1 ? "1 pedido" : `${sinCobrar.length} pedidos`} sin cobrar</p>
-          </div>
-        </Link>
-      </div>
-
       {/* Chips */}
       <div className="mb-4 flex items-center gap-2">
-        {([["pendientes", `Pendientes · ${pendientes.length}`], ["entregados", "Entregados"]] as [Vista, string][]).map(([v, t]) => (
+        {([["pendientes", `Pendientes · ${pendientes.length}${udsPendientes ? ` (${udsPendientes} uds)` : ""}`], ["entregados", "Entregados"]] as [Vista, string][]).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)} aria-pressed={vista === v}
             className={cx("h-10 rounded-full px-5 text-[13px] font-medium transition-colors", vista === v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>{t}</button>
         ))}
@@ -106,7 +87,7 @@ export default function Inicio() {
         <div className="tarjeta flex flex-col items-center px-6 py-14 text-center">
           <Prenda tipo="Camiseta" color="Blanco" className="mb-3 size-20" />
           <p className="font-semibold">{vista === "pendientes" ? "Nada pendiente" : "Aún no hay entregados"}</p>
-          <p className="mt-1 text-[13px] text-texto2">{vista === "pendientes" ? "Crea un pedido nuevo desde la tarjeta negra." : "Cuando marques un pedido como entregado aparecerá aquí."}</p>
+          <p className="mt-1 text-[13px] text-texto2">{vista === "pendientes" ? "Crea uno con «Nuevo pedido», arriba." : "Cuando marques un pedido como entregado aparecerá aquí."}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">

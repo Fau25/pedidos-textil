@@ -50,11 +50,14 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto
         <article aria-label={`Vista previa ${tipo === "factura" ? "de la factura" : "del ticket"}`} className="mx-auto max-w-sm overflow-hidden rounded-[14px] bg-white text-[13px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
           {/* Diseño E: franja gris con los datos, título grande y fino, total grande abajo */}
           <header className="bg-[#f5f6f8] px-5 pb-4 pt-5">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-start gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {logo ? <img src={logo} alt="" className="h-9 max-w-[45%] object-contain" /> : <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17181c] text-[11px] font-semibold text-white">{iniciales(d.empresa.nombre)}</span>}
-              <div className="min-w-0"><p className="truncate font-semibold">{d.empresa.nombre}</p>
+              <div className="min-w-0 flex-1"><p className="truncate font-semibold">{d.empresa.nombre}</p>
                 <p className="truncate text-[11.5px] text-[#6b7079]">{[d.empresa.nif && `NIF ${d.empresa.nif}`, d.empresa.telefono].filter(Boolean).join(" · ")}</p></div>
+              {/* Título y número en la franja gris: ahorra espacio */}
+              <div className="shrink-0 text-right"><p className="text-[26px] font-light leading-none tracking-[-0.04em]">{tipo === "factura" ? "Factura" : "Ticket"}</p>
+                <p className="mt-1 text-[11px] text-[#6b7079]"><b className="num font-semibold text-[#17181c]">{p.numero}</b> · {fecha(p.fecha)}</p></div>
             </div>
             {d.cliente && (
               <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
@@ -65,11 +68,9 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto
               </div>
             )}
           </header>
-          <div className="px-5 pb-5 pt-5">
-            <p className="text-[38px] font-light leading-none tracking-[-0.04em]">{tipo === "factura" ? "Factura" : "Ticket"}</p>
-            <p className="mt-2 text-[12px] text-[#6b7079]">Nº <b className="font-semibold text-[#17181c]">{p.numero}</b> · {fecha(p.fecha)}{tipo === "factura" && !d.cliente?.nif ? " · Factura simplificada" : ""}</p>
-            {d.pedido.referencia && <p className="text-[12px] text-[#6b7079]">Ref.: {d.pedido.referencia}</p>}
-            <ul className="mt-4">
+          <div className="px-5 pb-5 pt-3">
+            {(d.pedido.referencia || (tipo === "factura" && !d.cliente?.nif)) && <p className="text-[12px] text-[#6b7079]">{[tipo === "factura" && !d.cliente?.nif && "Factura simplificada", d.pedido.referencia && `Ref.: ${d.pedido.referencia}`].filter(Boolean).join(" · ")}</p>}
+            <ul className="mt-1">
               {filas.map((x, i) => (
                 <li key={i} className="flex justify-between gap-3 border-b border-[#e4e6ea] py-2.5">
                   <div className="min-w-0"><p>{x.descripcion}</p>
