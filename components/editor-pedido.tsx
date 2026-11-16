@@ -342,7 +342,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
       <Ticket abierto={verTicket} cerrar={() => setVerTicket(false)} p={verTicket ? ticketDe(p, empresa!, cliente ?? null) : null} />
       <VerFactura f={factura} abierto={verFactura} cerrar={() => setVerFactura(false)} cambiar={setFactura} borrada={() => setFactura(null)} />
       <div className="h-20 xl:hidden" />
-      <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 mx-auto flex max-w-[640px] lg:bottom-4 lg:left-[260px] items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur xl:hidden">
+      <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 mx-auto flex max-w-[640px] lg:bottom-4 lg:left-[260px] items-center gap-3 rounded-[22px] border border-borde bg-superficie px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] xl:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>
         <Boton onClick={cancelar}>Cancelar</Boton>
         <Boton variante="primario" cargando={enviando} onClick={() => guardar()}>Guardar</Boton>

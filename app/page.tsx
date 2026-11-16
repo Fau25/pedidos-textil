@@ -141,11 +141,11 @@ function TarjetaPedido({ p, cambiar }: { p: Fila; cambiar: (p: Fila, v: boolean)
         {lineas.length > 1 && l && <Prenda tipo={lineas[1].tipo} color={lineas[1].color} className="absolute right-[12%] top-[16%] size-[46%] opacity-80" />}
         <Prenda tipo={l?.tipo} color={l?.color} className={cx("relative transition-transform group-hover:scale-[1.04]", lineas.length > 1 ? "-translate-x-[12%] size-[66%]" : "size-[72%]")} />
         {tecnicas[0] && (
-          <span className="absolute left-2 top-2 inline-flex h-6 items-center gap-1 rounded-full bg-superficie/90 px-2 text-[11px] font-medium backdrop-blur">
+          <span className="absolute left-2 top-2 inline-flex h-6 items-center gap-1 rounded-full bg-superficie/95 px-2 text-[11px] font-medium">
             <Sparkles className="size-3 text-azul" />{tecnicas[0]}{tecnicas.length > 1 ? ` +${tecnicas.length - 1}` : ""}
           </span>
         )}
-        <span className="num absolute bottom-2 left-2 rounded-full bg-superficie/90 px-2 py-0.5 text-[11px] font-semibold backdrop-blur">{p.unidades} uds</span>
+        <span className="num absolute bottom-2 left-2 rounded-full bg-superficie/95 px-2 py-0.5 text-[11px] font-semibold">{p.unidades} uds</span>
       </Link>
       <div className="flex items-end gap-2 px-1.5 pb-1 pt-3">
         <Link href={`/pedidos/ver/?id=${p.id}`} className="min-w-0 flex-1">

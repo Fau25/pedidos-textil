@@ -50,7 +50,7 @@ export function Buscador({ cerrar }: { cerrar: () => void }) {
   const ir = (r?: Resultado) => { if (r) { router.push(r.href); cerrar(); } };
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-[8vh]" role="dialog" aria-modal="true" aria-label="Buscar">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={cerrar} />
+      <div className="absolute inset-0 bg-black/40" onClick={cerrar} />
       <div className="animar tarjeta relative w-full max-w-xl overflow-hidden">
         <div className="flex items-center gap-3 border-b border-borde px-4">
           {cargando ? <Loader2 className="size-5 animate-spin text-texto2" /> : <Search className="size-5 text-texto2" />}

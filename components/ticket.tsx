@@ -22,7 +22,9 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket", editar }: { p: Pre
   useEffect(() => {
     listo.current = null;
     if (!abierto || !p || !(p.datos.lineas.length + p.datos.personalizaciones.length)) return;
-    const pr = pdfDocumento(p, tipo); pr.catch(() => {}); listo.current = pr;
+    // Se prepara al terminar la animación de abrir (el motor de PDF ocupa el procesador un momento)
+    const espera = setTimeout(() => { const pr = pdfDocumento(p, tipo); pr.catch(() => {}); listo.current = pr; }, 450);
+    return () => clearTimeout(espera);
   }, [abierto, p, tipo]);
   if (!p) return null;
   const d = p.datos;

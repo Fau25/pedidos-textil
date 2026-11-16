@@ -122,7 +122,7 @@ export function Hoja({ abierta, cerrar, titulo, children, pie, ancho = "max-w-lg
   if (!abierta) return null;
   return createPortal(
     <div data-hoja className="fixed inset-0 z-50 flex items-end justify-center sm:items-stretch sm:justify-end" role="dialog" aria-modal="true" aria-label={titulo}>
-      <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" onClick={cerrar} />
+      <div className="absolute inset-0 bg-black/35" onClick={cerrar} />
       <div ref={ref} className={cx("cristal animar relative flex max-h-[92dvh] w-full flex-col rounded-t-[28px] shadow-2xl sm:max-h-none sm:rounded-none sm:rounded-l-[28px]", ancho)}>
         <div className="flex items-center justify-between border-b border-borde px-5 py-4">
           <h2 className="text-[16px] font-semibold">{titulo}</h2>

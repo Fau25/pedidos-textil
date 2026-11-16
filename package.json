@@ -8,7 +8,8 @@
     "test": "node --test lib/*.test.ts",
     "prueba:pantallas": "node pruebas/flujos.mjs",
     "lint": "oxlint app components lib --deny-warnings",
-    "prueba:sql": "node pruebas/sql.mjs"
+    "prueba:sql": "node pruebas/sql.mjs",
+    "postbuild": "node scripts/lista-pdf.mjs"
   },
   "repository": {
     "type": "git",

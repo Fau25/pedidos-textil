@@ -23,7 +23,9 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
   useEffect(() => {
     listo.current = null;
     if (!abierto || !t || !empresa) return;
-    const pr = pdfTicketTrabajo(t, empresa); pr.catch(() => {}); listo.current = pr;
+    // Se prepara al terminar la animación de abrir (el motor de PDF ocupa el procesador un momento)
+    const espera = setTimeout(() => { const pr = pdfTicketTrabajo(t, empresa); pr.catch(() => {}); listo.current = pr; }, 450);
+    return () => clearTimeout(espera);
   }, [abierto, t, empresa]);
   if (!t || !empresa) return null;
   const items = t.items.filter((i) => i.que || i.detalle);

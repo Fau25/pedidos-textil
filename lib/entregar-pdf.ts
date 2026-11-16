@@ -13,15 +13,17 @@ export async function entregarPDF(blob: Blob, nombre: string, titulo: string, so
   return "descargado";
 }
 
-/** Descarga por detrás el motor de PDF y sus fuentes cuando el dispositivo está libre,
- *  para que el primer ticket o factura salga al momento (quedan guardados en el dispositivo) */
+/** Descarga por detrás (sin ejecutarlo) el motor de PDF y sus fuentes cuando el dispositivo está libre.
+ *  Quedan guardados en el dispositivo y el primer ticket o factura sale rápido. Ejecutarlo aquí congelaba
+ *  el móvil medio segundo justo cuando se estaba escribiendo: ahora solo se ejecuta al abrir un ticket o factura. */
 export function calentarPDF() {
   const c = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   if (c?.saveData) return;
-  const ir = () => {
-    import("./pdf").catch(() => {});
-    for (const f of ["Inter_300Light", "Inter_400Regular", "Inter_600SemiBold"]) fetch(`/pedidos-textil/fonts/pdf/${f}.ttf`).catch(() => {});
+  const base = "/pedidos-textil/";
+  const ir = async () => {
+    const lista: string[] = await fetch(base + "pdf-chunks.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    for (const f of [...lista, "fonts/pdf/Inter_300Light.ttf", "fonts/pdf/Inter_400Regular.ttf", "fonts/pdf/Inter_600SemiBold.ttf"]) await fetch(base + f).catch(() => {});
   };
   const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number };
-  setTimeout(() => (w.requestIdleCallback ? w.requestIdleCallback(ir, { timeout: 8000 }) : ir()), 4000);
+  setTimeout(() => (w.requestIdleCallback ? w.requestIdleCallback(() => { ir(); }, { timeout: 8000 }) : ir()), 4000);
 }

@@ -305,7 +305,7 @@ function VerPrenda({ p, cerrar, editar }: { p: Prenda; cerrar: () => void; edita
     return () => { document.removeEventListener("keydown", tecla); document.body.style.overflow = prev; };
   }, [cerrar]);
   return createPortal(
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm animar" onClick={cerrar} role="dialog" aria-modal="true" aria-label={p.modelo || p.tipo}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4 animar" onClick={cerrar} role="dialog" aria-modal="true" aria-label={p.modelo || p.tipo}>
       <div className="w-full max-w-[560px]" onClick={(e) => e.stopPropagation()}>
         <div className="relative overflow-hidden rounded-[26px] bg-superficie">
           <FotoPrenda path={p.imagen_path} tipo={p.tipo} color={p.colores[0] ?? ""} className="aspect-square w-full rounded-none" />

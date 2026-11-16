@@ -3,7 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
-const Buscador = dynamic(() => import("./buscador").then((m) => m.Buscador), { ssr: false });
+const cargarBuscador = () => import("./buscador");
+const Buscador = dynamic(() => cargarBuscador().then((m) => m.Buscador), { ssr: false });
 import { Home, ShoppingBag, Users, Shirt, Settings, Plus, Search, Moon, Sun, LogOut, MoreHorizontal, ClipboardList, Wallet } from "lucide-react";
 import { Logo } from "./logo";
 import { cx } from "./ui";
@@ -45,6 +46,8 @@ export function Marco({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", k);
   }, []);
   useEffect(() => setMas(false), [ruta]);
+  // El buscador (⌘K) se descarga por detrás para que se abra al instante la primera vez
+  useEffect(() => { const t = setTimeout(() => { cargarBuscador().catch(() => {}); }, 3000); return () => clearTimeout(t); }, []);
 
   return (
     <div className="min-h-dvh lg:pl-[244px]">

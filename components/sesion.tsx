@@ -59,16 +59,25 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     if (!uid) return;
     setFallo(null);
     try {
-    const { data: m, error: em } = await sb.from("miembros").select("empresa_id, rol").eq("user_id", uid).limit(1).maybeSingle();
-    if (em) throw em;
+    // Todo en una sola petición (taller con sus técnicas, tarifas y proveedores): una ida y vuelta menos al abrir
+    type Junto = Empresa & { tecnicas?: Tecnica[]; tarifas?: TarifaFila[]; proveedores?: Proveedor[] };
+    const uno = await sb.from("miembros").select("empresa_id, rol, empresas(*, tecnicas(*), tarifas(*), proveedores(*))").eq("user_id", uid).limit(1).maybeSingle();
+    let m = uno.data as { empresa_id: string; rol: string; empresas?: Junto | null } | null;
+    if (uno.error) { // por si la base no admite la consulta conjunta: la de siempre
+      const r = await sb.from("miembros").select("empresa_id, rol").eq("user_id", uid).limit(1).maybeSingle();
+      if (r.error) throw r.error; m = r.data;
+    }
     if (!m) { setEmpresa(null); setCargado(true); return; }
-    const e = m.empresa_id;
-    const [emp, tec, tar, prov] = await Promise.all([
-      sb.from("empresas").select("*").eq("id", e).single(),
-      sb.from("tecnicas").select("*").eq("empresa_id", e).order("orden"),
-      sb.from("tarifas").select("*").eq("empresa_id", e).order("desde"),
-      sb.from("proveedores").select("*").eq("empresa_id", e).order("nombre"),
-    ]);
+    const e = m.empresa_id; const j = m.empresas;
+    const orden = <T,>(l: T[] | undefined, k: keyof T) => [...(l ?? [])].sort((a, b) => String(a[k] ?? "").localeCompare(String(b[k] ?? ""), "es", { numeric: true }));
+    const [emp, tec, tar, prov] = j && Array.isArray(j.tecnicas) && Array.isArray(j.tarifas) && Array.isArray(j.proveedores)
+      ? (() => { const { tecnicas, tarifas, proveedores, ...empresa } = j; return [{ data: empresa as Empresa, error: null }, { data: orden(tecnicas, "orden") }, { data: orden(tarifas, "desde") }, { data: orden(proveedores, "nombre") }] as const; })()
+      : await Promise.all([
+        sb.from("empresas").select("*").eq("id", e).single(),
+        sb.from("tecnicas").select("*").eq("empresa_id", e).order("orden"),
+        sb.from("tarifas").select("*").eq("empresa_id", e).order("desde"),
+        sb.from("proveedores").select("*").eq("empresa_id", e).order("nombre"),
+      ]);
     setRol(m.rol);
     setEmpresa(emp.data as Empresa); fijarEmpresaErrores((emp.data as Empresa)?.id ?? null);
     setTecnicas((tec.data ?? []) as Tecnica[]);
