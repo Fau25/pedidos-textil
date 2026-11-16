@@ -53,38 +53,41 @@ export function TicketTrabajo({ t, abierto, cerrar }: { t: Trabajo | null; abier
         </button>
       </div>
     }>
-      <article aria-label="Vista previa del ticket" className="overflow-hidden rounded-[14px] bg-white text-[13px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
-        {/* Diseño E: franja gris arriba, número grande y fino, pendiente grande al final */}
+      <article aria-label="Vista previa del ticket" className="overflow-hidden rounded-[14px] bg-white text-[15px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
+        {/* Diseño E, tamaño grande (propuesta 3): cantidades en caja, texto grande */}
         <header className="bg-[#f5f6f8] px-5 pb-4 pt-5">
           <div className="flex items-start gap-2.5">
             <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#17181c] text-[11px] font-semibold text-white">{iniciales(empresa.nombre)}</span>
-            <div className="min-w-0 flex-1"><p className="truncate font-semibold">{empresa.nombre}</p>{empresa.telefono && <p className="text-[11.5px] text-[#6b7079]">{empresa.telefono}</p>}</div>
+            <div className="min-w-0 flex-1"><p className="truncate text-[16.5px] font-semibold">{empresa.nombre}</p>{empresa.telefono && <p className="text-[13.5px] text-[#6b7079]">{empresa.telefono}</p>}</div>
             {/* El número va en la franja gris: ahorra espacio */}
-            <div className="shrink-0 text-right"><p className="num text-[30px] font-light leading-none tracking-[-0.04em]">{t.numero}</p>
-              <p className="mt-1 text-[11px] text-[#6b7079]">Ticket · {fecha(t.creado)}</p></div>
+            <div className="shrink-0 text-right"><p className="num text-[36px] font-light leading-none tracking-[-0.04em]">{t.numero}</p>
+              <p className="mt-1 text-[11.5px] text-[#6b7079]">Ticket · {fecha(t.creado)}</p></div>
           </div>
           <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
-            <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Cliente</p>
-              <p className="font-semibold [overflow-wrap:anywhere]">{t.cliente_nombre || "—"}</p>{t.cliente_telefono && <p className="text-[11.5px] text-[#6b7079]">{t.cliente_telefono}</p>}</div>
-            {t.entrega && <div className="text-right"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Recoger el</p><p className="font-semibold">{fecha(t.entrega, true)}</p></div>}
+            <div className="min-w-0"><p className="text-[10.5px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Cliente</p>
+              <p className="text-[16.5px] font-semibold [overflow-wrap:anywhere]">{t.cliente_nombre || "—"}</p>{t.cliente_telefono && <p className="text-[13.5px] text-[#6b7079]">{t.cliente_telefono}</p>}</div>
+            {t.entrega && <div className="text-right"><p className="text-[10.5px] font-semibold uppercase tracking-[.1em] text-[#6b7079]">Recoger el</p><p className="text-[16.5px] font-semibold">{fecha(t.entrega, true)}</p></div>}
           </div>
         </header>
         <div className="px-5 pb-5 pt-2">
           <ul>
             {items.map((i) => (
-              <li key={i.id} className="border-b border-[#e4e6ea] py-2.5">
-                <p className="font-semibold">{i.cantidad} × {i.que || "Trabajo"}</p>
-                {(i.tecnica || !!i.ubicaciones?.length) && <p className="text-[11.5px] text-[#6b7079]">{[i.tecnica, ...(i.ubicaciones ?? []).map((u) => CORTO[u] ?? u)].filter(Boolean).join(" · ")}</p>}
-                {i.detalle && <p className="text-[11.5px] text-[#6b7079] [overflow-wrap:anywhere]">{i.detalle}</p>}
+              <li key={i.id} className="flex items-start gap-3 border-b border-[#e4e6ea] py-3">
+                <span className="num grid h-9 min-w-9 shrink-0 place-items-center rounded-lg bg-[#f5f6f8] px-1.5 text-[18px] font-bold">{i.cantidad}</span>
+                <div className="min-w-0">
+                  <p className="text-[18px] font-bold leading-tight [overflow-wrap:anywhere]">{i.que || "Trabajo"}</p>
+                  {(i.tecnica || !!i.ubicaciones?.length) && <p className="mt-0.5 text-[13.5px] text-[#6b7079]">{[i.tecnica, ...(i.ubicaciones ?? []).map((u) => CORTO[u] ?? u)].filter(Boolean).join(" · ")}</p>}
+                  {i.detalle && <p className="text-[13.5px] text-[#6b7079] [overflow-wrap:anywhere]">{i.detalle}</p>}
+                </div>
               </li>
             ))}
           </ul>
-          {t.notas && <p className="mt-2 text-[12px] text-[#6b7079]">{t.notas}</p>}
+          {t.notas && <p className="mt-2 text-[13.5px] text-[#6b7079]">{t.notas}</p>}
           <div className="mt-6 flex items-end justify-between gap-3 border-t border-[#17181c] pt-3">
-            <div className="num text-[11.5px] leading-relaxed text-[#6b7079]"><p>Total {euros(aCent(t.total))}</p>{Number(t.a_cuenta) > 0 && <p>A cuenta {euros(aCent(t.a_cuenta))}</p>}</div>
-            <div className="text-right"><p className="text-[11.5px] text-[#6b7079]">Pendiente</p><p className="num text-[30px] font-light leading-tight tracking-[-0.03em]">{euros(pendienteCent(t))}</p></div>
+            <div className="num text-[13.5px] leading-relaxed text-[#6b7079]"><p>Total {euros(aCent(t.total))}</p>{Number(t.a_cuenta) > 0 && <p>A cuenta {euros(aCent(t.a_cuenta))}</p>}</div>
+            <div className="text-right"><p className="text-[13.5px] text-[#6b7079]">Pendiente</p><p className="num text-[40px] font-light leading-tight tracking-[-0.03em]">{euros(pendienteCent(t))}</p></div>
           </div>
-          <p className="mt-3 text-center text-[11px] text-[#6b7079]">Presenta este ticket para recoger tus prendas</p>
+          <p className="mt-3 text-center text-[11.5px] text-[#6b7079]">Presenta este ticket para recoger tus prendas</p>
         </div>
       </article>
     </Hoja>

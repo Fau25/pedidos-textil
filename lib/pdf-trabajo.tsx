@@ -10,13 +10,14 @@ const f = (d?: string | null, larga = false) => (d ? new Date(d.length === 10 ? 
 const iniciales = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("") || "·";
 
 const s = StyleSheet.create({
-  pag: { fontFamily: "Inter", fontSize: 8.5, color: OSC, backgroundColor: "#FFFFFF", lineHeight: 1.35 },
+  pag: { fontFamily: "Inter", fontSize: 10.5, color: OSC, backgroundColor: "#FFFFFF", lineHeight: 1.35 },
   cab: { backgroundColor: LATERAL, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
   fila: { flexDirection: "row", justifyContent: "space-between" },
-  peq: { fontSize: 6.5, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: GRIS },
+  peq: { fontSize: 7, fontWeight: 600, letterSpacing: 0.8, textTransform: "uppercase", color: GRIS },
   ini: { width: 22, height: 22, borderRadius: 5, backgroundColor: OSC, color: "#FFFFFF", fontSize: 7.5, fontWeight: 600, textAlign: "center", paddingTop: 6, marginRight: 8 },
   cuerpo: { paddingHorizontal: 20, paddingTop: 6, flexGrow: 1 },
-  item: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: LINEA },
+  item: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: LINEA, flexDirection: "row", alignItems: "flex-start" },
+  caja: { minWidth: 22, height: 22, borderRadius: 5, backgroundColor: LATERAL, fontSize: 12, fontWeight: 600, textAlign: "center", paddingTop: 5, paddingHorizontal: 3, marginRight: 8 },
 });
 
 function Ticket({ t, emp }: { t: Trabajo; emp: Empresa }) {
@@ -27,35 +28,38 @@ function Ticket({ t, emp }: { t: Trabajo; emp: Empresa }) {
         <View style={s.cab}>
           <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
             <Text style={s.ini}>{iniciales(emp.nombre)}</Text>
-            <View style={{ flexGrow: 1, flexShrink: 1 }}><Text style={{ fontWeight: 600, fontSize: 9.5 }}>{emp.nombre}</Text>{emp.telefono ? <Text style={{ color: GRIS }}>{emp.telefono}</Text> : null}</View>
+            <View style={{ flexGrow: 1, flexShrink: 1 }}><Text style={{ fontWeight: 600, fontSize: 11 }}>{emp.nombre}</Text>{emp.telefono ? <Text style={{ color: GRIS }}>{emp.telefono}</Text> : null}</View>
             <View style={{ alignItems: "flex-end" }}>
-              <Text style={{ fontSize: 22, fontWeight: 300, letterSpacing: -0.6, lineHeight: 1 }}>{t.numero ?? ""}</Text>
-              <Text style={{ color: GRIS, fontSize: 7, marginTop: 3 }}>Ticket · {f(t.creado)}</Text>
+              <Text style={{ fontSize: 24, fontWeight: 300, letterSpacing: -0.6, lineHeight: 1 }}>{t.numero ?? ""}</Text>
+              <Text style={{ color: GRIS, fontSize: 7, marginTop: 6 }}>Ticket · {f(t.creado)}</Text>
             </View>
           </View>
           <View style={[s.fila, { marginTop: 12 }]}>
-            <View style={{ maxWidth: 150 }}><Text style={s.peq}>Cliente</Text><Text style={{ fontWeight: 600 }}>{t.cliente_nombre || "—"}</Text>{t.cliente_telefono ? <Text style={{ color: GRIS }}>{t.cliente_telefono}</Text> : null}</View>
-            {t.entrega ? <View style={{ alignItems: "flex-end" }}><Text style={s.peq}>Recoger el</Text><Text style={{ fontWeight: 600 }}>{f(t.entrega, true)}</Text></View> : null}
+            <View style={{ maxWidth: 150 }}><Text style={s.peq}>Cliente</Text><Text style={{ fontWeight: 600, fontSize: 11 }}>{t.cliente_nombre || "—"}</Text>{t.cliente_telefono ? <Text style={{ color: GRIS }}>{t.cliente_telefono}</Text> : null}</View>
+            {t.entrega ? <View style={{ alignItems: "flex-end" }}><Text style={s.peq}>Recoger el</Text><Text style={{ fontWeight: 600, fontSize: 11 }}>{f(t.entrega, true)}</Text></View> : null}
           </View>
         </View>
         <View style={s.cuerpo}>
           {items.map((i) => (
             <View key={i.id} style={s.item} wrap={false}>
-              <Text style={{ fontWeight: 600 }}>{i.cantidad} × {i.que || "Trabajo"}</Text>
-              {i.tecnica || i.ubicaciones?.length ? <Text style={{ color: GRIS, fontSize: 7.5 }}>{[i.tecnica, ...(i.ubicaciones ?? []).map((u) => CORTO[u] ?? u)].filter(Boolean).join(" · ")}</Text> : null}
-              {i.detalle ? <Text style={{ color: GRIS, fontSize: 7.5 }}>{i.detalle}</Text> : null}
+              <Text style={s.caja}>{i.cantidad}</Text>
+              <View style={{ flexGrow: 1, flexShrink: 1 }}>
+                <Text style={{ fontWeight: 600, fontSize: 12 }}>{i.que || "Trabajo"}</Text>
+                {i.tecnica || i.ubicaciones?.length ? <Text style={{ color: GRIS, fontSize: 9 }}>{[i.tecnica, ...(i.ubicaciones ?? []).map((u) => CORTO[u] ?? u)].filter(Boolean).join(" · ")}</Text> : null}
+                {i.detalle ? <Text style={{ color: GRIS, fontSize: 9 }}>{i.detalle}</Text> : null}
+              </View>
             </View>
           ))}
           {t.notas ? <Text style={{ color: GRIS, marginTop: 6 }}>{t.notas}</Text> : null}
         </View>
-        <View style={{ marginHorizontal: 20, marginBottom: 16, paddingTop: 9, borderTopWidth: 1, borderTopColor: OSC, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <View style={{ color: GRIS, fontSize: 7.5 }}>
+        <View style={{ marginHorizontal: 20, marginBottom: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: OSC, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <View style={{ color: GRIS, fontSize: 9 }}>
             <Text>Total {e(Math.round(Number(t.total) * 100))}</Text>
             {Number(t.a_cuenta) > 0 ? <Text>A cuenta {e(Math.round(Number(t.a_cuenta) * 100))}</Text> : null}
           </View>
-          <View style={{ alignItems: "flex-end" }}><Text style={{ color: GRIS, fontSize: 7.5 }}>Pendiente</Text><Text style={{ fontSize: 22, fontWeight: 300, letterSpacing: -0.6 }}>{e(pendienteCent(t))}</Text></View>
+          <View style={{ alignItems: "flex-end" }}><Text style={{ color: GRIS, fontSize: 9 }}>Pendiente</Text><Text style={{ fontSize: 26, fontWeight: 300, letterSpacing: -0.6, lineHeight: 1.1 }}>{e(pendienteCent(t))}</Text></View>
         </View>
-        <Text style={{ textAlign: "center", color: GRIS, fontSize: 6.5, marginBottom: 12 }}>Presenta este ticket para recoger tus prendas</Text>
+        <Text style={{ textAlign: "center", color: GRIS, fontSize: 7, marginBottom: 12 }}>Presenta este ticket para recoger tus prendas</Text>
       </Page>
     </Document>
   );
