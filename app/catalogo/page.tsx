@@ -25,7 +25,8 @@ export default function Catalogo() {
 }
 
 function Prendas() {
-  const { empresa, proveedores } = useSesion();
+  const { empresa, proveedores, rol } = useSesion();
+  const [cargandoRoly, setCargandoRoly] = useState(false);
   const { aviso } = useAvisos();
   const [ed, setEd] = useState<Partial<Prenda> | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -41,6 +42,17 @@ function Prendas() {
     : actual === HABITUALES ? p.favorito : categoria(p.tipo) === actual))
     .sort((a, b) => Number(b.favorito) - Number(a.favorito) || (a.modelo ?? "").localeCompare(b.modelo ?? "", "es")); // habituales primero
   const total = datos?.length ?? 0;
+
+  const deRoly = (datos ?? []).filter((p) => /roly/i.test(p.marca ?? "")).length;
+  async function traerRoly() {
+    setCargandoRoly(true);
+    try {
+      const { ponerRolyAlDia } = await import("@/lib/roly-al-dia");
+      const r = await ponerRolyAlDia(empresa!.id);
+      try { localStorage.setItem("roly-2026c:" + empresa!.id, "1"); } catch { /* nada */ }
+      recargar(); aviso(r.nuevos ? `Añadidos ${r.nuevos} modelos de Roly` : "El catálogo de Roly ya estaba al día");
+    } catch (e) { aviso(textoError(e), "error"); } finally { setCargandoRoly(false); }
+  }
 
   async function estrella(p: Prenda) {
     setDatos((d) => d?.map((x) => (x.id === p.id ? { ...x, favorito: !x.favorito } : x)) ?? null);
@@ -65,6 +77,14 @@ function Prendas() {
           <Boton variante="primario" onClick={() => setEd({ tipo: "Camiseta", marca: "Roly", colores: [], tallas: [], precio_compra: 0, precio_venta: null })}><Plus className="size-4" />Añadir</Boton>
         </div>
       </div>
+      {datos && deRoly < 80 && (rol === "propietario" || rol === "editor") && (
+        <div className="mb-5 flex flex-wrap items-center gap-4 rounded-[22px] bg-[#17181c] p-5 text-white dark:bg-[#24262c]">
+          <span className="grid size-11 shrink-0 place-items-center rounded-full bg-white/12"><Shirt className="size-5" /></span>
+          <div className="min-w-0 flex-1"><p className="font-semibold">Carga el catálogo de Roly</p>
+            <p className="text-[13px] text-white/65">93 modelos de camisetas, polos, sudaderas y chaquetas con sus fotos y colores. Luego marca con ★ los que más uses.</p></div>
+          <Boton variante="primario" cargando={cargandoRoly} onClick={traerRoly} className="bg-white text-[#17181c] hover:bg-white/90">Cargar catálogo</Boton>
+        </div>
+      )}
       {!q && cats.length > 0 && (
         <nav aria-label="Categorías" className="-mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-1">
           {cats.map((c) => (

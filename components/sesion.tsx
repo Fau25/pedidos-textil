@@ -4,8 +4,9 @@ import type { Session } from "@supabase/supabase-js";
 import { sb, SUPABASE_URL } from "@/lib/supabase";
 import { salir } from "@/lib/supabase";
 import type { Empresa, TarifaFila, Tecnica, Proveedor } from "@/lib/tipos";
-import { fijarEmpresaErrores } from "@/lib/errores";
-import { MODELOS_ROLY, REFERENCIAS_ROLY, TALLAS_ADULTO, TALLAS_NINO, cargarCatalogoRoly } from "@/lib/roly";
+import { apuntarError, fijarEmpresaErrores } from "@/lib/errores";
+import { ponerRolyAlDia } from "@/lib/roly-al-dia";
+import { MODELOS_ROLY } from "@/lib/roly";
 
 type Datos = {
   sesion: Session | null;
@@ -127,37 +128,9 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     const clave = "roly-2026c:" + empresa.id; // c: sin prendas de bebé
     try { if (localStorage.getItem(clave)) return; } catch { return; }
     let vivo = true;
-    const espera = setTimeout(() => vivo && (async () => { // en diferido: no compite con la carga de la pantalla
-      const CATALOGO_ROLY = await cargarCatalogoRoly();
-      const norm = (x?: string | null) => (x ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      const { data, error } = await sb.from("catalogo").select("id, modelo, referencia, notas, imagen_path, colores").eq("empresa_id", empresa.id).ilike("marca", "roly");
-      if (error) return;
-      const BEBE = ["BD7200", "BD7202", "CA7203", "CA6564"]; // quitadas del catálogo (bebé)
-      const fuera = (data ?? []).filter((f) => BEBE.includes(f.referencia ?? ""));
-      if (fuera.length) { const { error: e } = await sb.from("catalogo").delete().in("id", fuera.map((f) => f.id)); if (e) return; }
-      const filas = (data ?? []).filter((f) => !BEBE.includes(f.referencia ?? ""));
-      // primero, referencias de los modelos antiguos que no la tenían
-      for (const p of filas) { const r = REFERENCIAS_ROLY[p.modelo ?? ""]; if (r && !p.referencia) p.referencia = r; }
-      const nuevos = []; const cambios: { id: string; c: Record<string, unknown> }[] = [];
-      for (const m of CATALOGO_ROLY) {
-        const p = filas.find((f) => f.referencia === m.ref) ?? filas.find((f) => !f.referencia && norm(f.modelo) === norm(m.modelo));
-        if (p) {
-          const c: Record<string, unknown> = {};
-          if (p.referencia !== m.ref) c.referencia = m.ref;
-          if (m.colores.length && JSON.stringify(p.colores ?? []) !== JSON.stringify(m.colores)) c.colores = m.colores;
-          if (!p.imagen_path) c.imagen_path = "roly:" + m.ref;
-          if (p.notas === "Revisa referencia y colores" || (p.notas === "Revisa los colores" && m.colores.length)) c.notas = null;
-          if (Object.keys(c).length) cambios.push({ id: p.id, c }); // solo lo que de verdad cambia
-        } else nuevos.push({ empresa_id: empresa.id, marca: "Roly", tipo: m.tipo, modelo: m.modelo, referencia: m.ref, colores: m.colores,
-          tallas: m.ninos ? TALLAS_NINO : TALLAS_ADULTO, favorito: false, precio_compra: 0, imagen_path: "roly:" + m.ref, notas: m.colores.length ? null : "Revisa los colores" });
-      }
-      for (let i = 0; i < cambios.length; i += 8) {
-        const r = await Promise.all(cambios.slice(i, i + 8).map((x) => sb.from("catalogo").update(x.c).eq("id", x.id)));
-        if (r.some((x) => x.error)) return;
-      }
-      if (nuevos.length) { const { error: e } = await sb.from("catalogo").insert(nuevos); if (e) return; }
-      try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento */ }
-    })().catch(() => {}), 4000);
+    const espera = setTimeout(() => vivo && ponerRolyAlDia(empresa.id)
+      .then(() => { try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento */ } })
+      .catch((e) => apuntarError(e, "roly-al-dia")), 4000); // en diferido: no compite con la carga de la pantalla
     return () => { vivo = false; clearTimeout(espera); };
   }, [empresa, rol]);
 

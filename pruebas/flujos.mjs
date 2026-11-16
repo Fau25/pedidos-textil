@@ -397,6 +397,17 @@ await prueba("el ticket del pedido se genera y se puede enviar o descargar", asy
   assert.deepEqual(errores, []); await ctx.close();
 });
 
+await prueba("un taller nuevo puede cargar el catálogo de Roly desde Catálogo", async () => {
+  const { ctx, p, escrituras, errores } = await abrir();
+  await p.addInitScript((e) => localStorage.setItem("roly-2026c:" + e, "1"), E); // que no lo haga solo al entrar
+  await ir(p, "catalogo/");
+  await p.getByRole("button", { name: "Cargar catálogo" }).click();
+  await p.getByText(/Añadidos \d+ modelos de Roly|ya estaba al día/).waitFor();
+  const alta = escrituras.find((e) => e.tabla === "catalogo" && e.metodo === "POST");
+  assert.ok(alta && Array.isArray(alta.cuerpo) && alta.cuerpo.length > 50, "da de alta los modelos");
+  assert.deepEqual(errores, []); await ctx.close();
+});
+
 await prueba("cobros: marcar un pedido como pagado y ver las cuentas", async () => {
   const { ctx, p, escrituras, errores } = await abrir();
   await ir(p, "pedidos/");
