@@ -16,7 +16,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(r.url);
   // Fotos de Supabase (catálogo, prendas, logos): la primera vez se descargan y después salen del dispositivo.
   // La clave es la ruta sin el token, que cambia aunque la foto sea la misma.
-  if (r.method === "GET" && url.hostname.endsWith(".supabase.co") && url.pathname.startsWith("/storage/v1/object/sign/")) {
+  if (r.method === "GET" && url.hostname.endsWith(".supabase.co") && (url.pathname.startsWith("/storage/v1/object/sign/") || url.pathname.startsWith("/storage/v1/object/public/"))) {
     const clave = new Request(url.origin + url.pathname);
     e.respondWith(caches.open(FOTOS).then((c) => c.match(clave).then((m) => m || fetch(r.url, { mode: "cors", credentials: "omit" }).then((res) => { if (res.ok) c.put(clave, res.clone()); return res; }).catch(() => fetch(r)))));
     return;

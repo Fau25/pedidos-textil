@@ -61,10 +61,23 @@ function pedirFirma(bucket: string, ruta: string): Promise<string | null> {
   });
 }
 
+/* Fotos de Roly: el cajón «roly» es público (SQL 14), así que se piden directamente, sin firma.
+   Si aún no lo es (la foto pública falla), se vuelve a la firma durante unas horas. */
+const CLAVE_PUB = "roly-privado-hasta";
+let rolyPrivadoHasta = (() => { try { return Number(localStorage.getItem(CLAVE_PUB) || 0); } catch { return 0; } })();
+export const esRolyPublica = (u?: string | null) => !!u && u.includes("/storage/v1/object/public/roly/");
+export function marcarRolyPrivado() { rolyPrivadoHasta = Date.now() + 6 * 3600e3; try { localStorage.setItem(CLAVE_PUB, String(rolyPrivadoHasta)); } catch { /* nada */ } }
+function urlRolyPublica(path: string): string | null {
+  if (Date.now() < rolyPrivadoHasta) return null;
+  const ruta = path.startsWith("roly-mini:") ? "mini/" + path.slice(10) + ".webp" : path.startsWith("roly:") ? path.slice(5) + ".jpg" : null;
+  return ruta ? `${SUPABASE_URL}/storage/v1/object/public/roly/${ruta}` : null;
+}
+
 /** URL ya firmada y vigente (sin esperar): para pintar la foto en el primer momento */
 export function urlCacheada(path?: string | null): string | null {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
+  const pub = urlRolyPublica(path); if (pub) return pub;
   const hit = cacheUrl.get(path);
   return hit && hit.hasta > Date.now() ? hit.url : null;
 }
@@ -73,6 +86,7 @@ export function urlCacheada(path?: string | null): string | null {
 export async function urlArchivo(path?: string | null): Promise<string | null> {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
+  const pub = urlRolyPublica(path); if (pub) return pub;
   const hit = cacheUrl.get(path);
   if (hit && hit.hasta > Date.now()) return hit.url;
   const [bucket, ruta] = path.startsWith("roly-mini:") ? ["roly", "mini/" + path.slice(10) + ".webp"]

@@ -396,20 +396,26 @@ await prueba("trabajos: lista por estado, marcar listo y avisar por WhatsApp", a
   await p.getByText(/vuelve a «sin cobrar»/).waitFor();
   assert.deepEqual(errores, []); await ctx.close();
 });
-await prueba("las fotos del catálogo se firman en un solo lote y se ven", async () => {
+for (const publico of [true, false]) await prueba(publico ? "las fotos de Roly se piden directamente (cajón público), sin firmas" : "si el cajón de Roly aún no es público, se firman en un solo lote", async () => {
   const { ctx, p, errores } = await abrir();
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
   let firmas = 0;
+  await ctx.route("**/storage/v1/object/public/roly/**", (r) => (publico ? r.fulfill({ status: 200, contentType: "image/png", body: png }) : r.fulfill({ status: 400, contentType: "application/json", body: '{"error":"Bucket not found"}' })));
   await ctx.route("**/storage/v1/object/sign/roly", async (r) => { firmas++; const { paths } = r.request().postDataJSON();
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paths.map((x) => ({ path: x, signedURL: "/object/sign/roly/" + x + "?token=t", error: null }))) }); });
   await ctx.route("**/storage/v1/object/sign/roly/mini/*.webp*", (r) => r.fulfill({ status: 200, contentType: "image/png", body: png }));
   T.catalogo.push({ ...T.catalogo[0], id: "c2", modelo: "Samoyedo", referencia: "CA6503", imagen_path: "roly:CA6503" });
   T.catalogo[0] = { ...T.catalogo[0], imagen_path: "roly:CA6554" };
-  await ir(p, "catalogo/"); await p.waitForTimeout(800);
-  assert.equal(firmas, 1, "un solo lote de firmas");
-  assert.equal(await p.locator('main img[src*="roly/mini/CA6554.webp"]').count(), 1, "en las fichas, la miniatura");
+  await ir(p, "catalogo/"); await p.waitForTimeout(1200);
+  if (publico) {
+    assert.equal(firmas, 0, "sin firmas");
+    assert.equal(await p.locator('main img[src*="/object/public/roly/mini/CA6554.webp"]').count(), 1, "la miniatura pública");
+  } else {
+    assert.equal(firmas, 1, "un solo lote de firmas");
+    assert.equal(await p.locator('main img[src*="/object/sign/roly/mini/CA6554.webp"]').count(), 1, "la miniatura firmada");
+  }
   T.catalogo = T.catalogo.slice(0, 1); T.catalogo[0] = { ...T.catalogo[0], imagen_path: null };
-  assert.deepEqual(errores, []); await ctx.close();
+  assert.deepEqual(errores.filter((e) => !/400|Bad Request/.test(e)), []); await ctx.close();
 });
 
 await prueba("el ticket del pedido se genera y se puede enviar o descargar", async () => {

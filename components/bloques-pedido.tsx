@@ -4,7 +4,7 @@ import { Camera, ChevronDown, Copy, Loader2, Pencil, Search, Trash2 } from "luci
 import { useSesion } from "./sesion";
 import { Campo, CampoImporte, cx, useAvisos } from "./ui";
 import { Muestra, Prenda as Dibujo, colorTela } from "./muestra";
-import { miniDe, subirArchivo, textoError, urlArchivo, urlCacheada } from "@/lib/supabase";
+import { esRolyPublica, marcarRolyPrivado, miniDe, subirArchivo, textoError, urlArchivo, urlCacheada } from "@/lib/supabase";
 import { euros, precioVentaUd } from "@/lib/calculo";
 import { ordenTalla, type LineaEd } from "@/lib/pedidos";
 import { TALLAS, TALLAS_NINO, TIPOS_PRENDA, type Prenda } from "@/lib/tipos";
@@ -38,7 +38,7 @@ export function FotoPrenda({ path: original, tipo, color, className, cubrir, min
     <div className={cx("relative grid place-items-center overflow-hidden rounded-[18px] bg-suave", className)}>
       {dibujo ? <Dibujo tipo={tipo} color={color} className="size-[78%]" /> : u ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={u} alt={tipo} loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setLista(true)} onError={() => (path !== original ? setSinMini(true) : setFalla(true))}
+        <img src={u} alt={tipo} loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setLista(true)} onError={() => { if (esRolyPublica(u)) { marcarRolyPrivado(); urlArchivo(path).then((x) => (x ? setU(x) : path !== original ? setSinMini(true) : setFalla(true))); return; } if (path !== original) setSinMini(true); else setFalla(true); }}
           className={cx("size-full transition-opacity duration-200", lista ? "opacity-100" : "opacity-0", cubrir ? "object-cover object-top" : "object-contain")} />
       ) : null}
     </div>
