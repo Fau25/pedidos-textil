@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Check, Plus, Search, ArrowUpRight, Sparkles } from "lucide-react";
+import { Check, Plus, Search, ArrowUpRight, Sparkles, CalendarDays } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cargando, cx, fecha, useAvisos } from "@/components/ui";
 import { Prenda } from "@/components/muestra";
@@ -9,6 +9,7 @@ import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
 import { conPago, marcarEntregado } from "@/lib/pedidos";
+import { ESTILO_ESTADO, NOMBRE_ESTADO, cuando, resumenItems, sinTablaTrabajos, type Trabajo } from "@/lib/trabajos";
 
 type Linea = { tipo: string; marca: string | null; modelo: string | null; color: string | null; orden: number };
 type Fila = {
@@ -22,6 +23,13 @@ export default function Inicio() {
   const { empresa, sesion } = useSesion();
   const { aviso } = useAvisos();
   const [vista, setVista] = useState<Vista>("pendientes");
+  // Trabajos («Recibí») por hacer o listos para recoger
+  const { datos: trabajos } = useCarga(async () => {
+    const { data, error } = await sb.from("trabajos").select("id, numero, cliente_nombre, entrega, estado, items")
+      .eq("empresa_id", empresa!.id).neq("estado", "entregado").order("entrega", { ascending: true, nullsFirst: false }).limit(200);
+    if (error) { if (sinTablaTrabajos(error)) return []; throw error; }
+    return (data ?? []) as Pick<Trabajo, "id" | "numero" | "cliente_nombre" | "entrega" | "estado" | "items">[];
+  });
   const { datos, setDatos, error, recargar } = useCarga(async () => {
     return conPago<Fila[]>((x) => sb.from("pedidos")
       .select(`id, numero, fecha, total, unidades, referencia, entregado, entregado_en${x}, clientes(nombre), pedido_lineas(tipo, marca, modelo, color, orden), personalizaciones(tecnica)`)
@@ -30,7 +38,6 @@ export default function Inicio() {
 
   const pendientes = useMemo(() => (datos ?? []).filter((p) => !p.entregado).sort((a, b) => (a.fecha < b.fecha ? -1 : 1)), [datos]);
   const entregados = useMemo(() => (datos ?? []).filter((p) => p.entregado).sort((a, b) => ((a.entregado_en ?? "") < (b.entregado_en ?? "") ? 1 : -1)), [datos]);
-  const udsPendientes = pendientes.reduce((a, p) => a + (p.unidades || 0), 0);
   const lista = vista === "pendientes" ? pendientes : entregados.slice(0, 24);
 
   async function cambiar(p: Fila, v: boolean) {
@@ -73,13 +80,39 @@ export default function Inicio() {
         <Search className="size-[18px]" />Buscar pedido, cliente o prenda
       </button>
 
+      {/* Trabajos pendientes */}
+      {!!trabajos?.length && (
+        <section className="mb-8" aria-labelledby="t-trabajos">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 id="t-trabajos" className="text-[15px] font-semibold">Trabajos pendientes <span className="num font-medium text-texto2">· {trabajos.length}</span></h2>
+            <Link href="/trabajos/" className="ml-auto flex h-10 items-center gap-1 px-1 text-[13px] font-medium text-azul">Ver todos <ArrowUpRight className="size-3.5" /></Link>
+          </div>
+          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {trabajos.slice(0, 6).map((t) => {
+              const tarde = t.estado === "pendiente" && !!t.entrega && t.entrega < new Date().toISOString().slice(0, 10);
+              return (
+                <Link key={t.id} href={`/trabajos/nuevo/?id=${t.id}`} className="tarjeta flex items-center gap-3 p-4 transition-shadow hover:shadow-[0_16px_36px_-16px_rgba(16,18,24,0.22)]">
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-[15px]">{t.cliente_nombre || "Sin nombre"}</b>
+                    <span className="block truncate text-[12.5px] text-texto2"><span className="num">{t.numero}</span> · {resumenItems(t) || "—"}</span>
+                    <span className={cx("mt-1 flex items-center gap-1 text-[12.5px]", tarde ? "font-semibold text-red-600" : "text-texto2")}><CalendarDays className="size-3.5" />{cuando(t.entrega)}</span>
+                  </span>
+                  <span className={cx("shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-bold", ESTILO_ESTADO[t.estado])}>{NOMBRE_ESTADO[t.estado]}</span>
+                </Link>
+              );
+            })}
+          </div>
+          {trabajos.length > 6 && <Link href="/trabajos/" className="mt-2.5 block text-center text-[13px] font-medium text-azul">Ver los {trabajos.length - 6} restantes</Link>}
+        </section>
+      )}
+
       {/* Chips */}
       <div className="mb-4 flex items-center gap-2">
-        {([["pendientes", `Pendientes · ${pendientes.length}${udsPendientes ? ` (${udsPendientes} uds)` : ""}`], ["entregados", "Entregados"]] as [Vista, string][]).map(([v, t]) => (
+        {([["pendientes", `Pendientes · ${pendientes.length}`], ["entregados", "Entregados"]] as [Vista, string][]).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)} aria-pressed={vista === v}
-            className={cx("h-10 rounded-full px-5 text-[13px] font-medium transition-colors", vista === v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>{t}</button>
+            className={cx("h-10 whitespace-nowrap rounded-full px-4 text-[13px] font-medium transition-colors", vista === v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>{t}</button>
         ))}
-        <Link href={`/pedidos/${vista === "entregados" ? "?ver=entregados" : ""}`} className="ml-auto flex h-10 items-center gap-1 px-1 text-[13px] font-medium text-azul">Ver lista <ArrowUpRight className="size-3.5" /></Link>
+        <Link href={`/pedidos/${vista === "entregados" ? "?ver=entregados" : ""}`} className="ml-auto flex h-10 items-center gap-1 whitespace-nowrap px-1 text-[13px] font-medium text-azul">Ver lista <ArrowUpRight className="size-3.5" /></Link>
       </div>
 
       {/* Tarjetas de pedidos */}

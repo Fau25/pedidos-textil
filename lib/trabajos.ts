@@ -94,3 +94,20 @@ export async function compartirTicketTrabajo(t: Trabajo, empresa: Empresa, soloD
   const nombre = `Ticket ${t.numero ?? ""} ${t.cliente_nombre ?? ""}.pdf`.replace(/\s+/g, " ").trim();
   return entregarPDF(blob, nombre, `Ticket ${t.numero}`, soloDescargar);
 }
+
+export const ESTILO_ESTADO: Record<EstadoTrabajo, string> = {
+  pendiente: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
+  listo: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+  entregado: "bg-suave text-texto2",
+};
+export const NOMBRE_ESTADO: Record<EstadoTrabajo, string> = { pendiente: "Por hacer", listo: "Listo", entregado: "Entregado" };
+
+/** Para cuándo: hoy, mañana, ayer o la fecha corta */
+export function cuando(d: string | null) {
+  if (!d) return "Sin fecha";
+  const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
+  const dias = Math.round((new Date(d + "T12:00:00").getTime() - hoy.getTime()) / 864e5);
+  if (dias === 0) return "Para hoy"; if (dias === 1) return "Para mañana"; if (dias === -1) return "Era para ayer";
+  const txt = new Date(d + "T12:00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+  return dias < 0 ? `Era para el ${txt}` : `Para el ${txt}`;
+}

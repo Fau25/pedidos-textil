@@ -10,27 +10,10 @@ import { TicketTrabajo } from "@/components/ticket-trabajo";
 import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { euros } from "@/lib/calculo";
-import { AVISO_SIN_TRABAJOS, cambiarEstado, cobrar, deshacerCobro, estaPagado, mensajeListo, pendienteCent, resumenItems, sinTablaTrabajos, unidades, type EstadoTrabajo, type Trabajo } from "@/lib/trabajos";
+import { AVISO_SIN_TRABAJOS, ESTILO_ESTADO as ESTILO, NOMBRE_ESTADO as NOMBRE, cuando, cambiarEstado, cobrar, deshacerCobro, estaPagado, mensajeListo, pendienteCent, resumenItems, sinTablaTrabajos, unidades, type EstadoTrabajo, type Trabajo } from "@/lib/trabajos";
 
 type Filtro = EstadoTrabajo | "sincobrar";
 const FILTROS: { v: Filtro; t: string }[] = [{ v: "pendiente", t: "Por hacer" }, { v: "listo", t: "Listos" }, { v: "entregado", t: "Entregados" }, { v: "sincobrar", t: "Sin cobrar" }];
-const ESTILO: Record<EstadoTrabajo, string> = {
-  pendiente: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
-  listo: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
-  entregado: "bg-suave text-texto2",
-};
-const NOMBRE: Record<EstadoTrabajo, string> = { pendiente: "Por hacer", listo: "Listo", entregado: "Entregado" };
-
-/** Para cuándo: hoy, mañana, ayer o la fecha corta */
-function cuando(d: string | null) {
-  if (!d) return "Sin fecha";
-  const hoy = new Date(); hoy.setHours(12, 0, 0, 0);
-  const dias = Math.round((new Date(d + "T12:00:00").getTime() - hoy.getTime()) / 864e5);
-  if (dias === 0) return "Para hoy"; if (dias === 1) return "Para mañana"; if (dias === -1) return "Era para ayer";
-  const txt = new Date(d + "T12:00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
-  return dias < 0 ? `Era para el ${txt}` : `Para el ${txt}`;
-}
-
 export default function Trabajos() {
   const { empresa, rol } = useSesion();
   const { aviso } = useAvisos();

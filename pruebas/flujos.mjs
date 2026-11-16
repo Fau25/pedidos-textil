@@ -412,6 +412,14 @@ await prueba("un taller nuevo puede cargar el catálogo de Roly desde Catálogo"
   assert.deepEqual(errores, []); await ctx.close();
 });
 
+await prueba("el inicio enseña los trabajos pendientes", async () => {
+  const { ctx, p, errores } = await abrir();
+  await ir(p, "");
+  await p.getByRole("heading", { name: /Trabajos pendientes/ }).waitFor();
+  await p.getByRole("link", { name: /T-0007/ }).first().waitFor();
+  assert.deepEqual(errores, []); await ctx.close();
+});
+
 await prueba("cobros: marcar un pedido como pagado y ver las cuentas", async () => {
   const { ctx, p, escrituras, errores } = await abrir();
   await ir(p, "pedidos/");
