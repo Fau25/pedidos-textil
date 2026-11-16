@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ClipboardList, Euro, ShoppingBag } from "lucide-react";
+import { ClipboardList, Euro, FileText, Search, ShoppingBag } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Cargando, cx, fecha, useAvisos } from "@/components/ui";
@@ -9,6 +9,8 @@ import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
 import { AVISO_SIN_COBROS, conPago, marcarPagado } from "@/lib/pedidos";
+import { VerFactura } from "@/components/factura";
+import { listarFacturas, type Factura } from "@/lib/facturas";
 import { cobrar, deshacerCobro, pendienteCent, sinTablaTrabajos, type Trabajo } from "@/lib/trabajos";
 
 type FilaPedido = { id: string; numero: string; fecha: string; total: number; pagado_en?: string | null; clientes: { nombre: string } | null };
@@ -24,7 +26,9 @@ const ultimosMeses = (n: number) => { const d = new Date(); return Array.from({ 
 export default function Cuentas() {
   const { empresa } = useSesion();
   const { aviso } = useAvisos();
-  const [vista, setVista] = useState<"cobrar" | "cobrado">("cobrar");
+  const [vista, setVista] = useState<"cobrar" | "cobrado" | "facturas">(() => (typeof location !== "undefined" && location.search.includes("facturas") ? "facturas" : "cobrar"));
+  const [qf, setQf] = useState("");
+  const [abierta, setAbierta] = useState<Factura | null>(null);
   const meses = useMemo(() => ultimosMeses(12), []);
   const [mes, setMes] = useState(meses[meses.length - 1]);
   const [encima, setEncima] = useState<string | null>(null);
@@ -41,6 +45,12 @@ export default function Cuentas() {
     ]);
     return { pedidos, trabajos: tr, conCobros: !pedidos.length || "pagado_en" in pedidos[0] };
   });
+
+  const { datos: facturas, setDatos: setFacturas } = useCarga(() => listarFacturas(empresa!.id));
+  const nrm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const listaFacturas = (facturas ?? []).filter((f) => !qf.trim() || nrm([f.numero, f.datos.cliente?.nombre, f.datos.cliente?.nif, f.datos.pedido?.numero].join(" ")).includes(nrm(qf.trim())));
+  const añoActual = String(new Date().getFullYear());
+  const facturadoAño = (facturas ?? []).filter((f) => f.fecha.startsWith(añoActual)).reduce((a, f) => a + aCent(f.total), 0);
 
   const c = useMemo(() => {
     const porCobrar: Mov[] = [], cobrados: Mov[] = [];
@@ -168,31 +178,65 @@ export default function Cuentas() {
       </section>
 
       {/* Listas */}
-      <div className="mb-3 flex gap-2">
-        {([["cobrar", `Por cobrar · ${c.porCobrar.length}`], ["cobrado", `Cobrado en ${nombreMes(mes, true).split(" ")[0].toLowerCase()} · ${delMes.length}`]] as const).map(([v, t]) => (
+      <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
+        {([["cobrar", `Por cobrar · ${c.porCobrar.length}`], ["cobrado", `Cobrado en ${nombreMes(mes, true).split(" ")[0].toLowerCase()} · ${delMes.length}`], ["facturas", `Facturas · ${facturas?.length ?? 0}`]] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)} aria-pressed={vista === v}
-            className={cx("h-10 rounded-full px-5 text-[13px] font-medium transition-colors", vista === v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>{t}</button>
+            className={cx("h-10 shrink-0 whitespace-nowrap rounded-full px-4 text-[13px] font-medium transition-colors", vista === v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>{t}</button>
         ))}
       </div>
+      {vista === "facturas" ? (
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <label className="relative min-w-0 flex-1 sm:max-w-sm"><span className="sr-only">Buscar factura</span>
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-texto2" />
+              <input className="campo pl-10" placeholder="Buscar por número, cliente o NIF" value={qf} onChange={(e) => setQf(e.target.value)} /></label>
+            <p className="text-[13px] text-texto2">Facturado en {añoActual}: <b className="num text-texto">{euros(facturadoAño)}</b></p>
+          </div>
+          <div className="tarjeta overflow-hidden">
+            {!facturas ? <p className="py-12 text-center text-texto2">Cargando…</p> : !listaFacturas.length ? (
+              <p className="px-6 py-12 text-center text-texto2">{qf ? "Ninguna factura coincide." : "Aún no hay facturas. Se crean desde un pedido con «Generar factura»."}</p>
+            ) : (
+              <ul className="divide-y divide-borde">
+                {listaFacturas.map((f) => (
+                  <li key={f.id}>
+                    <button onClick={() => setAbierta(f)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-suave/60">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-suave text-texto2"><FileText className="size-4" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{f.datos.cliente?.nombre || "Sin cliente"}</span>
+                        <span className="block truncate text-[12px] text-texto2"><span className="num font-semibold text-texto">{f.numero}</span> · {fecha(f.fecha)}{f.datos.pedido?.numero ? ` · pedido ${f.datos.pedido.numero}` : ""}{(f as { editado?: string | null }).editado ? " · modificada" : ""}</span>
+                      </span>
+                      <span className="num shrink-0 text-[14px] font-semibold">{euros(aCent(f.total))}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      ) : (
       <div className="tarjeta overflow-hidden">
-        {!lista.length ? <p className="py-12 text-center text-texto2">{vista === "cobrar" ? "Todo cobrado 🎉" : "Nada cobrado este mes."}</p> : (
-          <ul className="divide-y divide-borde">
-            {lista.map((m) => (
-              <li key={m.tipo + m.id + (m.aCuenta ? "a" : "")} className="flex items-center gap-3 px-4 py-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-suave text-texto2" title={m.tipo === "pedido" ? "Pedido" : "Trabajo"}>
-                  {m.tipo === "pedido" ? <ShoppingBag className="size-4" /> : <ClipboardList className="size-4" />}
-                </span>
-                <Link href={m.tipo === "pedido" ? `/pedidos/ver/?id=${m.id}` : `/trabajos/nuevo/?id=${m.id}`} className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{m.cliente}</span>
-                  <span className="block truncate text-[12px] text-texto2"><span className="num">{m.numero}</span> · {m.tipo === "pedido" ? "Pedido" : "Trabajo"} · {vista === "cobrar" ? `desde ${fecha(m.cuando.slice(0, 10))}` : m.aCuenta ? `a cuenta el ${fecha(m.cuando.slice(0, 10))}` : `cobrado el ${fecha(m.cuando.slice(0, 10))}`}</span>
-                </Link>
-                <span className="num shrink-0 text-[14px] font-semibold">{euros(m.cent)}</span>
-                {vista === "cobrar" && <Boton tam="s" onClick={() => cobrarMov(m)} aria-label={`Cobrar ${m.numero}`}><Euro className="size-3.5" />Cobrar</Boton>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+          {!lista.length ? <p className="py-12 text-center text-texto2">{vista === "cobrar" ? "Todo cobrado 🎉" : "Nada cobrado este mes."}</p> : (
+            <ul className="divide-y divide-borde">
+              {lista.map((m) => (
+                <li key={m.tipo + m.id + (m.aCuenta ? "a" : "")} className="flex items-center gap-3 px-4 py-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-suave text-texto2" title={m.tipo === "pedido" ? "Pedido" : "Trabajo"}>
+                    {m.tipo === "pedido" ? <ShoppingBag className="size-4" /> : <ClipboardList className="size-4" />}
+                  </span>
+                  <Link href={m.tipo === "pedido" ? `/pedidos/ver/?id=${m.id}` : `/trabajos/nuevo/?id=${m.id}`} className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{m.cliente}</span>
+                    <span className="block truncate text-[12px] text-texto2"><span className="num">{m.numero}</span> · {m.tipo === "pedido" ? "Pedido" : "Trabajo"} · {vista === "cobrar" ? `desde ${fecha(m.cuando.slice(0, 10))}` : m.aCuenta ? `a cuenta el ${fecha(m.cuando.slice(0, 10))}` : `cobrado el ${fecha(m.cuando.slice(0, 10))}`}</span>
+                  </Link>
+                  <span className="num shrink-0 text-[14px] font-semibold">{euros(m.cent)}</span>
+                  {vista === "cobrar" && <Boton tam="s" onClick={() => cobrarMov(m)} aria-label={`Cobrar ${m.numero}`}><Euro className="size-3.5" />Cobrar</Boton>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      <VerFactura f={abierta} abierto={!!abierta} cerrar={() => setAbierta(null)}
+        cambiar={(n) => { setAbierta(n); setFacturas((l) => l?.map((x) => (x.id === n.id ? { ...x, ...n, editado: new Date().toISOString() } : x)) ?? l); }}
+        borrada={() => setFacturas((l) => l?.filter((x) => x.id !== abierta?.id) ?? l)} />
     </>
   );
 }

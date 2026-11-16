@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Copy, Trash2, Download, Check, Paperclip, Phone, Mail, Undo2, Ticket as IconoTicket, FileText, Euro } from "lucide-react";
-import { emitirFactura, facturaComoDoc, facturaDe, type Factura } from "@/lib/facturas";
+import { emitirFactura, facturaDe, type Factura } from "@/lib/facturas";
+import { VerFactura } from "@/components/factura";
 import { useSesion } from "@/components/sesion";
 import { Boton, Cargando, Tarjeta, Vacio, cx, fecha, useAvisos } from "@/components/ui";
 import { sb, textoError, urlArchivo } from "@/lib/supabase";
@@ -57,7 +58,7 @@ export default function Ficha() {
     if (!empresa!.nif) return aviso("Para facturar, añade el NIF de tu taller en Ajustes", "error");
     if (!ed.cliente_id) return aviso("El pedido no tiene cliente: edítalo y elige uno", "error");
     if (!t || t.unidades === 0) return aviso("El pedido no tiene prendas con unidades", "error");
-    if (!(await confirmar({ titulo: "¿Emitir la factura?", texto: "Recibirá el número siguiente de tus facturas y quedará registrada tal cual: después no se puede cambiar ni borrar.", ok: "Emitir factura" }))) return;
+    if (!(await confirmar({ titulo: "¿Emitir la factura?", texto: "Recibirá el número siguiente de tus facturas. Después podrás modificarla desde la propia factura o en Cuentas → Facturas.", ok: "Emitir factura" }))) return;
     setOcupado("factura");
     try { const f = await emitirFactura(ed.id, ticketDe(ed, empresa!, cliente ?? null).datos); setFactura(f); setVerFactura(true); aviso(`Factura ${f.numero} emitida`); }
     catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
@@ -198,7 +199,7 @@ export default function Ficha() {
         </aside>
       </div>
       <Ticket abierto={verTicket} cerrar={() => setVerTicket(false)} p={verTicket ? ticketDe(ed, empresa!, cliente ?? null) : null} />
-      <Ticket tipo="factura" abierto={verFactura} cerrar={() => setVerFactura(false)} p={verFactura && factura ? facturaComoDoc(factura) : null} />
+      <VerFactura f={factura} abierto={verFactura} cerrar={() => setVerFactura(false)} cambiar={setFactura} borrada={() => setFactura(null)} />
     </>
   );
 }

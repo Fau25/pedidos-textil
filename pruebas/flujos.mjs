@@ -27,6 +27,9 @@ const T = {
   proveedores: [],
   invitados: [{ email: "prueba@ejemplo.es", creado: "2026-11-10" }],
   admins: [{ user_id: "u1" }],
+  facturas: [{ id: "f9", pedido_id: "p2", numero: "F-2026-0003", fecha: "2026-11-12", base: 100, iva: 21, total: 121, editado: null,
+    datos: { empresa: { nombre: "Bordados Prueba", nif: "B12345678" }, cliente: { nombre: "Club Pádel Norte", nif: "G87654321" }, pedido: { numero: "P-2026-0002", referencia: null, entrega: null },
+      lineas: [{ descripcion: "Polo Austral", detalle: "", unidades: 10, precio: 10, importe: 100 }], personalizaciones: [], gastos: 0, bruto: 100, descuento_pct: 0, descuento: 0, base: 100, iva_pct: 21, iva: 21, total: 121, condiciones: null } }],
   trabajos: [
     { id: "tr1", empresa_id: E, numero: "T-0007", cliente_id: null, cliente_nombre: "Laura Gómez", cliente_telefono: "612345678", items: [{ id: "i1", que: "Juego de cuna", cantidad: 2, tecnica: "Bordado", detalle: "Nombre en la esquina", diseno_path: null }], entrega: "2026-11-20", total: 36, a_cuenta: 10, notas: null, estado: "pendiente", listo_en: null, entregado_en: null, creado: "2026-11-14T10:00:00Z" },
     { id: "tr2", empresa_id: E, numero: "T-0006", cliente_id: null, cliente_nombre: "Mario Ruiz", cliente_telefono: "600111222", items: [{ id: "i2", que: "Mochila", cantidad: 1, tecnica: "Vinilo", detalle: "", diseno_path: null }], entrega: "2026-11-14", total: 8, a_cuenta: 0, notas: null, estado: "listo", listo_en: null, entregado_en: null, creado: "2026-11-13T10:00:00Z" },
@@ -50,7 +53,7 @@ async function abrir({ caido = false, conflicto = false } = {}) {
     if (caido) return r.abort("internetdisconnected");
     const req = r.request(); const u = new URL(req.url()); const tabla = u.pathname.match(/rest\/v1\/(?:rpc\/)?(\w+)/)?.[1];
     if (req.method() !== "GET" && tabla === "guardar_pedido" && conflicto && !req.postDataJSON()?.p?.forzar) { escrituras.push({ tabla, metodo: "POST", cuerpo: req.postDataJSON(), rechazado: true }); return r.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ code: "P0409", message: "CONFLICTO: otra persona guardó este pedido mientras lo editabas" }) }); }
-    if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : tabla === "trabajos" && req.method() === "POST" ? JSON.stringify({ numero: "T-0008", creado: "2026-11-14T12:00:00Z", estado: "pendiente", ...req.postDataJSON() }) : tabla === "emitir_factura" ? JSON.stringify({ id: "f1", pedido_id: req.postDataJSON().p_pedido, numero: "F-2026-0001", fecha: "2026-11-11", datos: req.postDataJSON().p_datos, base: 100, iva: 21, total: 121 }) : "[]" }); }
+    if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : tabla === "trabajos" && req.method() === "POST" ? JSON.stringify({ numero: "T-0008", creado: "2026-11-14T12:00:00Z", estado: "pendiente", ...req.postDataJSON() }) : tabla === "facturas" ? '[{"id":"f9"}]' : tabla === "emitir_factura" ? JSON.stringify({ id: "f1", pedido_id: req.postDataJSON().p_pedido, numero: "F-2026-0001", fecha: "2026-11-11", datos: req.postDataJSON().p_datos, base: 100, iva: 21, total: 121 }) : "[]" }); }
     if (!tabla) return r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
     let filas = T[tabla] ?? [];
     for (const [k, v] of u.searchParams) if (v.startsWith("eq.") && ["id", "pedido_id", "favorito", "entregado"].includes(k)) filas = filas.filter((x) => String(x[k]) === v.slice(3));
@@ -318,6 +321,32 @@ await prueba("generar factura: pide el NIF del taller, confirma, emite y la ense
     assert.deepEqual(b.errores, []); await b.ctx.close();
   } finally { T.empresas[0].nif = null; }
   assert.deepEqual(errores, []);
+});
+await prueba("facturas: se ven en Cuentas y se pueden modificar (número, cliente, conceptos) y borrar", async () => {
+  const { ctx, p, errores, escrituras } = await abrir();
+  await ir(p, "cuentas/");
+  await p.getByRole("button", { name: /^Facturas · 1/ }).click();
+  await p.getByRole("button", { name: /Club Pádel Norte/ }).click();
+  await p.getByRole("dialog", { name: "Factura" }).getByRole("button", { name: "Modificar factura" }).click();
+  const h = p.getByRole("dialog", { name: /Modificar factura/ });
+  await h.getByLabel("Nº de factura").fill("F-2026-0010");
+  await h.getByLabel("Nombre o empresa").fill("Club Pádel Sur");
+  await h.getByRole("button", { name: "Añadir concepto" }).click();
+  await h.getByLabel("Concepto 2").getByLabel("Descripción").fill("Bordado escudo");
+  await h.getByLabel("Concepto 2").getByLabel("Precio por unidad").fill("20");
+  await h.getByLabel("Concepto 2").getByLabel("Descripción").click();
+  await h.getByRole("button", { name: "Guardar cambios" }).click();
+  await p.getByText("Factura F-2026-0010 guardada").waitFor();
+  const w = escrituras.find((x) => x.tabla === "facturas" && x.metodo === "PATCH");
+  assert.equal(w.cuerpo.numero, "F-2026-0010"); assert.equal(w.cuerpo.datos.cliente.nombre, "Club Pádel Sur");
+  assert.equal(w.cuerpo.datos.lineas.length, 2); assert.equal(w.cuerpo.base, 120); assert.equal(w.cuerpo.total, 145.2);
+  await p.getByRole("dialog", { name: "Factura" }).getByText("Club Pádel Sur").first().waitFor();
+  await p.getByRole("dialog", { name: "Factura" }).getByRole("button", { name: "Modificar factura" }).click();
+  await p.getByRole("dialog", { name: /Modificar factura/ }).getByRole("button", { name: "Borrar factura" }).click();
+  await p.getByRole("alertdialog").getByRole("button", { name: "Borrar factura" }).click();
+  await p.getByText("Factura F-2026-0010 borrada").waitFor();
+  assert.ok(escrituras.some((x) => x.tabla === "facturas" && x.metodo === "DELETE"));
+  assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("recibí: apuntar un trabajo con prendas libres genera su ticket", async () => {
   const { ctx, p, errores, escrituras } = await abrir();

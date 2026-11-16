@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2, ChevronDown, Ticket as IconoTicket, Tag, Phone, Mail, FileText } from "lucide-react";
-import { emitirFactura, facturaComoDoc, facturaDe, type Factura } from "@/lib/facturas";
+import { emitirFactura, facturaDe, type Factura } from "@/lib/facturas";
+import { VerFactura } from "@/components/factura";
 import { Ticket } from "./ticket";
 import { ticketDe } from "@/lib/presupuestos";
 import { useSesion } from "./sesion";
@@ -147,7 +148,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
     if (!p.cliente_id) { setErrorCliente(true); setAbiertos((a) => ({ ...a, cliente: true })); return aviso("Elige un cliente para emitir la factura", "error"); }
     if (!t || t.unidades === 0) return aviso("Añade al menos una prenda con unidades", "error");
     const pendiente = p.nuevo || guardando === "pendiente";
-    if (!(await confirmar({ titulo: "¿Emitir la factura?", texto: `Recibirá el número siguiente de tus facturas y quedará registrada tal cual: después no se puede cambiar ni borrar.${pendiente ? " Antes se guardan los cambios del pedido." : ""}`, ok: "Emitir factura" }))) return;
+    if (!(await confirmar({ titulo: "¿Emitir la factura?", texto: `Recibirá el número siguiente de tus facturas. Después podrás modificarla desde la propia factura o en Cuentas → Facturas.${pendiente ? " Antes se guardan los cambios del pedido." : ""}`, ok: "Emitir factura" }))) return;
     setFacturando(true);
     try {
       let actual = p;
@@ -339,7 +340,7 @@ export function EditorPedido({ pedidoId, duplicarDe }: { pedidoId: string | null
 
       {/* Barra de acciones (móvil) */}
       <Ticket abierto={verTicket} cerrar={() => setVerTicket(false)} p={verTicket ? ticketDe(p, empresa!, cliente ?? null) : null} />
-      <Ticket tipo="factura" abierto={verFactura} cerrar={() => setVerFactura(false)} p={verFactura && factura ? facturaComoDoc(factura) : null} />
+      <VerFactura f={factura} abierto={verFactura} cerrar={() => setVerFactura(false)} cambiar={setFactura} borrada={() => setFactura(null)} />
       <div className="h-20 xl:hidden" />
       <div className="no-imprimir fixed inset-x-4 bottom-[92px] z-20 mx-auto flex max-w-[640px] lg:bottom-4 lg:left-[260px] items-center gap-3 rounded-[22px] border border-borde bg-superficie/95 px-4 py-3 shadow-[0_10px_30px_-12px_rgba(16,18,24,0.25)] backdrop-blur xl:hidden">
         <div className="min-w-0 flex-1"><p className="text-[11px] text-texto2">Total · {t.unidades} uds</p><p className="num text-[18px] font-semibold leading-tight">{euros(t.total)}</p></div>

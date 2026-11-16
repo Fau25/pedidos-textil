@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Download, Send } from "lucide-react";
+import { Download, Send, Pencil } from "lucide-react";
 import type { Presupuesto } from "@/lib/tipos";
 import { compartirDocumento, pdfDocumento } from "@/lib/presupuestos";
 import { textoError, urlArchivo } from "@/lib/supabase";
@@ -12,7 +12,7 @@ const fecha = (f: string) => { try { return new Date(f + "T12:00:00").toLocaleDa
 const iniciales = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("") || "·";
 
 /** Ticket o factura del pedido: vista tipo recibo y botones para enviarlo al cliente o descargarlo en PDF */
-export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto | null; abierto: boolean; cerrar: () => void; tipo?: "ticket" | "factura" }) {
+export function Ticket({ p, abierto, cerrar, tipo = "ticket", editar }: { p: Presupuesto | null; abierto: boolean; cerrar: () => void; tipo?: "ticket" | "factura"; editar?: () => void }) {
   const { aviso } = useAvisos();
   const [ocupado, setOcupado] = useState<"" | "enviar" | "pdf">("");
   const [logo, setLogo] = useState<string | null>(null);
@@ -41,6 +41,7 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto
   return (
     <Hoja abierta={abierto} cerrar={cerrar} titulo={tipo === "factura" ? "Factura" : "Ticket del pedido"} ancho="max-w-md"
       pie={<div className="flex gap-2">
+        {editar && <Boton onClick={editar} disabled={!!ocupado} aria-label="Modificar factura" className="shrink-0 px-4"><Pencil className="size-4" /><span className="hidden sm:inline">Modificar</span></Boton>}
         <Boton className="flex-1" cargando={ocupado === "pdf"} disabled={vacio || !!ocupado} onClick={() => hacer("pdf")}><Download className="size-4" />PDF</Boton>
         <Boton className="flex-[2]" variante="primario" cargando={ocupado === "enviar"} disabled={vacio || !!ocupado} onClick={() => hacer("enviar")}><Send className="size-4" />Enviar al cliente</Boton>
       </div>}>
@@ -57,7 +58,7 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket" }: { p: Presupuesto
                 <p className="truncate text-[11.5px] text-[#6b7079]">{[d.empresa.nif && `NIF ${d.empresa.nif}`, d.empresa.telefono].filter(Boolean).join(" · ")}</p></div>
               {/* Título y número en la franja gris: ahorra espacio */}
               <div className="shrink-0 text-right"><p className="text-[26px] font-light leading-none tracking-[-0.04em]">{tipo === "factura" ? "Factura" : "Ticket"}</p>
-                <p className="mt-1 text-[11px] text-[#6b7079]"><b className="num font-semibold text-[#17181c]">{p.numero}</b> · {fecha(p.fecha)}</p></div>
+                <p className="mt-1 whitespace-nowrap text-[11px] text-[#6b7079]"><b className="num font-semibold text-[#17181c]">{p.numero}</b></p><p className="whitespace-nowrap text-[11px] text-[#6b7079]">{fecha(p.fecha)}</p></div>
             </div>
             {d.cliente && (
               <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
