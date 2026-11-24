@@ -4,12 +4,27 @@ import { FileText, Plus, Trash2, X } from "lucide-react";
 import { Boton, CampoImporte, Hoja, useAvisos } from "@/components/ui";
 import { Ticket } from "@/components/ticket";
 import { sb, textoError } from "@/lib/supabase";
+import { IconoZona, ZONAS, iconoTecnica } from "@/components/bloque-personalizacion";
+import { cx } from "@/components/ui";
 import { useSesion } from "@/components/sesion";
 import { borrarDocumento, crearDocumento, facturaComoDoc, facturarPresupuesto, guardarDocumento, recalcular, type Documento, type TipoDocumento } from "@/lib/facturas";
 import type { DatosPresupuesto } from "@/lib/tipos";
 
 const eur = (n: number) => n.toLocaleString("es-ES", { style: "currency", currency: "EUR" });
 const etq = "mb-1 block text-[12px] font-medium text-texto2";
+
+type Pers = DatosPresupuesto["personalizaciones"][number];
+const corto = (u: string) => ZONAS.find((z) => z.nombre === u)?.corto ?? u;
+/** «Bordado · Pecho izq., Espalda» a partir de la técnica y las ubicaciones */
+const describir = (p: Pers): Pers => ({ ...p, descripcion: [p.tecnica || "Personalización", (p.ubicaciones ?? []).map(corto).join(", ")].filter(Boolean).join(" · ") });
+/** Las personalizaciones que vienen de un pedido solo traen el texto: se sacan técnica y ubicaciones */
+const conPartes = (p: Pers): Pers => {
+  if (p.tecnica !== undefined) return { ...p, ubicaciones: [...(p.ubicaciones ?? [])] };
+  const [t, ...resto] = p.descripcion.split(" · ");
+  const zonas = resto.join(" · ").replace(/ ×\d+$/, "").split(/,\s*/).map((u) => ZONAS.find((z) => z.nombre === u || z.corto === u)?.nombre).filter(Boolean) as string[];
+  return { ...p, tecnica: t ?? "", ubicaciones: zonas };
+};
+const nuevaPers = (tecnica: string, unidades: number): Pers => describir({ descripcion: "", detalle: "", unidades: unidades || 1, precio: 0, importe: 0, tecnica, ubicaciones: [] });
 
 const NOMBRE: Record<TipoDocumento, string> = { factura: "factura", presupuesto: "presupuesto" };
 
@@ -42,7 +57,7 @@ export const VerFactura = (p: { f: Documento | null; abierto: boolean; cerrar: (
 /** Crear o modificar una factura o presupuesto: número, fecha, cliente, conceptos, gastos, descuento, IVA y tus datos.
  *  Sin «id» es uno nuevo: al guardar recibe el número siguiente (o el que se escriba). */
 export function EditarDocumento({ tipo, f, abierta, cerrar, guardada, borrada }: { tipo: TipoDocumento; f: Documento | null; abierta: boolean; cerrar: () => void; guardada: (f: Documento) => void; borrada: () => void }) {
-  const { empresa } = useSesion();
+  const { empresa, tecnicas } = useSesion();
   const { aviso, confirmar } = useAvisos();
   const [x, setX] = useState<Documento | null>(null);
   const [clientes, setClientes] = useState<{ nombre: string; nif: string | null; telefono: string | null; direccion: string | null; email: string | null }[]>([]);
@@ -57,7 +72,7 @@ export function EditarDocumento({ tipo, f, abierta, cerrar, guardada, borrada }:
   const [ocupado, setOcupado] = useState<"" | "guardar" | "borrar">("");
   // Al abrir: copia editable, con prendas y personalizaciones juntas como «conceptos»
   useEffect(() => {
-    if (abierta && f) setX({ ...f, datos: { ...f.datos, cliente: { ...(f.datos.cliente ?? {}) }, empresa: { ...f.datos.empresa }, lineas: [...f.datos.lineas, ...f.datos.personalizaciones].map((l) => ({ ...l })), personalizaciones: [] } });
+    if (abierta && f) setX({ ...f, datos: { ...f.datos, cliente: { ...(f.datos.cliente ?? {}) }, empresa: { ...f.datos.empresa }, lineas: f.datos.lineas.map((l) => ({ ...l })), personalizaciones: f.datos.personalizaciones.map(conPartes) } });
   }, [abierta, f]);
   if (!x) return null;
   const d = recalcular(x.datos);
@@ -65,14 +80,18 @@ export function EditarDocumento({ tipo, f, abierta, cerrar, guardada, borrada }:
   const setCli = (c: Record<string, string>) => setD({ cliente: { ...(x.datos.cliente ?? {}), ...c } });
   const setEmp = (c: Record<string, string>) => setD({ empresa: { ...x.datos.empresa, ...c } });
   const setLinea = (i: number, c: Partial<DatosPresupuesto["lineas"][number]>) => setD({ lineas: x.datos.lineas.map((l, j) => (j === i ? { ...l, ...c } : l)) });
+  // Personalización: la descripción se forma sola con la técnica y las ubicaciones
+  const setPers = (i: number, c: Partial<Pers>) => setD({ personalizaciones: x.datos.personalizaciones.map((l, j) => (j === i ? describir({ ...l, ...c }) : l)) });
+  const nombresTecnicas = tecnicas.length ? tecnicas.map((t) => t.nombre) : ["Bordado", "Vinilo", "DTF"];
+  const udsPrendas = x.datos.lineas.reduce((a, l) => a + (Number(l.unidades) || 0), 0);
 
   async function guardar() {
     if (!nuevo && !x!.numero.trim()) return aviso(`Pon un número de ${nombre}`, "error");
     if (!x!.datos.cliente?.nombre?.trim()) return aviso("Escribe el nombre del cliente", "error");
-    if (!x!.datos.lineas.some((l) => l.descripcion.trim())) return aviso("Añade al menos un concepto", "error");
+    if (!x!.datos.lineas.some((l) => l.descripcion.trim()) && !x!.datos.personalizaciones.some((l) => l.tecnica || l.detalle.trim())) return aviso("Añade al menos un concepto o una personalización", "error");
     setOcupado("guardar");
     try {
-      const limpio = { ...x!, datos: { ...x!.datos, lineas: x!.datos.lineas.filter((l) => l.descripcion.trim() || Number(l.precio)) } };
+      const limpio = { ...x!, datos: { ...x!.datos, lineas: x!.datos.lineas.filter((l) => l.descripcion.trim() || Number(l.precio)), personalizaciones: x!.datos.personalizaciones.filter((l) => l.tecnica || l.detalle.trim() || Number(l.precio)) } };
       const n = nuevo ? await crearDocumento(tipo, empresa!.id, limpio) : await guardarDocumento(tipo, limpio);
       guardada(n); aviso(`${tipo === "factura" ? "Factura" : "Presupuesto"} ${n.numero} ${nuevo ? "creado" : "guardado"}`.replace(/o$/, tipo === "factura" ? "a" : "o"));
     } catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
@@ -139,6 +158,49 @@ export function EditarDocumento({ tipo, f, abierta, cerrar, guardada, borrada }:
             ))}
           </ul>
           <Boton className="mt-2.5 w-full" onClick={() => setD({ lineas: [...x.datos.lineas, { descripcion: "", detalle: "", unidades: 1, precio: 0, importe: 0 }] })}><Plus className="size-4" />Añadir concepto</Boton>
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-[12px] font-bold uppercase tracking-[.06em] text-texto2">Personalización</h3>
+          <ul className="space-y-2.5">
+            {x.datos.personalizaciones.map((l, i) => (
+              <li key={i} className="rounded-2xl border border-borde p-3" aria-label={`Personalización ${i + 1}`}>
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-[13px] font-semibold">{l.descripcion}</p>
+                  <button type="button" aria-label={`Quitar personalización ${i + 1}`} onClick={() => setD({ personalizaciones: x.datos.personalizaciones.filter((_, j) => j !== i) })} className="grid size-9 shrink-0 place-items-center rounded-full text-texto2 hover:text-red-600"><X className="size-4" /></button>
+                </div>
+                <div className="mb-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label={`Técnica de la personalización ${i + 1}`}>
+                  {[...new Set([...nombresTecnicas, ...(l.tecnica && !nombresTecnicas.includes(l.tecnica) ? [l.tecnica] : [])])].map((n) => {
+                    const I = iconoTecnica(n); const on = l.tecnica === n;
+                    return (
+                      <button key={n} type="button" role="radio" aria-checked={on} onClick={() => setPers(i, { tecnica: on ? "" : n })}
+                        className={cx("flex h-9 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-bold", on ? "bg-acento text-sobre-acento" : "border border-borde bg-superficie")}>
+                        <I className="size-[15px]" />{n}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mb-2 grid grid-cols-4 gap-1.5" role="group" aria-label={`Ubicación de la personalización ${i + 1}`}>
+                  {ZONAS.map((z) => {
+                    const on = (l.ubicaciones ?? []).includes(z.nombre);
+                    return (
+                      <button key={z.nombre} type="button" aria-pressed={on} onClick={() => setPers(i, { ubicaciones: on ? (l.ubicaciones ?? []).filter((u) => u !== z.nombre) : [...(l.ubicaciones ?? []), z.nombre] })}
+                        className={cx("flex flex-col items-center gap-0.5 rounded-[14px] px-1 py-1.5 text-[10.5px] font-semibold", on ? "bg-azul-suave ring-[1.5px] ring-azul" : "border border-borde bg-superficie")}>
+                        <IconoZona z={z} activa={on} />{z.corto}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input className="campo text-[13px]" placeholder="Qué y dónde (si es en otro sitio): nombre, logo, color del hilo…" aria-label="Detalle de la personalización" value={l.detalle} onChange={(e) => setPers(i, { detalle: e.target.value })} />
+                <div className="mt-2 grid grid-cols-[80px_1fr_auto] items-end gap-2">
+                  <label><span className={etq}>Uds</span><input className="campo num text-center" type="number" inputMode="decimal" min={0} value={l.unidades || ""} onChange={(e) => setPers(i, { unidades: Number(e.target.value) || 0 })} /></label>
+                  <label><span className={etq}>Precio/ud</span><CampoImporte valor={l.precio || null} cambiar={(v) => setPers(i, { precio: v ?? 0 })} aria-label="Precio por unidad de la personalización" /></label>
+                  <p className="num pb-3 text-right font-semibold">{eur(d.personalizaciones[i]?.importe ?? 0)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <Boton className="mt-2.5 w-full" onClick={() => setD({ personalizaciones: [...x.datos.personalizaciones, nuevaPers(nombresTecnicas[0] ?? "", udsPrendas)] })}><Plus className="size-4" />Añadir personalización</Boton>
         </section>
 
         <section className="grid grid-cols-3 gap-3">

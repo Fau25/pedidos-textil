@@ -44,7 +44,7 @@ export type DatosPresupuesto = {
   cliente: Partial<Cliente> | null;
   pedido: { numero: string; referencia: string | null; entrega: string | null };
   lineas: { descripcion: string; detalle: string; unidades: number; precio: number; importe: number }[];
-  personalizaciones: { descripcion: string; detalle: string; unidades: number; precio: number; importe: number }[];
+  personalizaciones: { descripcion: string; detalle: string; unidades: number; precio: number; importe: number; tecnica?: string; ubicaciones?: string[] }[];
   gastos: number; bruto: number; descuento_pct: number; descuento: number; base: number; iva_pct: number; iva: number; total: number;
   condiciones: string | null;
 };
