@@ -53,7 +53,7 @@ async function abrir({ caido = false, conflicto = false } = {}) {
     if (caido) return r.abort("internetdisconnected");
     const req = r.request(); const u = new URL(req.url()); const tabla = u.pathname.match(/rest\/v1\/(?:rpc\/)?(\w+)/)?.[1];
     if (req.method() !== "GET" && tabla === "guardar_pedido" && conflicto && !req.postDataJSON()?.p?.forzar) { escrituras.push({ tabla, metodo: "POST", cuerpo: req.postDataJSON(), rechazado: true }); return r.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ code: "P0409", message: "CONFLICTO: otra persona guardó este pedido mientras lo editabas" }) }); }
-    if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : tabla === "trabajos" && req.method() === "POST" ? JSON.stringify({ numero: "T-0008", creado: "2026-11-14T12:00:00Z", estado: "pendiente", ...req.postDataJSON() }) : tabla === "facturas" ? '[{"id":"f9"}]' : tabla === "emitir_factura" ? JSON.stringify({ id: "f1", pedido_id: req.postDataJSON().p_pedido, numero: "F-2026-0001", fecha: "2026-11-11", datos: req.postDataJSON().p_datos, base: 100, iva: 21, total: 121 }) : "[]" }); }
+    if (req.method() !== "GET") { escrituras.push({ tabla, url: req.url(), metodo: req.method(), cuerpo: (() => { try { return req.postDataJSON(); } catch { return null; } })() }); return r.fulfill({ status: 200, contentType: "application/json", body: tabla === "guardar_pedido" ? '"P-2026-0009"' : tabla === "trabajos" && req.method() === "POST" ? JSON.stringify({ numero: "T-0008", creado: "2026-11-14T12:00:00Z", estado: "pendiente", ...req.postDataJSON() }) : tabla === "facturas" || tabla === "presupuestos" ? '[{"id":"f9"}]' : tabla === "crear_documento" ? (() => { const b = req.postDataJSON(); const pre = b.p_tipo === "factura" ? "F" : "PR"; return JSON.stringify({ id: "n-" + pre, pedido_id: null, numero: b.p_numero || pre + "-2026-0004", fecha: b.p_fecha, validez: b.p_validez, datos: b.p_datos, base: b.p_datos.base, iva: b.p_datos.iva, total: b.p_datos.total, factura_id: null }); })() : tabla === "emitir_factura" ? JSON.stringify({ id: "f1", pedido_id: req.postDataJSON().p_pedido, numero: "F-2026-0001", fecha: "2026-11-11", datos: req.postDataJSON().p_datos, base: 100, iva: 21, total: 121 }) : "[]" }); }
     if (!tabla) return r.fulfill({ status: 200, contentType: "application/json", body: "{}" });
     let filas = T[tabla] ?? [];
     for (const [k, v] of u.searchParams) if (v.startsWith("eq.") && ["id", "pedido_id", "favorito", "entregado"].includes(k)) filas = filas.filter((x) => String(x[k]) === v.slice(3));
@@ -346,6 +346,51 @@ await prueba("facturas: se ven en Cuentas y se pueden modificar (número, client
   await p.getByRole("alertdialog").getByRole("button", { name: "Borrar factura" }).click();
   await p.getByText("Factura F-2026-0010 borrada").waitFor();
   assert.ok(escrituras.some((x) => x.tabla === "facturas" && x.metodo === "DELETE"));
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("cuentas: crear un presupuesto desde cero, rellenar el cliente de la lista y pasarlo a factura", async () => {
+  const { ctx, p, errores, escrituras } = await abrir();
+  await ir(p, "cuentas/?ver=presupuestos");
+  await p.getByRole("button", { name: "Nuevo presupuesto" }).click();
+  const h = p.getByRole("dialog", { name: "Nuevo presupuesto" });
+  await h.getByRole("button", { name: "Crear presupuesto" }).click();
+  await p.getByText("Escribe el nombre del cliente").waitFor();
+  await h.getByLabel("Nombre o empresa").fill("Club Deportivo Arenal");
+  assert.equal(await h.getByLabel("Teléfono").first().inputValue(), "612", "rellena los datos del cliente de tu lista");
+  await h.getByLabel("Concepto 1").getByLabel("Descripción").fill("Camisetas bordadas");
+  await h.getByLabel("Concepto 1").locator('input[type="number"]').fill("20");
+  await h.getByLabel("Concepto 1").getByLabel("Precio por unidad").fill("8");
+  await h.getByLabel("Concepto 1").getByLabel("Descripción").click();
+  assert.ok(await h.getByLabel("Válido hasta").inputValue(), "con validez");
+  await h.getByRole("button", { name: "Crear presupuesto" }).click();
+  await p.getByText("Presupuesto PR-2026-0004 creado").waitFor();
+  const c = escrituras.find((x) => x.tabla === "crear_documento");
+  assert.equal(c.cuerpo.p_tipo, "presupuesto"); assert.equal(c.cuerpo.p_numero, null, "número automático");
+  assert.equal(c.cuerpo.p_datos.cliente.nombre, "Club Deportivo Arenal"); assert.equal(c.cuerpo.p_datos.cliente.email, "a@b.es"); assert.equal(c.cuerpo.p_datos.base, 160); assert.equal(c.cuerpo.p_datos.total, 193.6);
+  const v = p.getByRole("dialog", { name: "Presupuesto" });
+  await v.getByText("Válido hasta").waitFor();
+  await v.getByRole("button", { name: "Convertir en factura" }).click();
+  await p.getByRole("alertdialog").getByRole("button", { name: "Crear factura" }).click();
+  await p.getByText("Factura F-2026-0004 creada").waitFor();
+  assert.ok(escrituras.some((x) => x.tabla === "crear_documento" && x.cuerpo.p_tipo === "factura" && x.cuerpo.p_datos.total === 193.6));
+  assert.ok(escrituras.some((x) => x.tabla === "presupuestos" && x.metodo === "PATCH" && x.cuerpo.factura_id === "n-F"));
+  await p.getByRole("dialog", { name: "Factura" }).getByText("F-2026-0004").first().waitFor();
+  assert.deepEqual(errores, []); await ctx.close();
+});
+await prueba("cuentas: crear una factura suelta con el número que yo quiera", async () => {
+  const { ctx, p, errores, escrituras } = await abrir();
+  await ir(p, "cuentas/?ver=facturas");
+  await p.getByRole("button", { name: "Nueva factura" }).click();
+  const h = p.getByRole("dialog", { name: "Nueva factura" });
+  await h.getByLabel("Nº de factura").fill("A-15");
+  await h.getByLabel("Nombre o empresa").fill("Ana Pérez");
+  await h.getByLabel("Concepto 1").getByLabel("Descripción").fill("Arreglo");
+  await h.getByLabel("Concepto 1").getByLabel("Precio por unidad").fill("10");
+  await h.getByLabel("Concepto 1").getByLabel("Descripción").click();
+  await h.getByRole("button", { name: "Crear factura" }).click();
+  await p.getByText("Factura A-15 creada").waitFor();
+  const c = escrituras.find((x) => x.tabla === "crear_documento");
+  assert.equal(c.cuerpo.p_tipo, "factura"); assert.equal(c.cuerpo.p_numero, "A-15"); assert.equal(c.cuerpo.p_datos.total, 12.1);
   assert.deepEqual(errores, []); await ctx.close();
 });
 await prueba("recibí: apuntar un trabajo con prendas libres genera su ticket", async () => {

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ClipboardList, Euro, FileText, Search, ShoppingBag } from "lucide-react";
+import { ClipboardList, Euro, FileSignature, FileText, Plus, Search, ShoppingBag } from "lucide-react";
 import { useSesion } from "@/components/sesion";
 import { Cabecera } from "@/components/marco";
 import { Boton, Cargando, cx, fecha, useAvisos } from "@/components/ui";
@@ -9,8 +9,8 @@ import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
 import { AVISO_SIN_COBROS, conPago, marcarPagado } from "@/lib/pedidos";
-import { VerFactura } from "@/components/factura";
-import { listarFacturas, type Factura } from "@/lib/facturas";
+import { EditarDocumento, VerDocumento } from "@/components/factura";
+import { documentoNuevo, listarFacturas, listarPresupuestos, type Documento, type TipoDocumento } from "@/lib/facturas";
 import { cobrar, deshacerCobro, pendienteCent, sinTablaTrabajos, type Trabajo } from "@/lib/trabajos";
 
 type FilaPedido = { id: string; numero: string; fecha: string; total: number; pagado_en?: string | null; clientes: { nombre: string } | null };
@@ -26,9 +26,10 @@ const ultimosMeses = (n: number) => { const d = new Date(); return Array.from({ 
 export default function Cuentas() {
   const { empresa } = useSesion();
   const { aviso } = useAvisos();
-  const [vista, setVista] = useState<"cobrar" | "cobrado" | "facturas">(() => (typeof location !== "undefined" && location.search.includes("facturas") ? "facturas" : "cobrar"));
+  const [vista, setVista] = useState<"cobrar" | "cobrado" | "facturas" | "presupuestos">(() => (typeof location === "undefined" ? "cobrar" : location.search.includes("presupuestos") ? "presupuestos" : location.search.includes("facturas") ? "facturas" : "cobrar"));
   const [qf, setQf] = useState("");
-  const [abierta, setAbierta] = useState<Factura | null>(null);
+  const [abierta, setAbierta] = useState<{ tipo: TipoDocumento; d: Documento } | null>(null);
+  const [nuevo, setNuevo] = useState<{ tipo: TipoDocumento; d: Documento } | null>(null);
   const meses = useMemo(() => ultimosMeses(12), []);
   const [mes, setMes] = useState(meses[meses.length - 1]);
   const [encima, setEncima] = useState<string | null>(null);
@@ -47,8 +48,12 @@ export default function Cuentas() {
   });
 
   const { datos: facturas, setDatos: setFacturas } = useCarga(() => listarFacturas(empresa!.id));
+  const { datos: presupuestos, setDatos: setPresupuestos } = useCarga(() => listarPresupuestos(empresa!.id));
   const nrm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const listaFacturas = (facturas ?? []).filter((f) => !qf.trim() || nrm([f.numero, f.datos.cliente?.nombre, f.datos.cliente?.nif, f.datos.pedido?.numero].join(" ")).includes(nrm(qf.trim())));
+  const docs = vista === "presupuestos" ? presupuestos : facturas;
+  const listaDocs = ((docs ?? []) as Documento[]).filter((f) => !qf.trim() || nrm([f.numero, f.datos.cliente?.nombre, f.datos.cliente?.nif, f.datos.pedido?.numero].join(" ")).includes(nrm(qf.trim())));
+  const setLista = (tipo: TipoDocumento) => (tipo === "factura" ? setFacturas : setPresupuestos) as (f: (l: Documento[] | null) => Documento[] | null) => void;
+  const numeroDe = (id?: string | null) => (facturas ?? []).find((f) => f.id === id)?.numero;
   const añoActual = String(new Date().getFullYear());
   const facturadoAño = (facturas ?? []).filter((f) => f.fecha.startsWith(añoActual)).reduce((a, f) => a + aCent(f.total), 0);
 
@@ -107,8 +112,16 @@ export default function Cuentas() {
 
   return (
     <>
-      <Cabecera titulo="Cuentas" sub="Lo que te deben, lo cobrado y cómo va cada mes (pedidos y trabajos)" />
+      <Cabecera titulo="Cuentas" sub="Lo que te deben, lo cobrado, tus facturas y presupuestos" />
       {!datos.conCobros && <p role="status" className="tarjeta mb-4 border-amber-300 p-4 text-[13px] text-amber-800 dark:text-amber-300">{AVISO_SIN_COBROS}. Hasta entonces los pedidos salen todos como «sin cobrar».</p>}
+
+      {/* Crear documentos sueltos, sin pedido ni trabajo */}
+      <div className="mb-4 grid grid-cols-2 gap-2.5 sm:flex">
+        <button onClick={() => { setVista("facturas"); setNuevo({ tipo: "factura", d: documentoNuevo("factura", empresa!) }); }} className="flex h-[52px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-acento px-3 text-[14px] font-semibold sm:px-5 text-sobre-acento shadow-[0_10px_24px_-12px_rgba(16,18,24,0.55)] active:scale-[0.98]">
+          <Plus className="size-[18px]" />Nueva factura</button>
+        <button onClick={() => { setVista("presupuestos"); setNuevo({ tipo: "presupuesto", d: documentoNuevo("presupuesto", empresa!) }); }} className="flex h-[52px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-azul px-3 text-[14px] font-semibold sm:px-5 text-white shadow-[0_10px_24px_-12px_rgba(29,82,235,0.7)] active:scale-[0.98]">
+          <Plus className="size-[18px]" />Nuevo presupuesto</button>
+      </div>
 
       {/* Cifras */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
@@ -178,33 +191,39 @@ export default function Cuentas() {
       </section>
 
       {/* Listas */}
-      <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
-        {([["cobrar", `Por cobrar · ${c.porCobrar.length}`], ["cobrado", `Cobrado en ${nombreMes(mes, true).split(" ")[0].toLowerCase()} · ${delMes.length}`], ["facturas", `Facturas · ${facturas?.length ?? 0}`]] as const).map(([v, t]) => (
+      <div className="mb-3 flex flex-wrap gap-2">
+        {([["cobrar", `Por cobrar · ${c.porCobrar.length}`], ["cobrado", `Cobrado en ${nombreMes(mes, true).split(" ")[0].toLowerCase()} · ${delMes.length}`], ["facturas", `Facturas · ${facturas?.length ?? 0}`], ["presupuestos", `Presupuestos · ${presupuestos?.length ?? 0}`]] as const).map(([v, t]) => (
           <button key={v} onClick={() => setVista(v)} aria-pressed={vista === v}
             className={cx("h-10 shrink-0 whitespace-nowrap rounded-full px-4 text-[13px] font-medium transition-colors", vista === v ? "bg-acento text-sobre-acento" : "bg-superficie text-texto2 hover:text-texto")}>{t}</button>
         ))}
       </div>
-      {vista === "facturas" ? (
+      {vista === "facturas" || vista === "presupuestos" ? (() => {
+        const tipo: TipoDocumento = vista === "facturas" ? "factura" : "presupuesto";
+        return (
         <>
           <div className="mb-3 flex flex-wrap items-center gap-3">
-            <label className="relative min-w-0 flex-1 sm:max-w-sm"><span className="sr-only">Buscar factura</span>
+            <label className="relative w-full min-w-0 sm:w-auto sm:max-w-sm sm:flex-1"><span className="sr-only">Buscar {tipo}</span>
               <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-texto2" />
               <input className="campo pl-10" placeholder="Buscar por número, cliente o NIF" value={qf} onChange={(e) => setQf(e.target.value)} /></label>
-            <p className="text-[13px] text-texto2">Facturado en {añoActual}: <b className="num text-texto">{euros(facturadoAño)}</b></p>
+            {tipo === "factura" && <p className="text-[13px] text-texto2">Facturado en {añoActual}: <b className="num text-texto">{euros(facturadoAño)}</b></p>}
           </div>
           <div className="tarjeta overflow-hidden">
-            {!facturas ? <p className="py-12 text-center text-texto2">Cargando…</p> : !listaFacturas.length ? (
-              <p className="px-6 py-12 text-center text-texto2">{qf ? "Ninguna factura coincide." : "Aún no hay facturas. Se crean desde un pedido con «Generar factura»."}</p>
+            {!docs ? <p className="py-12 text-center text-texto2">Cargando…</p> : !listaDocs.length ? (
+              <p className="px-6 py-12 text-center text-texto2">{qf ? "Ningún documento coincide." : tipo === "factura"
+                ? "Aún no hay facturas. Crea una con «Nueva factura», arriba, o desde un pedido con «Generar factura»."
+                : "Aún no hay presupuestos. Crea uno con «Nuevo presupuesto», arriba."}</p>
             ) : (
               <ul className="divide-y divide-borde">
-                {listaFacturas.map((f) => (
+                {listaDocs.map((f) => (
                   <li key={f.id}>
-                    <button onClick={() => setAbierta(f)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-suave/60">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-suave text-texto2"><FileText className="size-4" /></span>
+                    <button onClick={() => setAbierta({ tipo, d: f })} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-suave/60">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-suave text-texto2">{tipo === "factura" ? <FileText className="size-4" /> : <FileSignature className="size-4" />}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{f.datos.cliente?.nombre || "Sin cliente"}</span>
-                        <span className="block truncate text-[12px] text-texto2"><span className="num font-semibold text-texto">{f.numero}</span> · {fecha(f.fecha)}{f.datos.pedido?.numero ? ` · pedido ${f.datos.pedido.numero}` : ""}{(f as { editado?: string | null }).editado ? " · modificada" : ""}</span>
+                        <span className="block truncate text-[12px] text-texto2"><span className="num font-semibold text-texto">{f.numero}</span> · {fecha(f.fecha)}
+                          {f.datos.pedido?.numero ? ` · pedido ${f.datos.pedido.numero}` : ""}{f.editado ? ` · modificad${tipo === "factura" ? "a" : "o"}` : ""}</span>
                       </span>
+                      {f.factura_id && <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Facturado{numeroDe(f.factura_id) ? ` · ${numeroDe(f.factura_id)}` : ""}</span>}
                       <span className="num shrink-0 text-[14px] font-semibold">{euros(aCent(f.total))}</span>
                     </button>
                   </li>
@@ -213,7 +232,8 @@ export default function Cuentas() {
             )}
           </div>
         </>
-      ) : (
+        );
+      })() : (
       <div className="tarjeta overflow-hidden">
           {!lista.length ? <p className="py-12 text-center text-texto2">{vista === "cobrar" ? "Todo cobrado 🎉" : "Nada cobrado este mes."}</p> : (
             <ul className="divide-y divide-borde">
@@ -234,9 +254,12 @@ export default function Cuentas() {
           )}
         </div>
       )}
-      <VerFactura f={abierta} abierto={!!abierta} cerrar={() => setAbierta(null)}
-        cambiar={(n) => { setAbierta(n); setFacturas((l) => l?.map((x) => (x.id === n.id ? { ...x, ...n, editado: new Date().toISOString() } : x)) ?? l); }}
-        borrada={() => setFacturas((l) => l?.filter((x) => x.id !== abierta?.id) ?? l)} />
+      <VerDocumento tipo={abierta?.tipo ?? "factura"} f={abierta?.d ?? null} abierto={!!abierta} cerrar={() => setAbierta(null)}
+        cambiar={(n) => { const t = abierta!.tipo; setAbierta({ tipo: t, d: n }); setLista(t)((l) => l?.map((x) => (x.id === n.id ? { ...x, ...n, editado: new Date().toISOString() } : x)) ?? l); }}
+        borrada={() => { const a = abierta; if (a) setLista(a.tipo)((l) => l?.filter((x) => x.id !== a.d.id) ?? l); }}
+        facturado={(f) => { setFacturas((l) => [f as Documento, ...((l ?? []) as Documento[])]); setVista("facturas"); setAbierta({ tipo: "factura", d: f }); }} />
+      <EditarDocumento tipo={nuevo?.tipo ?? "factura"} f={nuevo?.d ?? null} abierta={!!nuevo} cerrar={() => setNuevo(null)} borrada={() => setNuevo(null)}
+        guardada={(n) => { const t = nuevo!.tipo; setLista(t)((l) => [n, ...(l ?? [])]); setNuevo(null); setAbierta({ tipo: t, d: n }); }} />
     </>
   );
 }

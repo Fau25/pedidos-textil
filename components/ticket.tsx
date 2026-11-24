@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Download, Send, Pencil } from "lucide-react";
 import type { Presupuesto } from "@/lib/tipos";
 import { compartirDocumento, pdfDocumento } from "@/lib/presupuestos";
@@ -12,7 +12,9 @@ const fecha = (f: string) => { try { return new Date(f + "T12:00:00").toLocaleDa
 const iniciales = (n?: string | null) => (n ?? "").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join("") || "·";
 
 /** Ticket o factura del pedido: vista tipo recibo y botones para enviarlo al cliente o descargarlo en PDF */
-export function Ticket({ p, abierto, cerrar, tipo = "ticket", editar }: { p: Presupuesto | null; abierto: boolean; cerrar: () => void; tipo?: "ticket" | "factura"; editar?: () => void }) {
+const TITULO = { ticket: "Ticket", factura: "Factura", presupuesto: "Presupuesto" } as const;
+
+export function Ticket({ p, abierto, cerrar, tipo = "ticket", editar, acciones }: { p: Presupuesto | null; abierto: boolean; cerrar: () => void; tipo?: "ticket" | "factura" | "presupuesto"; editar?: () => void; acciones?: ReactNode }) {
   const { aviso } = useAvisos();
   const [ocupado, setOcupado] = useState<"" | "enviar" | "pdf">("");
   const [logo, setLogo] = useState<string | null>(null);
@@ -36,21 +38,21 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket", editar }: { p: Pre
     setOcupado(que);
     try {
       const r = await compartirDocumento(p!, doc, que === "pdf", listo.current ?? undefined);
-      if (r === "descargado") aviso(tipo === "factura" ? "Factura descargada en PDF" : "Ticket descargado en PDF");
+      if (r === "descargado") aviso(`${TITULO[tipo]} descargad${tipo === "ticket" ? "o" : "a"} en PDF`);
     } catch (e) { aviso(textoError(e), "error"); } finally { setOcupado(""); }
   }
 
   return (
-    <Hoja abierta={abierto} cerrar={cerrar} titulo={tipo === "factura" ? "Factura" : "Ticket del pedido"} ancho="max-w-md"
-      pie={<div className="flex gap-2">
-        {editar && <Boton onClick={editar} disabled={!!ocupado} aria-label="Modificar factura" className="shrink-0 px-4"><Pencil className="size-4" /><span className="hidden sm:inline">Modificar</span></Boton>}
+    <Hoja abierta={abierto} cerrar={cerrar} titulo={tipo === "ticket" ? "Ticket del pedido" : TITULO[tipo]} ancho="max-w-md"
+      pie={<div className="space-y-2">{acciones}<div className="flex gap-2">
+        {editar && <Boton onClick={editar} disabled={!!ocupado} aria-label={`Modificar ${TITULO[tipo].toLowerCase()}`} className="shrink-0 px-4"><Pencil className="size-4" /><span className="hidden sm:inline">Modificar</span></Boton>}
         <Boton className="flex-1" cargando={ocupado === "pdf"} disabled={vacio || !!ocupado} onClick={() => hacer("pdf")}><Download className="size-4" />PDF</Boton>
         <Boton className="flex-[2]" variante="primario" cargando={ocupado === "enviar"} disabled={vacio || !!ocupado} onClick={() => hacer("enviar")}><Send className="size-4" />Enviar al cliente</Boton>
-      </div>}>
+      </div></div>}>
       {vacio ? (
         <p className="rounded-2xl bg-suave p-4 text-[14px] text-texto2">Añade al menos una prenda con unidades.</p>
       ) : (
-        <article aria-label={`Vista previa ${tipo === "factura" ? "de la factura" : "del ticket"}`} className="mx-auto max-w-sm overflow-hidden rounded-[14px] bg-white text-[13px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
+        <article aria-label={`Vista previa ${tipo === "ticket" ? "del ticket" : `de la ${TITULO[tipo].toLowerCase()}`}`} className="mx-auto max-w-sm overflow-hidden rounded-[14px] bg-white text-[13px] text-[#17181c] shadow-[0_18px_40px_-22px_rgba(20,30,60,.4)] ring-1 ring-black/5">
           {/* Diseño E: franja gris con los datos, título grande y fino, total grande abajo */}
           <header className="bg-[#f5f6f8] px-5 pb-4 pt-5">
             <div className="flex items-start gap-2.5">
@@ -59,7 +61,7 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket", editar }: { p: Pre
               <div className="min-w-0 flex-1"><p className="truncate font-semibold">{d.empresa.nombre}</p>
                 <p className="truncate text-[11.5px] text-[#6b7079]">{[d.empresa.nif && `NIF ${d.empresa.nif}`, d.empresa.telefono].filter(Boolean).join(" · ")}</p></div>
               {/* Título y número en la franja gris: ahorra espacio */}
-              <div className="shrink-0 text-right"><p className="text-[26px] font-light leading-none tracking-[-0.04em]">{tipo === "factura" ? "Factura" : "Ticket"}</p>
+              <div className="shrink-0 text-right"><p className="text-[26px] font-light leading-none tracking-[-0.04em]">{TITULO[tipo]}</p>
                 <p className="mt-1 whitespace-nowrap text-[11px] text-[#6b7079]"><b className="num font-semibold text-[#17181c]">{p.numero}</b></p><p className="whitespace-nowrap text-[11px] text-[#6b7079]">{fecha(p.fecha)}</p></div>
             </div>
             {d.cliente && (
@@ -72,7 +74,7 @@ export function Ticket({ p, abierto, cerrar, tipo = "ticket", editar }: { p: Pre
             )}
           </header>
           <div className="px-5 pb-5 pt-3">
-            {(d.pedido.referencia || (tipo === "factura" && !d.cliente?.nif)) && <p className="text-[12px] text-[#6b7079]">{[tipo === "factura" && !d.cliente?.nif && "Factura simplificada", d.pedido.referencia && `Ref.: ${d.pedido.referencia}`].filter(Boolean).join(" · ")}</p>}
+            {(d.pedido.referencia || (tipo === "factura" && !d.cliente?.nif) || (tipo === "presupuesto" && p.validez)) && <p className="text-[12px] text-[#6b7079]">{[tipo === "factura" && !d.cliente?.nif && "Factura simplificada", tipo === "presupuesto" && p.validez && `Válido hasta el ${fecha(p.validez)}`, d.pedido.referencia && `Ref.: ${d.pedido.referencia}`].filter(Boolean).join(" · ")}</p>}
             <ul className="mt-1">
               {filas.map((x, i) => (
                 <li key={i} className="flex justify-between gap-3 border-b border-[#e4e6ea] py-2.5">

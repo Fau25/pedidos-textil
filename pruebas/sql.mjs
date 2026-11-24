@@ -12,7 +12,7 @@ grant select on auth.users to supabase_auth_admin;`);
 const u = "11111111-1111-1111-1111-111111111111", v = "22222222-2222-2222-2222-222222222222", w = "33333333-3333-3333-3333-333333333333";
 await db.exec(`insert into auth.users(id,email,created_at) values ('${u}','fau@x.es','2026-01-01'),('${v}','otra@x.es','2026-02-01'),('${w}','ayuda@x.es','2026-03-01')`);
 const P = new URL("../supabase/", import.meta.url);
-for (const f of ["esquema.sql", "02-simplificar.sql", "03-fiabilidad.sql", "05-invitados.sql", "06-fotos-roly.sql", "07-borrar-cuenta.sql", "08-auditoria.sql", "08-auditoria.sql", "09-facturas.sql", "09-facturas.sql", "10-trabajos.sql", "10-trabajos.sql", "11-trabajos-cobro.sql", "11-trabajos-cobro.sql", "12-pedidos-cobro.sql", "12-pedidos-cobro.sql", "13-facturas-editables.sql", "13-facturas-editables.sql"])
+for (const f of ["esquema.sql", "02-simplificar.sql", "03-fiabilidad.sql", "05-invitados.sql", "06-fotos-roly.sql", "07-borrar-cuenta.sql", "08-auditoria.sql", "08-auditoria.sql", "09-facturas.sql", "09-facturas.sql", "10-trabajos.sql", "10-trabajos.sql", "11-trabajos-cobro.sql", "11-trabajos-cobro.sql", "12-pedidos-cobro.sql", "12-pedidos-cobro.sql", "13-facturas-editables.sql", "13-facturas-editables.sql", "15-documentos-sueltos.sql", "15-documentos-sueltos.sql"])
   await db.exec(fs.readFileSync(new URL(f, P), "utf8"));
 async function como(user, q) { await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${user}',false);`); try { return await db.query(q); } finally { await db.exec("reset role"); } }
 const falla = async (user, q, re) => { await assert.rejects(como(user, q), re); };
@@ -58,7 +58,9 @@ await prueba("registro de errores: cada uno apunta los suyos y el administrador 
   assert.equal((await como(u, `select count(*)::int c from errores`)).rows[0].c, 1);
 });
 await prueba("ya no existen las tablas antiguas", async () => {
-  assert.equal((await db.query(`select count(*)::int c from information_schema.tables where table_name in ('estados','presupuestos','pedido_historial')`)).rows[0].c, 0);
+  assert.equal((await db.query(`select count(*)::int c from information_schema.tables where table_name in ('estados','pedido_historial')`)).rows[0].c, 0);
+  // «presupuestos» vuelve con el SQL 15, ya sin las columnas de la v1
+  assert.equal((await db.query(`select count(*)::int c from information_schema.columns where table_name = 'presupuestos' and column_name in ('version','pedido_id','estado')`)).rows[0].c, 0);
 });
 await prueba("facturas: número correlativo, una por pedido, nadie de fuera puede emitir ni cambiar", async () => {
   const id = "aaaaaaaa-0000-0000-0000-000000000001";
@@ -78,6 +80,24 @@ await prueba("facturas: número correlativo, una por pedido, nadie de fuera pued
   assert.equal((await db.query(`select total::int t from facturas where numero = 'F-2026-0100'`)).rows[0].t, 120, "el dueño cambia número y datos");
   await falla(u, `update facturas set numero = 'F-2026-0100' where numero like '%-0002'`, /duplicate|unique/);
   await falla(u, `update facturas set empresa_id = gen_random_uuid()`, /permission denied/);
+});
+await prueba("facturas y presupuestos sueltos: número siguiente o el elegido, y solo en tu taller", async () => {
+  const d = `'{"base":100,"iva":21,"total":121}'::jsonb`;
+  const f1 = (await como(u, `select crear_documento('factura', '${e}', ${d}) r`)).rows[0].r;
+  assert.match(f1.numero, /^F-\d{4}-\d{4}$/); assert.equal(f1.pedido_id, null); assert.equal(Number(f1.total), 121);
+  const f2 = (await como(u, `select crear_documento('factura', '${e}', ${d}) r`)).rows[0].r;
+  assert.equal(Number(f2.numero.slice(-4)), Number(f1.numero.slice(-4)) + 1, "correlativas");
+  const f3 = (await como(u, `select crear_documento('factura', '${e}', ${d}, null, 'A-7') r`)).rows[0].r;
+  assert.equal(f3.numero, "A-7", "número elegido");
+  const p1 = (await como(u, `select crear_documento('presupuesto', '${e}', ${d}, '2026-11-24', null, '2026-12-24') r`)).rows[0].r;
+  assert.equal(p1.numero, "PR-2026-0001"); assert.equal(p1.validez, "2026-12-24");
+  await como(u, `update presupuestos set factura_id = '${f1.id}', editado = now() where id = '${p1.id}'`);
+  assert.equal((await db.query(`select factura_id from presupuestos where id = '${p1.id}'`)).rows[0].factura_id, f1.id);
+  await falla(v, `select crear_documento('presupuesto', '${e}', ${d})`, /permiso/);
+  assert.equal((await como(v, `select count(*)::int c from presupuestos`)).rows[0].c, 0, "otro taller no los ve");
+  await como(v, `delete from presupuestos`); assert.equal((await db.query(`select count(*)::int c from presupuestos`)).rows[0].c, 1);
+  await falla(u, `insert into presupuestos(empresa_id, numero, datos) values ('${e}', 'X', '{}')`, /permission denied/);
+  await como(u, `delete from presupuestos where id = '${p1.id}'`); assert.equal((await db.query(`select count(*)::int c from presupuestos`)).rows[0].c, 0);
 });
 await prueba("trabajos: número T-0001 seguido por taller y cada uno ve solo los suyos", async () => {
   const t1 = (await como(u, `insert into trabajos(empresa_id, cliente_nombre, items, total, a_cuenta) values ('${e}', 'Laura', '[{"que":"Juego de cuna","cantidad":2}]', 36, 10) returning numero`)).rows[0].numero;
