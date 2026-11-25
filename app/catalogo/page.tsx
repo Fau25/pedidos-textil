@@ -11,6 +11,7 @@ import { borrarConDeshacer, sb, subirArchivo, textoError } from "@/lib/supabase"
 import { FotoPrenda } from "@/components/bloques-pedido";
 import { useCarga } from "@/lib/usar";
 import { TIPOS_PRENDA, type Prenda, type Proveedor, type TarifaFila } from "@/lib/tipos";
+import { todas } from "@/lib/buscar";
 
 export default function Catalogo() {
   const [tab, setTab] = useState<"prendas" | "tarifas" | "proveedores">("prendas");
@@ -38,7 +39,7 @@ function Prendas() {
   const n = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const cats = categorias(datos ?? []);
   const actual = cat && cats.some((c) => c.nombre === cat) ? cat : cats[0]?.nombre ?? null;
-  const lista = (datos ?? []).filter((p) => (q ? n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(n(q))
+  const lista = (datos ?? []).filter((p) => (q ? todas(n([p.marca, p.modelo, p.tipo, p.referencia].join(" ")), n(q))
     : actual === HABITUALES ? p.favorito : categoria(p.tipo) === actual))
     .sort((a, b) => Number(b.favorito) - Number(a.favorito) || (a.modelo ?? "").localeCompare(b.modelo ?? "", "es")); // habituales primero
   const total = datos?.length ?? 0;
@@ -49,7 +50,7 @@ function Prendas() {
     try {
       const { ponerRolyAlDia } = await import("@/lib/roly-al-dia");
       const r = await ponerRolyAlDia(empresa!.id);
-      try { localStorage.setItem("roly-2026c:" + empresa!.id, "1"); } catch { /* nada */ }
+      try { localStorage.setItem("roly-2026d:" + empresa!.id, "1"); } catch { /* nada */ }
       recargar(); aviso(r.nuevos ? `Añadidos ${r.nuevos} modelos de Roly` : "El catálogo de Roly ya estaba al día");
     } catch (e) { aviso(textoError(e), "error"); } finally { setCargandoRoly(false); }
   }
@@ -81,7 +82,7 @@ function Prendas() {
         <div className="mb-5 flex flex-wrap items-center gap-4 rounded-[22px] bg-[#17181c] p-5 text-white dark:bg-[#24262c]">
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-white/12"><Shirt className="size-5" /></span>
           <div className="min-w-0 flex-1"><p className="font-semibold">Carga el catálogo de Roly</p>
-            <p className="text-[13px] text-white/65">93 modelos de camisetas, polos, sudaderas y chaquetas con sus fotos y colores. Luego marca con ★ los que más uses.</p></div>
+            <p className="text-[13px] text-white/65">Más de 90 modelos de camisetas, polos, sudaderas y chaquetas con sus fotos y colores. Luego marca con ★ los que más uses.</p></div>
           <Boton variante="primario" cargando={cargandoRoly} onClick={traerRoly} className="bg-white text-[#17181c] hover:bg-white/90">Cargar catálogo</Boton>
         </div>
       )}

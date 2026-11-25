@@ -10,6 +10,7 @@ import { sb } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { aCent, euros } from "@/lib/calculo";
 import type { Cliente } from "@/lib/tipos";
+import { todas } from "@/lib/buscar";
 
 export default function Clientes() {
   const { empresa } = useSesion();
@@ -27,7 +28,7 @@ export default function Clientes() {
   });
   const lista = useMemo(() => {
     const n = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-    return (datos?.clientes ?? []).filter((c) => !q || n([c.nombre, c.contacto, c.telefono, c.email, c.nif].join(" ")).includes(n(q)));
+    return (datos?.clientes ?? []).filter((c) => !q || todas(n([c.nombre, c.contacto, c.telefono, c.email, c.nif].join(" ")), n(q)));
   }, [datos, q]);
 
   return (

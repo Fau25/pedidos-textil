@@ -11,6 +11,7 @@ import { sb, textoError } from "@/lib/supabase";
 import { useCarga } from "@/lib/usar";
 import { euros } from "@/lib/calculo";
 import { AVISO_SIN_TRABAJOS, ESTILO_ESTADO as ESTILO, NOMBRE_ESTADO as NOMBRE, cuando, cambiarEstado, cobrar, deshacerCobro, estaPagado, mensajeListo, pendienteCent, resumenItems, sinTablaTrabajos, unidades, type EstadoTrabajo, type Trabajo } from "@/lib/trabajos";
+import { todas } from "@/lib/buscar";
 
 type Filtro = EstadoTrabajo | "sincobrar";
 const FILTROS: { v: Filtro; t: string }[] = [{ v: "pendiente", t: "Por hacer" }, { v: "listo", t: "Listos" }, { v: "entregado", t: "Entregados" }, { v: "sincobrar", t: "Sin cobrar" }];
@@ -42,7 +43,7 @@ export default function Trabajos() {
   const lista = useMemo(() => {
     const n = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     let l = (datos ?? []).filter((t) => (filtro === "sincobrar" ? pendienteCent(t) > 0 : t.estado === filtro));
-    if (q.trim()) l = (datos ?? []).filter((t) => n([t.numero, t.cliente_nombre, t.cliente_telefono, resumenItems(t)].join(" ")).includes(n(q.trim())));
+    if (q.trim()) l = (datos ?? []).filter((t) => todas(n([t.numero, t.cliente_nombre, t.cliente_telefono, resumenItems(t)].join(" ")), n(q.trim())));
     // Por hacer: lo más urgente primero; el resto, lo último primero
     return filtro === "pendiente" && !q.trim() ? [...l].sort((a, b) => (a.entrega ?? "9999").localeCompare(b.entrega ?? "9999")) : l;
   }, [datos, filtro, q]);

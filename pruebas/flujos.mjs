@@ -171,7 +171,7 @@ await prueba("el catálogo de Roly se completa con colores y fotos, y las fotos 
   await p.waitForTimeout(5500);
   const ins = escrituras.filter((x) => x.tabla === "catalogo" && x.metodo === "POST").flatMap((x) => x.cuerpo);
   const beagle = escrituras.find((x) => x.tabla === "catalogo" && x.metodo === "PATCH");
-  assert.equal(ins.length, 92, "añade los modelos que faltan (sin bebé)");
+  assert.equal(ins.length, 93, "añade los modelos que faltan (sin bebé, con Valier)");
   assert.ok(!ins.some((n) => ["BD7200", "BD7202", "CA7203", "CA6564"].includes(n.referencia)), "sin prendas de bebé");
   assert.ok(ins.every((n) => n.imagen_path === "roly:" + n.referencia && n.favorito === false));
   assert.equal(beagle.cuerpo.colores.length, 36); assert.equal(beagle.cuerpo.imagen_path, "roly:CA6554");
@@ -490,9 +490,21 @@ await prueba("el ticket del pedido se genera y se puede enviar o descargar", asy
   assert.deepEqual(errores, []); await ctx.close();
 });
 
+await prueba("buscar en el catálogo por palabras sueltas, en cualquier orden", async () => {
+  const { ctx, p, errores } = await abrir();
+  T.catalogo.push({ ...T.catalogo[0], id: "c-star", tipo: "Polo", marca: "Roly", modelo: "Star", referencia: "PO6638", favorito: false });
+  await ir(p, "catalogo/");
+  await p.getByPlaceholder(/Buscar en/).fill("polo star");
+  await p.getByText("Star", { exact: true }).first().waitFor();
+  await p.getByPlaceholder(/Buscar en/).fill("star roly 6638");
+  await p.getByText("Star", { exact: true }).first().waitFor();
+  T.catalogo = T.catalogo.filter((x) => x.id !== "c-star");
+  assert.deepEqual(errores, []); await ctx.close();
+});
+
 await prueba("un taller nuevo puede cargar el catálogo de Roly desde Catálogo", async () => {
   const { ctx, p, escrituras, errores } = await abrir();
-  await p.addInitScript((e) => localStorage.setItem("roly-2026c:" + e, "1"), E); // que no lo haga solo al entrar
+  await p.addInitScript((e) => localStorage.setItem("roly-2026d:" + e, "1"), E); // que no lo haga solo al entrar
   await ir(p, "catalogo/");
   await p.getByRole("button", { name: "Cargar catálogo" }).click();
   await p.getByText(/Añadidos \d+ modelos de Roly|ya estaba al día/).waitFor();

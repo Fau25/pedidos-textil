@@ -12,6 +12,7 @@ import { AVISO_SIN_COBROS, conPago, marcarPagado } from "@/lib/pedidos";
 import { EditarDocumento, VerDocumento } from "@/components/factura";
 import { documentoNuevo, listarFacturas, listarPresupuestos, type Documento, type TipoDocumento } from "@/lib/facturas";
 import { cobrar, deshacerCobro, pendienteCent, sinTablaTrabajos, type Trabajo } from "@/lib/trabajos";
+import { todas } from "@/lib/buscar";
 
 type FilaPedido = { id: string; numero: string; fecha: string; total: number; pagado_en?: string | null; clientes: { nombre: string } | null };
 type FilaTrabajo = Pick<Trabajo, "id" | "numero" | "cliente_nombre" | "total" | "a_cuenta" | "pagado_en" | "creado">;
@@ -51,7 +52,7 @@ export default function Cuentas() {
   const { datos: presupuestos, setDatos: setPresupuestos } = useCarga(() => listarPresupuestos(empresa!.id));
   const nrm = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const docs = vista === "presupuestos" ? presupuestos : facturas;
-  const listaDocs = ((docs ?? []) as Documento[]).filter((f) => !qf.trim() || nrm([f.numero, f.datos.cliente?.nombre, f.datos.cliente?.nif, f.datos.pedido?.numero].join(" ")).includes(nrm(qf.trim())));
+  const listaDocs = ((docs ?? []) as Documento[]).filter((f) => !qf.trim() || todas(nrm([f.numero, f.datos.cliente?.nombre, f.datos.cliente?.nif, f.datos.pedido?.numero].join(" ")), nrm(qf.trim())));
   const setLista = (tipo: TipoDocumento) => (tipo === "factura" ? setFacturas : setPresupuestos) as (f: (l: Documento[] | null) => Documento[] | null) => void;
   const numeroDe = (id?: string | null) => (facturas ?? []).find((f) => f.id === id)?.numero;
   const añoActual = String(new Date().getFullYear());

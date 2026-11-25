@@ -134,7 +134,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   // Una vez por empresa: referencias, colores y fotos de Roly (catálogo 2026) y alta de los modelos que falten
   useEffect(() => {
     if (!empresa || (rol !== "propietario" && rol !== "editor")) return;
-    const clave = "roly-2026c:" + empresa.id; // c: sin prendas de bebé
+    const clave = "roly-2026d:" + empresa.id; // d: + Valier (CQ0437)
     try { if (localStorage.getItem(clave)) return; } catch { return; }
     let vivo = true;
     const espera = setTimeout(() => vivo && ponerRolyAlDia(empresa.id)

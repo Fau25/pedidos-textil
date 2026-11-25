@@ -8,6 +8,7 @@ import { esRolyPublica, marcarRolyPrivado, miniDe, subirArchivo, textoError, url
 import { euros, precioVentaUd } from "@/lib/calculo";
 import { ordenTalla, type LineaEd } from "@/lib/pedidos";
 import { TALLAS, TALLAS_NINO, TIPOS_PRENDA, type Prenda } from "@/lib/tipos";
+import { todas } from "@/lib/buscar";
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -220,7 +221,7 @@ function BuscadorPrenda({ catalogo, margen, n, elegir, manual }: { catalogo: Pre
   }, []);
   const lista = useMemo(() => {
     const t = norm(q.trim());
-    return catalogo.filter((p) => (t ? norm([p.marca, p.modelo, p.tipo, p.referencia].join(" ")).includes(t) : p.favorito))
+    return catalogo.filter((p) => (t ? todas(norm([p.marca, p.modelo, p.tipo, p.referencia].join(" ")), t) : p.favorito))
       .sort((a, b) => Number(b.favorito) - Number(a.favorito)).slice(0, 8);
   }, [catalogo, q]);
   const precio = (p: Prenda) => (p.precio_venta !== null && Number(p.precio_venta) ? Number(p.precio_venta) * 100 : Number(p.precio_compra) ? precioVentaUd({ precio_compra: Number(p.precio_compra), precio_venta: null }, margen) : null);

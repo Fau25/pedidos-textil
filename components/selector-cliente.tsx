@@ -5,6 +5,7 @@ import { useSesion } from "./sesion";
 import { Boton, Campo, Hoja, cx, useAvisos } from "./ui";
 import { sb, textoError } from "@/lib/supabase";
 import type { Cliente } from "@/lib/tipos";
+import { todas } from "@/lib/buscar";
 
 /* ───────── Cliente ───────── */
 export function SelectorCliente({ clientes, valor, cambiar, creado, error }: { clientes: Cliente[]; valor: string | null; cambiar: (id: string) => void; creado: (c: Cliente) => void; error?: boolean }) {
@@ -18,7 +19,7 @@ export function SelectorCliente({ clientes, valor, cambiar, creado, error }: { c
   const caja = useRef<HTMLDivElement>(null);
   const actual = clientes.find((c) => c.id === valor);
   const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const lista = clientes.filter((c) => !q || norm([c.nombre, c.contacto, c.telefono, c.email].join(" ")).includes(norm(q))).slice(0, 8);
+  const lista = clientes.filter((c) => !q || todas(norm([c.nombre, c.contacto, c.telefono, c.email].join(" ")), norm(q))).slice(0, 8);
   const opciones = [...lista.map((c) => ({ c })), ...(q.trim() ? [{ nuevo: q.trim() }] : [{ nuevo: "" }])];
 
   useEffect(() => {
